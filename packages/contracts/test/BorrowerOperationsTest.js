@@ -67,6 +67,12 @@ contract('BorrowerOperations', async accounts => {
 
   })
 
+  const mintCollateralTokens = async (contracts, accounts, amount) => {  
+    for (const account of accounts) {
+      await contracts.collateralToken.mint(account, amount)
+    }
+  }
+
   const testCorpus = ({ withProxy = false }) => {
     beforeEach(async () => {
       contracts = await deploymentHelper.deployLiquityCore()
@@ -84,7 +90,8 @@ contract('BorrowerOperations', async accounts => {
         const users = [alice, bob, carol, dennis, whale, A, B, C, D, E]
         await deploymentHelper.deployProxyScripts(contracts, LQTYContracts, owner, users)
       }
-
+      await mintCollateralTokens(contracts, [alice, bob, carol, dennis, whale, A, B, C, D, E], toBN(dec(1000, 18)))
+      
       priceFeed = contracts.priceFeedTestnet
       lusdToken = contracts.lusdToken
       sortedTroves = contracts.sortedTroves
@@ -119,14 +126,14 @@ contract('BorrowerOperations', async accounts => {
 
       const collTopUp = 1  // 1 wei top up
 
-     await assertRevert(borrowerOperations.addColl(alice, alice, { from: alice, value: collTopUp }), 
+     await assertRevert(borrowerOperations.addColl(alice, alice, collTopUp, { from: alice }), 
       "BorrowerOps: An operation that would result in ICR < MCR is not permitted")
     })
 
-    it.skip("addColl(): Increases the activePool ETH and raw ether balance by correct amount", async () => {
+    it("addColl(): Increases the activePool collateral and raw collateral balance by correct amount", async () => {
       const { collateral: aliceColl } = await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
-      const activePool_ETH_Before = await activePool.getETH()
+      const activePool_Collateral_Before = await activePool.getETH()
       const activePool_RawEther_Before = toBN(await web3.eth.getBalance(activePool.address))
 
       assert.isTrue(activePool_ETH_Before.eq(aliceColl))

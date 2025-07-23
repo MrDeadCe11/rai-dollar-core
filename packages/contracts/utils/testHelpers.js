@@ -1209,7 +1209,7 @@ class TestHelper {
     // netDebt = totalDebt - gas_comp
     //const netDebt = await this.getActualDebtFromComposite(totalDebt, contracts)
     const netDebt = lusdAmount
-
+    let collateralAmount;
     if (ICR) {
       const par = await contracts.relayer.par()
       const price = await contracts.priceFeedTestnet.getPrice()
@@ -1221,8 +1221,15 @@ class TestHelper {
           extraParams.value = extraParams.value.add(this.toBN('1'))
       }
     }
-    
-    const tx = await contracts.borrowerOperations.openTrove(lusdAmount, upperHint, lowerHint, extraParams)
+    collateralAmount = extraParams.value;
+    // Approve ERC20 tokens instead of sending ETH
+  await contracts.collateralToken.approve(
+    contracts.borrowerOperations.address, 
+    collateralAmount, 
+    { from: extraParams.from }
+  )
+
+    const tx = await contracts.borrowerOperations.openTrove(lusdAmount, upperHint, lowerHint, collateralAmount, { from: extraParams.from})
 
     return {
       lusdAmount,
