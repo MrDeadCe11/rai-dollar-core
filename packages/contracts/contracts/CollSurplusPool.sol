@@ -78,8 +78,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
         emit CollBalanceUpdated(_account, newAmount);
     }
-
-    function claimColl(address _account) external override {
+    // @note: this function has only been modified to return the amount of collateral claimed not to use an erc20 collateral
+    function claimColl(address _account) external override returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint claimableColl = balances[_account];
         require(claimableColl > 0, "CollSurplusPool: No collateral available to claim");
@@ -92,6 +92,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
         (bool success, ) = _account.call{ value: claimableColl }("");
         require(success, "CollSurplusPool: sending ETH failed");
+
+        return claimableColl;
     }
 
     // --- 'require' functions ---

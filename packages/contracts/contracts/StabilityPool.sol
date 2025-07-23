@@ -451,7 +451,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         emit StabilityPoolETHBalanceUpdated(ETH);
         emit EtherSent(msg.sender, depositorETHGain);
 
-        borrowerOperations.moveETHGainToTrove{ value: depositorETHGain }(msg.sender, _upperHint, _lowerHint);
+        borrowerOperations.moveCOLLGainToTrove(msg.sender, _upperHint, _lowerHint, depositorETHGain);
     }
 
     // --- LQTY issuance functions ---

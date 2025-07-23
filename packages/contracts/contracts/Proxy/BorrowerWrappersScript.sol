@@ -70,21 +70,21 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
 
     }
 
-    function claimCollateralAndOpenTrove(uint _maxFee, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable {
+    function claimCollateralAndOpenTrove(uint _maxFee, uint _LUSDAmount, address _upperHint, address _lowerHint) external {
         uint balanceBefore = address(this).balance;
 
         // Claim collateral
-        borrowerOperations.claimCollateral();
+        uint256 collateralClaimed = borrowerOperations.claimCollateral();
 
         uint balanceAfter = address(this).balance;
 
         // already checked in CollSurplusPool
         assert(balanceAfter > balanceBefore);
 
-        uint totalCollateral = balanceAfter.sub(balanceBefore).add(msg.value);
+        uint totalCollateral = balanceAfter.sub(balanceBefore).add(collateralClaimed);
 
         // Open trove with obtained collateral, plus collateral sent by user
-        borrowerOperations.openTrove{ value: totalCollateral }(_LUSDAmount, _upperHint, _lowerHint);
+        borrowerOperations.openTrove(_LUSDAmount, _upperHint, _lowerHint, totalCollateral);
     }
 
     function claimSPRewardsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
@@ -98,11 +98,11 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         uint lqtyBalanceAfter = lqtyToken.balanceOf(address(this));
         uint claimedCollateral = collBalanceAfter.sub(collBalanceBefore);
 
-        // Add claimed ETH to trove, get more LUSD and stake it into the Stability Pool
+        // Add claimed Collateral to trove, get more LUSD and stake it into the Stability Pool
         if (claimedCollateral > 0) {
             _requireUserHasTrove(address(this));
             uint LUSDAmount = _getNetLUSDAmount(claimedCollateral);
-            borrowerOperations.adjustTrove{ value: claimedCollateral }(0, LUSDAmount, true, _upperHint, _lowerHint);
+            borrowerOperations.adjustTrove(0, LUSDAmount, true, _upperHint, _lowerHint, claimedCollateral);
             // Provide withdrawn LUSD to Stability Pool
             if (LUSDAmount > 0) {
                 stabilityPool.provideToSP(LUSDAmount, address(0));
@@ -132,7 +132,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         if (gainedCollateral > 0) {
             _requireUserHasTrove(address(this));
             netLUSDAmount = _getNetLUSDAmount(gainedCollateral);
-            borrowerOperations.adjustTrove{ value: gainedCollateral }(0, netLUSDAmount, true, _upperHint, _lowerHint);
+            borrowerOperations.adjustTrove(0, netLUSDAmount, true, _upperHint, _lowerHint, gainedCollateral);
         }
 
         uint totalLUSD = gainedLUSD.add(netLUSDAmount);
