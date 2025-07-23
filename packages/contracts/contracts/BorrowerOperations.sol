@@ -12,6 +12,7 @@ import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
+import "./Dependencies/IERC20.sol";
 
 contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOperations {
     string constant public NAME = "BorrowerOperations";
@@ -33,7 +34,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     // A doubly linked list of Troves, sorted by their collateral ratios
     ISortedTroves public sortedTroves;
-
+    IERC20 public collateralToken;
     /* --- Variable container structs  ---
 
     Used to hold, return and assign variables inside a function, in order to avoid the error:
@@ -102,6 +103,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // --- Dependency setters ---
 
     function setAddresses(
+        address _collateralTokenAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _defaultPoolAddress,
@@ -121,6 +123,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         // This makes impossible to open a trove with zero withdrawn LUSD
         assert(MIN_NET_DEBT > 0);
 
+        checkContract(_collateralTokenAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
         checkContract(_defaultPoolAddress);
@@ -133,6 +136,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         checkContract(_lqtyStakingAddress);
         checkContract(_relayerAddress);
 
+        collateralToken = IERC20(_collateralTokenAddress);
         troveManager = ITroveManager(_troveManagerAddress);
         activePool = IActivePool(_activePoolAddress);
         defaultPool = IDefaultPool(_defaultPoolAddress);

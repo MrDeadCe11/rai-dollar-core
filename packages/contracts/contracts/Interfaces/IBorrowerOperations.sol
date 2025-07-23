@@ -2,6 +2,8 @@
 
 pragma solidity 0.6.11;
 
+import "../Dependencies/IERC20.sol";
+
 // Common interface for the Trove Manager.
 interface IBorrowerOperations {
 
@@ -26,6 +28,7 @@ interface IBorrowerOperations {
     // --- Functions ---
 
     function setAddresses(
+        address _collateralTokenAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _defaultPoolAddress,
