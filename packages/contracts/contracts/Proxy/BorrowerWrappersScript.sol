@@ -15,7 +15,7 @@ import "./BorrowerOperationsScript.sol";
 import "./ETHTransferScript.sol";
 import "./LQTYStakingScript.sol";
 import "../Dependencies/console.sol";
-
+import "../Dependencies/IERC20.sol";
 
 contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, LQTYStakingScript {
     using SafeMath for uint;
@@ -29,8 +29,10 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
     IERC20 immutable lqtyToken;
     ILQTYStaking immutable lqtyStaking;
     IRelayer immutable relayer;
+    IERC20 immutable collateralToken;
 
     constructor(
+        address _collateralTokenAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _lqtyStakingAddress,
@@ -60,6 +62,10 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         checkContract(lqtyTokenCached);
         lqtyToken = IERC20(lqtyTokenCached);
 
+        address collateralTokenCached = _collateralTokenAddress;
+        checkContract(collateralTokenCached);
+        collateralToken = IERC20(collateralTokenCached);
+
         ILQTYStaking lqtyStakingCached = troveManagerCached.lqtyStaking();
         require(_lqtyStakingAddress == address(lqtyStakingCached), "BorrowerWrappersScript: Wrong LQTYStaking address");
         lqtyStaking = lqtyStakingCached;
@@ -71,12 +77,12 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
     }
 
     function claimCollateralAndOpenTrove(uint _maxFee, uint _LUSDAmount, address _upperHint, address _lowerHint) external {
-        uint balanceBefore = address(this).balance;
+        uint balanceBefore = collateralToken.balanceOf(address(this));
 
         // Claim collateral
         uint256 collateralClaimed = borrowerOperations.claimCollateral();
 
-        uint balanceAfter = address(this).balance;
+        uint balanceAfter = collateralToken.balanceOf(address(this));
 
         // already checked in CollSurplusPool
         assert(balanceAfter > balanceBefore);
@@ -84,17 +90,17 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         uint totalCollateral = balanceAfter.sub(balanceBefore).add(collateralClaimed);
 
         // Open trove with obtained collateral, plus collateral sent by user
-        borrowerOperations.openTrove(_LUSDAmount, _upperHint, _lowerHint, totalCollateral);
+        borrowerOperations.openTrove(totalCollateral, _LUSDAmount, _upperHint, _lowerHint);
     }
 
     function claimSPRewardsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
-        uint collBalanceBefore = address(this).balance;
+        uint collBalanceBefore = collateralToken.balanceOf(address(this));
         uint lqtyBalanceBefore = lqtyToken.balanceOf(address(this));
 
         // Claim rewards
         stabilityPool.withdrawFromSP(0);
 
-        uint collBalanceAfter = address(this).balance;
+        uint collBalanceAfter = collateralToken.balanceOf(address(this));
         uint lqtyBalanceAfter = lqtyToken.balanceOf(address(this));
         uint claimedCollateral = collBalanceAfter.sub(collBalanceBefore);
 
@@ -102,7 +108,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         if (claimedCollateral > 0) {
             _requireUserHasTrove(address(this));
             uint LUSDAmount = _getNetLUSDAmount(claimedCollateral);
-            borrowerOperations.adjustTrove(0, LUSDAmount, true, _upperHint, _lowerHint, claimedCollateral);
+            borrowerOperations.adjustTrove(claimedCollateral, 0, LUSDAmount, true, _upperHint, _lowerHint);
             // Provide withdrawn LUSD to Stability Pool
             if (LUSDAmount > 0) {
                 stabilityPool.provideToSP(LUSDAmount, address(0));
@@ -117,14 +123,14 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
     }
 
     function claimStakingGainsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
-        uint collBalanceBefore = address(this).balance;
+        uint collBalanceBefore = collateralToken.balanceOf(address(this));
         uint lusdBalanceBefore = lusdToken.balanceOf(address(this));
         uint lqtyBalanceBefore = lqtyToken.balanceOf(address(this));
 
         // Claim gains
         lqtyStaking.unstake(0);
 
-        uint gainedCollateral = address(this).balance.sub(collBalanceBefore); // stack too deep issues :'(
+        uint gainedCollateral = collateralToken.balanceOf(address(this)).sub(collBalanceBefore); // stack too deep issues :'(
         uint gainedLUSD = lusdToken.balanceOf(address(this)).sub(lusdBalanceBefore);
 
         uint netLUSDAmount;
@@ -132,7 +138,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         if (gainedCollateral > 0) {
             _requireUserHasTrove(address(this));
             netLUSDAmount = _getNetLUSDAmount(gainedCollateral);
-            borrowerOperations.adjustTrove(0, netLUSDAmount, true, _upperHint, _lowerHint, gainedCollateral);
+            borrowerOperations.adjustTrove(gainedCollateral, 0, netLUSDAmount, true, _upperHint, _lowerHint);
         }
 
         uint totalLUSD = gainedLUSD.add(netLUSDAmount);

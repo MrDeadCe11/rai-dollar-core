@@ -1230,8 +1230,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     function _updateSystemSnapshots_excludeCollRemainder(IActivePool _activePool, uint _collRemainder) internal {
         totalStakesSnapshot = totalStakes;
 
-        uint activeColl = _activePool.getCOLLATERAL();
-        uint liquidatedColl = defaultPool.getCOLLATERAL();
+        uint activeColl = _activePool.getCollateral();
+        uint liquidatedColl = defaultPool.getCollateral();
         totalCollateralSnapshot = activeColl.sub(_collRemainder).add(liquidatedColl);
 
         emit SystemSnapshotsUpdated(totalStakesSnapshot, totalCollateralSnapshot);

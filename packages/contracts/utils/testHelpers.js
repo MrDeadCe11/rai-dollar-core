@@ -1229,7 +1229,7 @@ class TestHelper {
     { from: extraParams.from }
   )
 
-    const tx = await contracts.borrowerOperations.openTrove(lusdAmount, upperHint, lowerHint, collateralAmount, { from: extraParams.from})
+    const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, { from: extraParams.from})
 
     return {
       lusdAmount,
@@ -1347,7 +1347,7 @@ class TestHelper {
       const { newColl, newDebt } = await this.getCollAndDebtFromAddColl(contracts, account, amount)
       const {upperHint, lowerHint} = await this.getBorrowerOpsListHint(contracts, newColl, newDebt)
 
-      const tx = await contracts.borrowerOperations.addColl(upperHint, lowerHint, { from: account, value: amount })
+      const tx = await contracts.borrowerOperations.addColl(amount, upperHint, lowerHint, { from: account })
       const gas = this.gasUsed(tx)
       gasCostList.push(gas)
     }
@@ -1361,8 +1361,9 @@ class TestHelper {
 
       const { newColl, newDebt } = await this.getCollAndDebtFromAddColl(contracts, account, randCollAmount)
       const {upperHint, lowerHint} = await this.getBorrowerOpsListHint(contracts, newColl, newDebt)
-
-      const tx = await contracts.borrowerOperations.addColl(upperHint, lowerHint, { from: account, value: randCollAmount })
+      // approve coll transfer
+      await contracts.collateralToken.approve(contracts.activePool.address, randCollAmount, { from: account})
+      const tx = await contracts.borrowerOperations.addColl(randCollAmount, upperHint, lowerHint, { from: account})
       const gas = this.gasUsed(tx)
       gasCostList.push(gas)
     }

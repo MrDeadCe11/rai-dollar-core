@@ -16,7 +16,7 @@ interface IPool {
 
     // --- Functions ---
     
-    function getCOLLATERAL() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     function getLUSDDebt() external view returns (uint);
 

@@ -128,14 +128,14 @@ contract('BorrowerOperations', async accounts => {
 
       const collTopUp = 1  // 1 wei top up
 
-     await assertRevert(borrowerOperations.addColl(alice, alice, collTopUp, { from: alice }), 
+     await assertRevert(borrowerOperations.addColl(collTopUp, alice, alice, { from: alice }), 
       "BorrowerOps: An operation that would result in ICR < MCR is not permitted")
     })
 
     it("addColl(): Increases the activePool collateral and raw collateral balance by correct amount", async () => {
       const { collateral: aliceColl } = await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
-      const activePool_Collateral_Before = await activePool.getCOLLATERAL()
+      const activePool_Collateral_Before = await activePool.getCollateral()
       const activePool_RawCollateral_Before = toBN(await collateralToken.balanceOf(activePool.address))
 
       assert.isTrue(activePool_Collateral_Before.eq(aliceColl))
@@ -143,9 +143,9 @@ contract('BorrowerOperations', async accounts => {
      // alice approve coll transfer
      await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
      // alice add coll to active pool
-      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
+      await borrowerOperations.addColl(dec(1, 'ether'), alice, alice, { from: alice })
 
-      const activePool_Collateral_After = await activePool.getCOLLATERAL()
+      const activePool_Collateral_After = await activePool.getCollateral()
       const activePool_RawCollateral_After = toBN(await collateralToken.balanceOf(activePool.address))
 
       expect(activePool_Collateral_After.eq(aliceColl.add(toBN(dec(1, 'ether'))))).to.be.true;
@@ -166,7 +166,7 @@ contract('BorrowerOperations', async accounts => {
       await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
 
       // Alice adds second collateral
-      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
+      await borrowerOperations.addColl(dec(1, 'ether'), alice, alice, { from: alice })
 
       const alice_Trove_After = await troveManager.Troves(alice)
       const coll_After = alice_Trove_After[1]
@@ -189,7 +189,7 @@ contract('BorrowerOperations', async accounts => {
       // alice approve coll transfer
       await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
       // alice add coll to active pool
-      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
+      await borrowerOperations.addColl(dec(1, 'ether'), alice, alice, { from: alice })
 
       // check Alice is still in list after
       const aliceTroveInList_After = await sortedTroves.contains(alice)
@@ -210,7 +210,7 @@ contract('BorrowerOperations', async accounts => {
       // alice approve coll transfer
       await collateralToken.approve(activePool.address, dec(2, 'ether'), { from: alice })
       // alice add coll to active pool
-      await borrowerOperations.addColl(alice, alice, dec(2, 'ether'), { from: alice })
+      await borrowerOperations.addColl(dec(2, 'ether'), alice, alice, { from: alice })
 
       // Check stake and total stakes get updated
       const alice_Trove_After = await troveManager.Troves(alice)
@@ -271,11 +271,11 @@ contract('BorrowerOperations', async accounts => {
       // alice approve coll transfer
       await collateralToken.approve(activePool.address, aliceTopUp, { from: alice })
       // alice add coll to active pool
-      await borrowerOperations.addColl(alice, alice, aliceTopUp, { from: alice })
+      await borrowerOperations.addColl(aliceTopUp, alice, alice, { from: alice })
       // bob approve coll transfer
       await collateralToken.approve(activePool.address, bobTopUp, { from: bob })
       // bob add coll to active pool
-      await borrowerOperations.addColl(bob, bob, bobTopUp, { from: bob })
+      await borrowerOperations.addColl(bobTopUp, bob, bob, { from: bob })
 
       // Check that both alice and Bob have had pending rewards applied in addition to their top-ups. 
       const aliceNewColl = await getTroveEntireColl(alice)

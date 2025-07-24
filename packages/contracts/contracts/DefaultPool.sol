@@ -24,7 +24,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     IERC20 public collateralToken;
     address public troveManagerAddress;
     address public activePoolAddress;
-    uint256 internal COLLATERAL;  // deposited collateral tracker
+    uint256 internal collateral;  // deposited collateral tracker
     uint256 internal LUSDDebt;  // debt
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
@@ -62,8 +62,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     *
     * Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
-    function getCOLLATERAL() external view override returns (uint) {
-        return COLLATERAL;
+    function getCollateral() external view override returns (uint) {
+        return collateral;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -75,8 +75,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     function sendCollateralToActivePool(uint _amount) external override {
         _requireCallerIsTroveManager();
         IActivePool activePool = IActivePool(activePoolAddress);
-        COLLATERAL = COLLATERAL.sub(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(COLLATERAL);
+        collateral = collateral.sub(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(collateral);
         emit CollateralSent(activePoolAddress, _amount);
         collateralToken.approve(activePoolAddress, _amount);
         activePool.addCollateral(address(this), _amount);
@@ -84,8 +84,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsTroveMorActivePool();
-        COLLATERAL = COLLATERAL.add(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(COLLATERAL);
+        collateral = collateral.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(collateral);
         collateralToken.transferFrom(_account, address(this), _amount);
     }
 

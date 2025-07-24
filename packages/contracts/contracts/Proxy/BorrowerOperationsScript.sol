@@ -14,12 +14,12 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations = _borrowerOperations;
     }
 
-    function openTrove(uint _LUSDAmount, address _upperHint, address _lowerHint, uint256 _collateralToAdd) external payable {
-        borrowerOperations.openTrove(_LUSDAmount, _upperHint, _lowerHint, _collateralToAdd);
+    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable {
+        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint);
     }
 
-    function addColl(address _upperHint, address _lowerHint, uint256 _collateralToAdd) external {
-        borrowerOperations.addColl(_upperHint, _lowerHint, _collateralToAdd);
+    function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external {
+        borrowerOperations.addColl(_collateralToAdd, _upperHint, _lowerHint);
     }
 
     function withdrawColl(uint _amount, address _upperHint, address _lowerHint) external {
@@ -38,8 +38,8 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations.closeTrove();
     }
 
-    function adjustTrove(uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint, uint256 _collateralToAdd) external {
-        borrowerOperations.adjustTrove(_collWithdrawal, _debtChange, isDebtIncrease, _upperHint, _lowerHint, _collateralToAdd);
+    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external {
+        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, isDebtIncrease, _upperHint, _lowerHint);
     }
 
     function claimCollateral() external {

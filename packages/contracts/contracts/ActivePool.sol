@@ -25,7 +25,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     address public troveManagerAddress;
     address public stabilityPoolAddress;
     address public defaultPoolAddress;
-    uint256 internal COLLATERAL;  // deposited collateral tracker
+    uint256 internal collateral;  // deposited collateral tracker
     uint256 internal LUSDDebt;
     // --- Events ---
 
@@ -74,8 +74,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     *
     *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
     */
-    function getCOLLATERAL() external view override returns (uint) {
-        return COLLATERAL;
+    function getCollateral() external view override returns (uint) {
+        return collateral;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -86,8 +86,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function sendCollateral(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        COLLATERAL = COLLATERAL.sub(_amount);
-        emit ActivePoolCollateralBalanceUpdated(COLLATERAL);
+        collateral = collateral.sub(_amount);
+        emit ActivePoolCollateralBalanceUpdated(collateral);
         emit CollateralSent(_account, _amount);
         bool isPool = _isPool(_account);
         if (isPool) {
@@ -100,10 +100,10 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSPorDefaultPool();
-        COLLATERAL = COLLATERAL.add(_amount);
+        collateral = collateral.add(_amount);
 
         collateralToken.transferFrom(_account, address(this), _amount);
-        emit ActivePoolCollateralBalanceUpdated(COLLATERAL);
+        emit ActivePoolCollateralBalanceUpdated(collateral);
     }
 
     function increaseLUSDDebt(uint _amount) external override {
