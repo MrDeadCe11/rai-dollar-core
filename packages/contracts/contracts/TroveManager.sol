@@ -544,7 +544,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         _redistributeDebtAndColl(contractsCache.activePool, contractsCache.defaultPool, totals.totalDebtToRedistribute, totals.totalCollToRedistribute);
         if (totals.totalCollSurplus > 0) {
-            contractsCache.activePool.sendETH(address(collSurplusPool), totals.totalCollSurplus);
+            contractsCache.activePool.sendCollateral(address(collSurplusPool), totals.totalCollSurplus);
         }
 
         // Update system snapshots
@@ -629,7 +629,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _redistributeDebtAndColl(activePoolCached, defaultPoolCached, totals.totalDebtToRedistribute, totals.totalCollToRedistribute);
 
         if (totals.totalCollSurplus > 0) {
-            activePoolCached.sendETH(address(collSurplusPool), totals.totalCollSurplus);
+            activePoolCached.sendCollateral(address(collSurplusPool), totals.totalCollSurplus);
         }
 
         // Update system snapshots
@@ -702,7 +702,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         }
 
         if (_ETH > 0) {
-            _activePool.sendETH(_liquidator, _ETH);
+            _activePool.sendCollateral(_liquidator, _ETH);
         }
     }
 
@@ -710,7 +710,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _LUSD, uint _ETH) internal {
         _defaultPool.decreaseLUSDDebt(_LUSD);
         _activePool.increaseLUSDDebt(_LUSD);
-        _defaultPool.sendETHToActivePool(_ETH);
+        _defaultPool.sendCollateralToActivePool(_ETH);
     }
 
     // --- Redemption functions ---
@@ -803,7 +803,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     * The debt recorded on the trove's struct is zero'd elswhere, in _closeTrove.
     * Any surplus ETH left in the trove, is sent to the Coll surplus pool, and can be later claimed by the borrower.
     */
-    function _redeemCloseTrove(ContractsCache memory _contractsCache, address _borrower, uint _LUSD, uint _ETH) internal {
+    function _redeemCloseTrove(ContractsCache memory _contractsCache, address _borrower, uint _LUSD, uint _Collateral) internal {
         _contractsCache.lusdToken.burn(gasPoolAddress, _LUSD);
         // Update Active Pool LUSD, and send ETH to account
         // subtract 1 more to ensure debt <= supply
@@ -818,8 +818,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(_LUSD)+1);
 
         // send ETH from Active Pool to CollSurplus Pool
-        _contractsCache.collSurplusPool.accountSurplus(_borrower, _ETH);
-        _contractsCache.activePool.sendETH(address(_contractsCache.collSurplusPool), _ETH);
+        _contractsCache.collSurplusPool.accountSurplus(_borrower, _Collateral);
+        _contractsCache.activePool.sendCollateral(address(_contractsCache.collSurplusPool), _Collateral);
     }
 
     function _isValidFirstRedemptionHint(ISortedTroves _sortedTroves, address _firstRedemptionHint, uint _price) internal view returns (bool) {
@@ -952,7 +952,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _requireUserAcceptsFee(totals.ETHFee, totals.totalETHDrawn, _maxFeePercentage);
 
         // Send the ETH fee to the LQTY staking contract
-        contractsCache.activePool.sendETH(address(contractsCache.lqtyStaking), totals.ETHFee);
+        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.ETHFee);
         contractsCache.lqtyStaking.increaseF_ETH(totals.ETHFee);
 
         totals.ETHToSendToRedeemer = totals.totalETHDrawn.sub(totals.ETHFee);
@@ -963,7 +963,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         contractsCache.lusdToken.burn(msg.sender, totals.totalLUSDToRedeem);
         // Update Active Pool LUSD, and send ETH to account
         contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalLUSDToRedeem));
-        contractsCache.activePool.sendETH(msg.sender, totals.ETHToSendToRedeemer);
+        contractsCache.activePool.sendCollateral(msg.sender, totals.ETHToSendToRedeemer);
     }
 
     // --- Helper functions ---
@@ -1188,7 +1188,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Transfer coll and debt from ActivePool to DefaultPool
         _activePool.decreaseLUSDDebt(_debt);
         _defaultPool.increaseLUSDDebt(_debt);
-        _activePool.sendETH(address(_defaultPool), _coll);
+        _activePool.sendCollateral(address(_defaultPool), _coll);
     }
 
     function closeTrove(address _borrower) external override {
@@ -1226,8 +1226,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     function _updateSystemSnapshots_excludeCollRemainder(IActivePool _activePool, uint _collRemainder) internal {
         totalStakesSnapshot = totalStakes;
 
-        uint activeColl = _activePool.getETH();
-        uint liquidatedColl = defaultPool.getETH();
+        uint activeColl = _activePool.getCOLLATERAL();
+        uint liquidatedColl = defaultPool.getCOLLATERAL();
         totalCollateralSnapshot = activeColl.sub(_collRemainder).add(liquidatedColl);
 
         emit SystemSnapshotsUpdated(totalStakesSnapshot, totalCollateralSnapshot);

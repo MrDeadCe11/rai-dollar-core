@@ -300,7 +300,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         }
 
         _requireSingularCollChange(_collWithdrawal);
-        _requireNonZeroAdjustment(_collWithdrawal, _LUSDChange);
+        _requireNonZeroAdjustment(_collWithdrawal, _LUSDChange, _collateralAmount);
         _requireTroveisActive(contractsCache.troveManager, _borrower);
         _requireSufficientCollateralBalance(collateralToken, _borrower, _collateralAmount);
 
@@ -405,8 +405,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _repayLUSD(activePoolCached, lusdTokenCached, gasPoolAddress, LUSD_GAS_COMPENSATION, nGas);
 
         // Send the collateral back to the user
-        activePoolCached.sendETH(msg.sender, coll);
-        // activePoolCached.sendCollateral(msg.sender, coll);
+        // activePoolCached.sendETH(msg.sender, coll);
+        activePoolCached.addCollateral(msg.sender, coll);
     }
 
     /**
@@ -499,14 +499,14 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         if (_isCollIncrease) {
             _activePoolAddColl(_activePool, _collChange);
         } else {
-            _activePool.sendETH(_borrower, _collChange);
-            // _activePool.sendCollateral(_borrower, _collChange);
+            // _activePool.sendETH(_borrower, _collChange);
+            _activePool.addCollateral(_borrower, _collChange);
         }
     }
 
     // Send ETH to Active Pool and increase its recorded ETH balance
     function _activePoolAddColl(IActivePool _activePool, uint256 _amount) internal {
-        collateralToken.transferFrom(msg.sender, address(_activePool), _amount);
+        _activePool.addCollateral(msg.sender, _amount);
     }
 
     // Issue the specified amount of LUSD to _account and increases the total active debt
@@ -531,8 +531,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         require(msg.sender == _borrower, "BorrowerOps: Caller must be the borrower for a withdrawal");
     }
 
-    function _requireNonZeroAdjustment(uint _collWithdrawal, uint _LUSDChange) internal view {
-        require(_collWithdrawal != 0 || _LUSDChange != 0, "BorrowerOps: There must be either a collateral change or a debt change");
+    function _requireNonZeroAdjustment(uint _collWithdrawal, uint _LUSDChange, uint _collateralAmount) internal view {
+        require(_collWithdrawal != 0 || _LUSDChange != 0 || _collateralAmount != 0, "BorrowerOps: There must be either a collateral change or a debt change");
     }
 
     function _requireTroveisActive(ITroveManager _troveManager, address _borrower) internal view {

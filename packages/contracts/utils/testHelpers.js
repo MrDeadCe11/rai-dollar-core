@@ -1224,7 +1224,7 @@ class TestHelper {
     collateralAmount = extraParams.value;
     // Approve ERC20 tokens instead of sending ETH
   await contracts.collateralToken.approve(
-    contracts.borrowerOperations.address, 
+    contracts.activePool.address, 
     collateralAmount, 
     { from: extraParams.from }
   )

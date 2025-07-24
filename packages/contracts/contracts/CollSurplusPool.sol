@@ -96,6 +96,14 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         return claimableColl;
     }
 
+    function addCollateral(address _account, uint _amount) external override {
+        _requireCallerIsActivePool();
+        ETH = ETH.add(_amount);
+        //@note: ucomment following function when collateralToken is added
+        //collateralToken.transferFrom(_account, address(this), _amount);
+        emit EtherSent(address(this), _amount);
+    }
+
     // --- 'require' functions ---
 
     function _requireCallerIsBorrowerOperations() internal view {
@@ -118,8 +126,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     // --- Fallback function ---
 
-    receive() external payable {
-        _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
-    }
+    // receive() external payable {
+    //     _requireCallerIsActivePool();
+    //     ETH = ETH.add(msg.value);
+    // }
 }

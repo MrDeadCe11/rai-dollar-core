@@ -651,7 +651,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         // Burn the debt that was successfully offset
         lusdToken.burn(address(this), _debtToOffset);
 
-        activePoolCached.sendETH(address(this), _collToAdd);
+        activePoolCached.sendCollateral(address(this), _collToAdd);
     }
 
     function _decreaseLUSD(uint _amount) internal {

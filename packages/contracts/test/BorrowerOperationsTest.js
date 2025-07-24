@@ -48,6 +48,7 @@ contract('BorrowerOperations', async accounts => {
   let borrowerOperations
   let lqtyStaking
   let lqtyToken
+  let collateralToken
 
   let contracts
 
@@ -107,6 +108,7 @@ contract('BorrowerOperations', async accounts => {
       lqtyToken = LQTYContracts.lqtyToken
       communityIssuance = LQTYContracts.communityIssuance
       lockupContractFactory = LQTYContracts.lockupContractFactory
+      collateralToken = contracts.collateralToken
 
       LUSD_GAS_COMPENSATION = await borrowerOperations.LUSD_GAS_COMPENSATION()
       MIN_NET_DEBT = await borrowerOperations.MIN_NET_DEBT()
@@ -133,18 +135,21 @@ contract('BorrowerOperations', async accounts => {
     it("addColl(): Increases the activePool collateral and raw collateral balance by correct amount", async () => {
       const { collateral: aliceColl } = await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
-      const activePool_Collateral_Before = await activePool.getETH()
-      const activePool_RawEther_Before = toBN(await web3.eth.getBalance(activePool.address))
+      const activePool_Collateral_Before = await activePool.getCOLLATERAL()
+      const activePool_RawCollateral_Before = toBN(await collateralToken.balanceOf(activePool.address))
 
-      assert.isTrue(activePool_ETH_Before.eq(aliceColl))
-      assert.isTrue(activePool_RawEther_Before.eq(aliceColl))
+      assert.isTrue(activePool_Collateral_Before.eq(aliceColl))
+      assert.isTrue(activePool_RawCollateral_Before.eq(aliceColl))
+     // alice approve coll transfer
+     await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
+     // alice add coll to active pool
+      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
 
-      await borrowerOperations.addColl(alice, alice, { from: alice, value: dec(1, 'ether') })
+      const activePool_Collateral_After = await activePool.getCOLLATERAL()
+      const activePool_RawCollateral_After = toBN(await collateralToken.balanceOf(activePool.address))
 
-      const activePool_ETH_After = await activePool.getETH()
-      const activePool_RawEther_After = toBN(await web3.eth.getBalance(activePool.address))
-      assert.isTrue(activePool_ETH_After.eq(aliceColl.add(toBN(dec(1, 'ether')))))
-      assert.isTrue(activePool_RawEther_After.eq(aliceColl.add(toBN(dec(1, 'ether')))))
+      expect(activePool_Collateral_After.eq(aliceColl.add(toBN(dec(1, 'ether'))))).to.be.true;
+      expect(activePool_RawCollateral_After.eq(aliceColl.add(toBN(dec(1, 'ether'))))).to.be.true;
     })
 
     it.skip("addColl(), active Trove: adds the correct collateral amount to the Trove", async () => {
