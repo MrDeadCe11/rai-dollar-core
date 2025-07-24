@@ -708,9 +708,13 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
     function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _LUSD, uint _ETH) internal {
-        _defaultPool.decreaseLUSDDebt(_LUSD);
-        _activePool.increaseLUSDDebt(_LUSD);
-        _defaultPool.sendCollateralToActivePool(_ETH);
+        if (_LUSD > 0) {
+            _defaultPool.decreaseLUSDDebt(_LUSD);
+            _activePool.increaseLUSDDebt(_LUSD);
+        }
+        if (_ETH > 0) {
+            _defaultPool.sendCollateralToActivePool(_ETH);
+        }
     }
 
     // --- Redemption functions ---

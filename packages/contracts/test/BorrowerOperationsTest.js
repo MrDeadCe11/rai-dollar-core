@@ -115,7 +115,7 @@ contract('BorrowerOperations', async accounts => {
       BORROWING_FEE_FLOOR = await borrowerOperations.BORROWING_FEE_FLOOR()
     })
 
-    it.skip("addColl(): reverts when top-up would leave trove with ICR < MCR", async () => {
+    it("addColl(): reverts when top-up would leave trove with ICR < MCR", async () => {
       // alice creates a Trove and adds first collateral
       await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
       await openTrove({ ICR: toBN(dec(10, 18)), extraParams: { from: bob } })
@@ -152,7 +152,7 @@ contract('BorrowerOperations', async accounts => {
       expect(activePool_RawCollateral_After.eq(aliceColl.add(toBN(dec(1, 'ether'))))).to.be.true;
     })
 
-    it.skip("addColl(), active Trove: adds the correct collateral amount to the Trove", async () => {
+    it("addColl(), active Trove: adds the correct collateral amount to the Trove", async () => {
       // alice creates a Trove and adds first collateral
       await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
@@ -162,9 +162,11 @@ contract('BorrowerOperations', async accounts => {
 
       // check status before
       assert.equal(status_Before, 1)
+      // alice approve coll transfer
+      await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
 
       // Alice adds second collateral
-      await borrowerOperations.addColl(alice, alice, { from: alice, value: dec(1, 'ether') })
+      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
 
       const alice_Trove_After = await troveManager.Troves(alice)
       const coll_After = alice_Trove_After[1]
@@ -175,7 +177,7 @@ contract('BorrowerOperations', async accounts => {
       assert.equal(status_After, 1)
     })
 
-    it.skip("addColl(), active Trove: Trove is in sortedList before and after", async () => {
+    it("addColl(), active Trove: Trove is in sortedList before and after", async () => {
       // alice creates a Trove and adds first collateral
       await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
@@ -184,8 +186,10 @@ contract('BorrowerOperations', async accounts => {
       const listIsEmpty_Before = await sortedTroves.isEmpty()
       assert.equal(aliceTroveInList_Before, true)
       assert.equal(listIsEmpty_Before, false)
-
-      await borrowerOperations.addColl(alice, alice, { from: alice, value: dec(1, 'ether') })
+      // alice approve coll transfer
+      await collateralToken.approve(activePool.address, dec(1, 'ether'), { from: alice })
+      // alice add coll to active pool
+      await borrowerOperations.addColl(alice, alice, dec(1, 'ether'), { from: alice })
 
       // check Alice is still in list after
       const aliceTroveInList_After = await sortedTroves.contains(alice)
@@ -194,7 +198,7 @@ contract('BorrowerOperations', async accounts => {
       assert.equal(listIsEmpty_After, false)
     })
 
-    it.skip("addColl(), active Trove: updates the stake and updates the total stakes", async () => {
+    it("addColl(), active Trove: updates the stake and updates the total stakes", async () => {
       //  Alice creates initial Trove with 1 ether
       await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
 
@@ -203,9 +207,10 @@ contract('BorrowerOperations', async accounts => {
       const totalStakes_Before = (await troveManager.totalStakes())
 
       assert.isTrue(totalStakes_Before.eq(alice_Stake_Before))
-
-      // Alice tops up Trove collateral with 2 ether
-      await borrowerOperations.addColl(alice, alice, { from: alice, value: dec(2, 'ether') })
+      // alice approve coll transfer
+      await collateralToken.approve(activePool.address, dec(2, 'ether'), { from: alice })
+      // alice add coll to active pool
+      await borrowerOperations.addColl(alice, alice, dec(2, 'ether'), { from: alice })
 
       // Check stake and total stakes get updated
       const alice_Trove_After = await troveManager.Troves(alice)
@@ -216,7 +221,7 @@ contract('BorrowerOperations', async accounts => {
       assert.isTrue(totalStakes_After.eq(totalStakes_Before.add(toBN(dec(2, 'ether')))))
     })
 
-    it.skip("addColl(), active Trove: applies pending rewards and updates user's L_ETH, L_LUSDDebt snapshots", async () => {
+    it("addColl(), active Trove: applies pending rewards and updates user's L_ETH, L_LUSDDebt snapshots", async () => {
       // --- SETUP ---
 
       const { collateral: aliceCollBefore, totalDebt: aliceDebtBefore } = await openTrove({ extraLUSDAmount: toBN(dec(15000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: alice } })
@@ -238,6 +243,7 @@ contract('BorrowerOperations', async accounts => {
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
       const alice_rewardSnapshot_Before = await troveManager.rewardSnapshots(alice)
+      
       const alice_ETHrewardSnapshot_Before = alice_rewardSnapshot_Before[0]
       const alice_LUSDDebtRewardSnapshot_Before = alice_rewardSnapshot_Before[1]
 
@@ -262,8 +268,14 @@ contract('BorrowerOperations', async accounts => {
       const aliceTopUp = toBN(dec(5, 'ether'))
       const bobTopUp = toBN(dec(1, 'ether'))
 
-      await borrowerOperations.addColl(alice, alice, { from: alice, value: aliceTopUp })
-      await borrowerOperations.addColl(bob, bob, { from: bob, value: bobTopUp })
+      // alice approve coll transfer
+      await collateralToken.approve(activePool.address, aliceTopUp, { from: alice })
+      // alice add coll to active pool
+      await borrowerOperations.addColl(alice, alice, aliceTopUp, { from: alice })
+      // bob approve coll transfer
+      await collateralToken.approve(activePool.address, bobTopUp, { from: bob })
+      // bob add coll to active pool
+      await borrowerOperations.addColl(bob, bob, bobTopUp, { from: bob })
 
       // Check that both alice and Bob have had pending rewards applied in addition to their top-ups. 
       const aliceNewColl = await getTroveEntireColl(alice)

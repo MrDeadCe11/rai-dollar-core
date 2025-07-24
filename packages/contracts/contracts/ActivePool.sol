@@ -91,14 +91,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         emit CollateralSent(_account, _amount);
         bool isPool = _isPool(_account);
         if (isPool) {
-            IPool(_account).addCollateral(_account,_amount);
+            collateralToken.approve(_account, _amount);
+            IPool(_account).addCollateral(address(this), _amount);
         } else {
             collateralToken.transfer(_account, _amount);
         }
     }
 
     function addCollateral(address _account, uint _amount) external override {
-        _requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorDefaultPool();
         COLLATERAL = COLLATERAL.add(_amount);
 
         collateralToken.transferFrom(_account, address(this), _amount);
@@ -118,23 +119,24 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     }
 
     function _isPool(address _pool) internal view returns (bool) {
-        // First check if _pool is a contract
-        uint256 size;
-        assembly {
-            size := extcodesize(_pool)
-        }
+        return _pool == stabilityPoolAddress || _pool == defaultPoolAddress;
+        // // First check if _pool is a contract
+        // uint256 size;
+        // assembly {
+        //     size := extcodesize(_pool)
+        // }
 
-        if (size == 0) {
-            return false;
-        }
+        // if (size == 0) {
+        //     return false;
+        // }
 
-        if (size > 0) {
-            // It's a contract, try to call addCollateral first
-            bytes memory data = abi.encodeWithSignature("addCollateral(address,uint256)", _pool, 0);
-            (bool success,) = _pool.staticcall(data);
+        // if (size > 0) {
+        //     // It's a contract, try to call addCollateral first
+        //     bytes memory data = abi.encodeWithSignature("addCollateral(address,uint256)", _pool, 0);
+        //     (bool success,) = _pool.staticcall(data);
             
-            return success;
-        } 
+        //     return success;
+        // } 
     }
 
     // --- 'require' functions ---
@@ -152,6 +154,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             msg.sender == troveManagerAddress ||
             msg.sender == stabilityPoolAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool");
+    }
+
+    function _requireCallerIsBOorTroveMorSPorDefaultPool() internal view {
+        require(
+            msg.sender == borrowerOperationsAddress ||
+            msg.sender == troveManagerAddress ||
+            msg.sender == stabilityPoolAddress ||
+            msg.sender == defaultPoolAddress,
+            "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
     }
 
     function _requireCallerIsBOorTroveM() internal view {

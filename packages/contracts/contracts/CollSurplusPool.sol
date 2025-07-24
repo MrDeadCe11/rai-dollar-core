@@ -7,7 +7,7 @@ import "./Dependencies/SafeMath.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
-
+import "./Dependencies/IERC20.sol";
 
 contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     using SafeMath for uint256;
@@ -17,7 +17,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
-
+    IERC20 public collateralToken;
     // deposited ether tracker
     uint256 internal ETH;
     // Collateral surplus claimable by trove owners
@@ -35,6 +35,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     // --- Contract setters ---
 
     function setAddresses(
+        address _collateralTokenAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress
@@ -43,6 +44,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         override
         onlyOwner
     {
+        checkContract(_collateralTokenAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
@@ -50,7 +52,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
-
+        collateralToken = IERC20(_collateralTokenAddress);
+        
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
@@ -100,7 +103,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         _requireCallerIsActivePool();
         ETH = ETH.add(_amount);
         //@note: ucomment following function when collateralToken is added
-        //collateralToken.transferFrom(_account, address(this), _amount);
+        collateralToken.transferFrom(_account, address(this), _amount);
         emit EtherSent(address(this), _amount);
     }
 

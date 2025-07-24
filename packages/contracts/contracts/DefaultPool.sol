@@ -58,9 +58,9 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     // --- Getters for public variables. Required by IPool interface ---
 
     /*
-    * Returns the ETH state variable.
+    * Returns the collateral state variable.
     *
-    * Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
+    * Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
     function getCOLLATERAL() external view override returns (uint) {
         return COLLATERAL;
@@ -78,12 +78,12 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         COLLATERAL = COLLATERAL.sub(_amount);
         emit DefaultPoolCollateralBalanceUpdated(COLLATERAL);
         emit CollateralSent(activePoolAddress, _amount);
-
+        collateralToken.approve(activePoolAddress, _amount);
         activePool.addCollateral(address(this), _amount);
     }
 
     function addCollateral(address _account, uint _amount) external override {
-        _requireCallerIsTroveManager();
+        _requireCallerIsTroveMorActivePool();
         COLLATERAL = COLLATERAL.add(_amount);
         emit DefaultPoolCollateralBalanceUpdated(COLLATERAL);
         collateralToken.transferFrom(_account, address(this), _amount);
@@ -109,6 +109,13 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
+    }
+
+    function _requireCallerIsTroveMorActivePool() internal view {
+        require(
+            msg.sender == troveManagerAddress ||
+            msg.sender == activePoolAddress,
+            "DefaultPool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
     }
 
     // --- Fallback function ---

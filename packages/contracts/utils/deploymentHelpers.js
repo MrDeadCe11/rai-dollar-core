@@ -447,6 +447,7 @@ class DeploymentHelper {
     )
 
     await contracts.collSurplusPool.setAddresses(
+      contracts.collateralToken.address,
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       contracts.activePool.address,

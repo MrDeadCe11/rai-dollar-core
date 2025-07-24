@@ -304,12 +304,12 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _requireTroveisActive(contractsCache.troveManager, _borrower);
         _requireSufficientCollateralBalance(collateralToken, _borrower, _collateralAmount);
 
-        // Confirm the operation is either a borrower adjusting their own trove, or a pure ETH transfer from the Stability Pool to a trove
+        // Confirm the operation is either a borrower adjusting their own trove, or a pure Collateral transfer from the Stability Pool to a trove
         assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && _collateralAmount > 0 && _LUSDChange == 0));
 
         contractsCache.troveManager.applyPendingRewards(_borrower);
 
-        // Get the collChange based on whether or not ETH was sent in the transaction
+        // Get the collChange based on whether or not Collateral was sent in the transaction
         (vars.collChange, vars.isCollIncrease) = _getCollChange(_collateralAmount, _collWithdrawal);
 
         vars.netDebtChange = _LUSDChange;
@@ -496,15 +496,15 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
             _repayLUSD(_activePool, _lusdToken, _borrower, _LUSDChange, _nNetDebtChange);
         }
 
-        if (_isCollIncrease) {
+        // if (_isCollIncrease) {
             _activePoolAddColl(_activePool, _collChange);
-        } else {
+        // } else {
             // _activePool.sendETH(_borrower, _collChange);
-            _activePool.addCollateral(_borrower, _collChange);
-        }
+        //     _activePool.addCollateral(_borrower, _collChange);
+        // }
     }
 
-    // Send ETH to Active Pool and increase its recorded ETH balance
+    // Send Collateral to Active Pool and increase its recorded ETH balance
     function _activePoolAddColl(IActivePool _activePool, uint256 _amount) internal {
         _activePool.addCollateral(msg.sender, _amount);
     }
