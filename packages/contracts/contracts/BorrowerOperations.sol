@@ -357,7 +357,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         emit TroveUpdated(_borrower, _actualDebt(vars.newDebt, vars.accRate), vars.newColl, vars.stake, BorrowerOperation.adjustTrove);
 
         // Use the unmodified _LUSDChange here, as we don't send the fee to the user
-        _moveTokensAndETHfromAdjustment(
+        _moveTokensAndCollateralfromAdjustment(
             contractsCache.activePool,
             contractsCache.lusdToken,
             msg.sender,
@@ -405,8 +405,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _repayLUSD(activePoolCached, lusdTokenCached, gasPoolAddress, LUSD_GAS_COMPENSATION, nGas);
 
         // Send the collateral back to the user
-        // activePoolCached.sendETH(msg.sender, coll);
-        activePoolCached.addCollateral(msg.sender, coll);
+        activePoolCached.sendCollateral(msg.sender, coll);
     }
 
     /**
@@ -477,7 +476,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         return (newColl, newDebt);
     }
 
-    function _moveTokensAndETHfromAdjustment
+    function _moveTokensAndCollateralfromAdjustment
     (
         IActivePool _activePool,
         ILUSDToken _lusdToken,
@@ -499,8 +498,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         if (_isCollIncrease) {
             _activePoolAddColl(_activePool, _collChange);
         } else {
-            // _activePool.sendETH(_borrower, _collChange);
-            _activePool.addCollateral(_borrower, _collChange);
+            _activePool.sendCollateral(_borrower, _collChange);
         }
     }
 

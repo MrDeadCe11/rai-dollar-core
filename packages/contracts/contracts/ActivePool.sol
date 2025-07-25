@@ -89,13 +89,20 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         collateral = collateral.sub(_amount);
         emit ActivePoolCollateralBalanceUpdated(collateral);
         emit CollateralSent(_account, _amount);
-        bool isPool = _isPool(_account);
-        if (isPool) {
-            collateralToken.approve(_account, _amount);
-            IPool(_account).addCollateral(address(this), _amount);
-        } else {
-            collateralToken.transfer(_account, _amount);
-        }
+        
+        // transfer collateral to account
+        collateralToken.transfer(_account, _amount);
+        
+        // process collateral increase if address is a pool
+        if (_isPool(_account)) {
+            IPool(_account).processCollateralIncrease(_amount);
+        } 
+    }
+
+    function processCollateralIncrease(uint _amount) external override {
+        _requireCallerIsBOorTroveMorSPorDefaultPool();
+        collateral = collateral.add(_amount);
+        emit ActivePoolCollateralBalanceUpdated(collateral);
     }
 
     function addCollateral(address _account, uint _amount) external override {
@@ -120,23 +127,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function _isPool(address _pool) internal view returns (bool) {
         return _pool == stabilityPoolAddress || _pool == defaultPoolAddress;
-        // // First check if _pool is a contract
-        // uint256 size;
-        // assembly {
-        //     size := extcodesize(_pool)
-        // }
-
-        // if (size == 0) {
-        //     return false;
-        // }
-
-        // if (size > 0) {
-        //     // It's a contract, try to call addCollateral first
-        //     bytes memory data = abi.encodeWithSignature("addCollateral(address,uint256)", _pool, 0);
-        //     (bool success,) = _pool.staticcall(data);
-            
-        //     return success;
-        // } 
     }
 
     // --- 'require' functions ---

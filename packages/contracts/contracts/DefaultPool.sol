@@ -78,8 +78,11 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         collateral = collateral.sub(_amount);
         emit DefaultPoolCollateralBalanceUpdated(collateral);
         emit CollateralSent(activePoolAddress, _amount);
-        collateralToken.approve(activePoolAddress, _amount);
-        activePool.addCollateral(address(this), _amount);
+        
+        // transfer collateral to active pool
+        collateralToken.transfer(activePoolAddress, _amount);
+        // process collateral increase
+        activePool.processCollateralIncrease(_amount);
     }
 
     function addCollateral(address _account, uint _amount) external override {
@@ -87,6 +90,12 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         collateral = collateral.add(_amount);
         emit DefaultPoolCollateralBalanceUpdated(collateral);
         collateralToken.transferFrom(_account, address(this), _amount);
+    }
+
+    function processCollateralIncrease(uint _amount) external override {
+        _requireCallerIsTroveMorActivePool();
+        collateral = collateral.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(collateral);
     }
 
     function increaseLUSDDebt(uint _amount) external override {

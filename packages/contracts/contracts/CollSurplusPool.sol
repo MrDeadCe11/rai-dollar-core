@@ -102,7 +102,6 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsActivePool();
         ETH = ETH.add(_amount);
-        //@note: ucomment following function when collateralToken is added
         collateralToken.transferFrom(_account, address(this), _amount);
         emit EtherSent(address(this), _amount);
     }

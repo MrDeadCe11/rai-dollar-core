@@ -25,4 +25,6 @@ interface IPool {
     function increaseLUSDDebt(uint _amount) external;
 
     function decreaseLUSDDebt(uint _amount) external;
+
+    function processCollateralIncrease(uint _amount) external;
 }
