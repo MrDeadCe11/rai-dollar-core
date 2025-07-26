@@ -361,7 +361,7 @@ TroveManager state variables:
 Total trove stakes: 188347.910169118875210030
 Snapshot of total trove stakes before last liq. : 137204.600258289651261017
 Snapshot of total trove collateral before last liq. : 137204.600258289651261017
-L_ETH: .000000000000000000
+L_COLL: .000000000000000000
 L_LUSDDebt: .000000000000000000
 StabilityPool state variables:
 Product P: .992747893314368378

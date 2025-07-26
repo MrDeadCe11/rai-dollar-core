@@ -363,15 +363,15 @@ contract EchidnaTester {
             return false;
         }
 
-        if (address(activePool).balance != activePool.getETH()) {
+        if (address(activePool).balance != activePool.getCollateral()) {
             return false;
         }
 
-        if (address(defaultPool).balance != defaultPool.getETH()) {
+        if (address(defaultPool).balance != defaultPool.getCollateral()) {
             return false;
         }
 
-        if (address(stabilityPool).balance != stabilityPool.getETH()) {
+        if (address(stabilityPool).balance != stabilityPool.getCollateral()) {
             return false;
         }
 

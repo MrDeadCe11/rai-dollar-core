@@ -334,7 +334,7 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "_ETHFee",
+          "name": "_CollateralFee",
           "type": "uint256"
         }
       ],

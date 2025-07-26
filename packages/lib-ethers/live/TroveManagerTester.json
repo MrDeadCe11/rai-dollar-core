@@ -113,7 +113,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "_L_ETH",
+          "name": "_L_COLL",
           "type": "uint256"
         },
         {
@@ -239,7 +239,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "_ETHFee",
+          "name": "_CollateralFee",
           "type": "uint256"
         }
       ],
@@ -360,7 +360,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "_L_ETH",
+          "name": "_L_COLL",
           "type": "uint256"
         },
         {
@@ -490,7 +490,7 @@
     },
     {
       "inputs": [],
-      "name": "L_ETH",
+      "name": "L_COLL",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1179,7 +1179,7 @@
           "type": "address"
         }
       ],
-      "name": "getPendingETHReward",
+      "name": "getPendingCollateralReward",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1463,7 +1463,7 @@
     },
     {
       "inputs": [],
-      "name": "lastETHError_Redistribution",
+      "name": "lastCollateralError_Redistribution",
       "outputs": [
         {
           "internalType": "uint256",

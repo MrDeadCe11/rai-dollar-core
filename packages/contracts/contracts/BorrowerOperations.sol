@@ -247,7 +247,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         //emit LUSDBorrowingFeePaid(msg.sender, vars.LUSDFee);
     }
 
-    // Send ETH as collateral to a trove
+    // Send collateral to a trove
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external override {
         _adjustTrove(msg.sender, _collateralToAdd, 0, 0, false, _upperHint, _lowerHint);
     }
@@ -258,7 +258,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _adjustTrove(_borrower, _collateralToAdd, 0, 0, false, _upperHint, _lowerHint);
     }
 
-    // Withdraw ETH collateral from a trove
+    // Withdraw collateral from a trove
     function withdrawColl(uint _collWithdrawal, address _upperHint, address _lowerHint) external override {
         _adjustTrove(msg.sender, 0, _collWithdrawal, 0, false, _upperHint, _lowerHint);
     }
@@ -502,7 +502,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         }
     }
 
-    // Send Collateral to Active Pool and increase its recorded ETH balance
+    // Send Collateral to Active Pool and increase its recorded balance
     function _activePoolAddColl(IActivePool _activePool, uint256 _amount) internal {
         _activePool.addCollateral(msg.sender, _amount);
     }

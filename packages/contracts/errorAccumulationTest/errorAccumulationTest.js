@@ -63,7 +63,7 @@ contract('TroveManager', async accounts => {
     await borrowerOperations.addColl(accounts[99], accounts[99], { from: accounts[99], value: 1 })
     
     // check DefaultPool
-    const ETH_DefaultPool = await defaultPool.getETH()
+    const ETH_DefaultPool = await defaultPool.getCollateral()
     const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
     console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
     console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -98,7 +98,7 @@ contract('TroveManager', async accounts => {
    
     await borrowerOperations.addColl(accounts[999], accounts[999], { from: accounts[999], value: 1 })
     // check DefaultPool
-    const ETH_DefaultPool = await defaultPool.getETH()
+    const ETH_DefaultPool = await defaultPool.getCollateral()
     const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
     console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
     console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -131,7 +131,7 @@ contract('TroveManager', async accounts => {
 
     await borrowerOperations.addColl(accounts[99], accounts[99], { from: accounts[99], value: 1 })
     // check DefaultPool
-    const ETH_DefaultPool = await defaultPool.getETH()
+    const ETH_DefaultPool = await defaultPool.getCollateral()
     const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
     console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
     console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -164,7 +164,7 @@ contract('TroveManager', async accounts => {
     await borrowerOperations.addColl(accounts[99], accounts[99], { from: accounts[99], value: 1 })
 
     // check DefaultPool
-    const ETH_DefaultPool = await defaultPool.getETH()
+    const ETH_DefaultPool = await defaultPool.getCollateral()
     const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
     console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
     console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -197,7 +197,7 @@ contract('TroveManager', async accounts => {
     await borrowerOperations.addColl(accounts[999], accounts[999], { from: accounts[999], value: 1 })
 
     // check DefaultPool
-    const ETH_DefaultPool = await defaultPool.getETH()
+    const ETH_DefaultPool = await defaultPool.getCollateral()
     const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
     console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
     console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}:`)
@@ -237,12 +237,12 @@ contract('TroveManager', async accounts => {
     let totalLUSDDebtPoolDifference = web3.utils.toBN(0)
 
     for (account of accounts.slice(1, 11)) {
-      const activePoolETH = await activePool.getETH()
+      const activePoolETH = await activePool.getCollateral()
       const activePoolLUSDDebt = await activePool.getLUSD()
 
       await troveManager.liquidate(account)
 
-      const defaultPoolETH = await defaultPool.getETH()
+      const defaultPoolETH = await defaultPool.getCollateral()
       const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
       totalETHPoolDifference.add(activePoolETH.sub(defaultPoolETH))
@@ -279,16 +279,16 @@ contract('TroveManager', async accounts => {
       await troveManager.liquidate(account)
     }
 
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)
@@ -328,16 +328,16 @@ contract('TroveManager', async accounts => {
       await troveManager.liquidate(account)
     }
 
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)
@@ -377,16 +377,16 @@ contract('TroveManager', async accounts => {
       await troveManager.liquidate(account)
 
     }
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)
@@ -427,16 +427,16 @@ contract('TroveManager', async accounts => {
     }
 
     // check (DefaultPool  - totalRewards)
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)
@@ -481,16 +481,16 @@ contract('TroveManager', async accounts => {
       await troveManager.liquidate(account)
     }
     // check (DefaultPool - totalRewards from distribution)
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards_Distribution = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards_Distribution = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards_Distribution = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards_Distribution)
@@ -529,16 +529,16 @@ contract('TroveManager', async accounts => {
        await troveManager.liquidate(account)
      }
      // check (DefaultPool - totalRewards from distribution)
-     const L_ETH = await troveManager.L_ETH()
+     const L_COLL = await troveManager.L_COLL()
      const L_LUSDDebt = await troveManager.L_LUSDDebt()
  
-     const totalColl = await activePool.getETH()
+     const totalColl = await activePool.getCollateral()
  
      const _1e18_BN = web3.utils.toBN(dec(1, 18))
-     const totalETHRewards_Distribution = (totalColl.mul(L_ETH)).div(_1e18_BN)
+     const totalETHRewards_Distribution = (totalColl.mul(L_COLL)).div(_1e18_BN)
      const totalLUSDRewards_Distribution = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
  
-     const defaultPoolETH = await defaultPool.getETH()
+     const defaultPoolETH = await defaultPool.getCollateral()
      const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
  
      const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards_Distribution)
@@ -589,7 +589,7 @@ contract('TroveManager', async accounts => {
     await stabilityPool.provideToSP(whaleSPDeposit,ZERO_ADDRESS, {from: accounts[999]} )
     
     await stabilityPool.withdrawFromSP(dec(50, 18), {from: accounts[1]} )
-    const SP_ETH = await stabilityPool.getETH()
+    const SP_ETH = await stabilityPool.getCollateral()
     const SP_LUSD = await stabilityPool.getTotalLUSDDeposits()  
 
     const SP_LUSD_Insufficiency = web3.utils.toBN(whaleSPDeposit).sub(SP_LUSD)
@@ -642,7 +642,7 @@ contract('TroveManager', async accounts => {
     await stabilityPool.provideToSP(whaleSPDeposit,ZERO_ADDRESS, {from: accounts[999]} )
     
     await stabilityPool.withdrawFromSP(dec(50, 18), {from: accounts[1]} )
-    const SP_ETH = await stabilityPool.getETH()
+    const SP_ETH = await stabilityPool.getCollateral()
     const SP_LUSD = await stabilityPool.getTotalLUSDDeposits()  
 
     const SP_LUSD_Insufficiency = web3.utils.toBN(whaleSPDeposit).sub(SP_LUSD)
@@ -695,7 +695,7 @@ contract('TroveManager', async accounts => {
     await stabilityPool.provideToSP(whaleSPDeposit, ZERO_ADDRESS, {from: accounts[999]} )
     
     await stabilityPool.withdrawFromSP(account1SPDeposit, {from: accounts[1]} )
-    const SP_ETH = await stabilityPool.getETH()
+    const SP_ETH = await stabilityPool.getCollateral()
     const SP_LUSD = await stabilityPool.getTotalLUSDDeposits()  
 
     const SP_LUSD_Insufficiency = web3.utils.toBN(whaleSPDeposit).sub(SP_LUSD)
@@ -755,7 +755,7 @@ contract('TroveManager', async accounts => {
     
     await stabilityPool.withdrawFromSP(account1SPDeposit, {from: accounts[1]} )
 
-    const SP_ETH = await stabilityPool.getETH()
+    const SP_ETH = await stabilityPool.getCollateral()
     const SP_LUSD = await stabilityPool.getTotalLUSDDeposits()  
 
     const SP_LUSD_Insufficiency = web3.utils.toBN(whaleSPDeposit).sub(SP_LUSD)
@@ -812,7 +812,7 @@ contract('TroveManager', async accounts => {
   
   await stabilityPool.withdrawFromSP(account1SPDeposit, {from: accounts[1]} )
 
-  const SP_ETH = await stabilityPool.getETH()
+  const SP_ETH = await stabilityPool.getCollateral()
   const SP_LUSD = await stabilityPool.getTotalLUSDDeposits()  
 
   const SP_LUSD_Insufficiency = web3.utils.toBN(whaleSPDeposit).sub(SP_LUSD)
@@ -844,7 +844,7 @@ contract('TroveManager', async accounts => {
  
   // Starting values for parallel off-chain computation
   let offchainTotalStakes = await troveManager.totalStakes()
-  let offchainTotalColl = await activePool.getETH()
+  let offchainTotalColl = await activePool.getCollateral()
   let offchainStake = web3.utils.toBN(0)
   let stakeDifference = web3.utils.toBN(0)
   let totalStakesDifference = web3.utils.toBN(0)
@@ -900,7 +900,7 @@ contract('TroveManager', async accounts => {
  
   // Starting values for parallel off-chain computation
   let offchainTotalStakes = await troveManager.totalStakes()
-  let offchainTotalColl = await activePool.getETH()
+  let offchainTotalColl = await activePool.getCollateral()
   let offchainStake = web3.utils.toBN(0)
   let stakeDifference = web3.utils.toBN(0)
   let totalStakesDifference = web3.utils.toBN(0)
@@ -957,7 +957,7 @@ it("100 accounts. 100x liquidate -> addColl. Random coll. Check stake and totalS
  
   // Starting values for parallel off-chain computation
   let offchainTotalStakes = await troveManager.totalStakes()
-  let offchainTotalColl = await activePool.getETH()
+  let offchainTotalColl = await activePool.getCollateral()
   let offchainStake = web3.utils.toBN(0)
   let stakeDifference = web3.utils.toBN(0)
   let totalStakesDifference = web3.utils.toBN(0)
@@ -1026,7 +1026,7 @@ it("11 accounts with random large coll, magnitude ~1e8 ether. 1 liquidation. 10 
 
   await borrowerOperations.addColl(accounts[99], accounts[99], { from: accounts[99], value: 1 })
   // check DefaultPool
-  const ETH_DefaultPool = await defaultPool.getETH()
+  const ETH_DefaultPool = await defaultPool.getCollateral()
   const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
   console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
   console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -1063,7 +1063,7 @@ it("101 accounts with random large coll, magnitude ~1e8 ether. 1 liquidation. 50
  
   await borrowerOperations.addColl(accounts[999], accounts[999], { from: accounts[999], value: 1 })
   // check DefaultPool
-  const ETH_DefaultPool = await defaultPool.getETH()
+  const ETH_DefaultPool = await defaultPool.getCollateral()
   const LUSDDebt_DefaultPool = await defaultPool.getLUSDDebt()
   console.log(`ETH left in Default Pool is: ${ETH_DefaultPool}`)
   console.log(`LUSDDebt left in Default Pool is: ${LUSDDebt_DefaultPool}`)
@@ -1095,16 +1095,16 @@ it("11 accounts with random ETH and proportional LUSD (180:1). 10 liquidations. 
     await troveManager.liquidate(account)
   }
 
-  const L_ETH = await troveManager.L_ETH()
+  const L_COLL = await troveManager.L_COLL()
   const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-  const totalColl = await activePool.getETH()
+  const totalColl = await activePool.getCollateral()
 
   const _1e18_BN = web3.utils.toBN(dec(1, 18))
-  const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+  const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
   const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-  const defaultPoolETH = await defaultPool.getETH()
+  const defaultPoolETH = await defaultPool.getCollateral()
   const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
   const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)
@@ -1140,16 +1140,16 @@ it("11 accounts with random ETH and proportional LUSD (180:1). 10 liquidations. 
     }
 
     // check (DefaultPool  - totalRewards)
-    const L_ETH = await troveManager.L_ETH()
+    const L_COLL = await troveManager.L_COLL()
     const L_LUSDDebt = await troveManager.L_LUSDDebt()
 
-    const totalColl = await activePool.getETH()
+    const totalColl = await activePool.getCollateral()
 
     const _1e18_BN = web3.utils.toBN(dec(1, 18))
-    const totalETHRewards = (totalColl.mul(L_ETH)).div(_1e18_BN)
+    const totalETHRewards = (totalColl.mul(L_COLL)).div(_1e18_BN)
     const totalLUSDRewards = (totalColl.mul(L_LUSDDebt)).div(_1e18_BN)
 
-    const defaultPoolETH = await defaultPool.getETH()
+    const defaultPoolETH = await defaultPool.getCollateral()
     const defaultPoolLUSDDebt = await defaultPool.getLUSDDebt()
 
     const ETHRewardDifference = defaultPoolETH.sub(totalETHRewards)

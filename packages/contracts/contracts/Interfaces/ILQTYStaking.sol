@@ -35,7 +35,7 @@ interface ILQTYStaking {
 
     function unstake(uint _LQTYamount) external;
 
-    function increaseF_ETH(uint _ETHFee) external; 
+    function increaseF_ETH(uint _CollateralFee) external; 
 
     function increaseF_LUSD(uint _LQTYFee) external;  
 

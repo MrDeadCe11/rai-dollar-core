@@ -25,8 +25,8 @@ contract('StabilityPool', async accounts => {
     await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress)
   })
 
-  it('getETH(): gets the recorded ETH balance', async () => {
-    const recordedETHBalance = await stabilityPool.getETH()
+  it('getCollateral(): gets the recorded ETH balance', async () => {
+    const recordedETHBalance = await stabilityPool.getCollateral()
     assert.equal(recordedETHBalance, 0)
   })
 
@@ -48,8 +48,8 @@ contract('ActivePool', async accounts => {
     await activePool.setAddresses(mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress)
   })
 
-  it('getETH(): gets the recorded ETH balance', async () => {
-    const recordedETHBalance = await activePool.getETH()
+  it('getCollateral(): gets the recorded ETH balance', async () => {
+    const recordedETHBalance = await activePool.getCollateral()
     assert.equal(recordedETHBalance, 0)
   })
 
@@ -131,8 +131,8 @@ contract('DefaultPool', async accounts => {
     await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address)
   })
 
-  it('getETH(): gets the recorded LUSD balance', async () => {
-    const recordedETHBalance = await defaultPool.getETH()
+  it('getCollateral(): gets the recorded LUSD balance', async () => {
+    const recordedETHBalance = await defaultPool.getCollateral()
     assert.equal(recordedETHBalance, 0)
   })
 

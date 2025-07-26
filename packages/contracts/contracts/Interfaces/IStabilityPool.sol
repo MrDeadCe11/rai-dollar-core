@@ -153,7 +153,7 @@ interface IStabilityPool {
      * Returns the total amount of ETH held by the pool, accounted in an internal variable instead of `balance`,
      * to exclude edge cases like ETH received from a self-destruct.
      */
-    function getETH() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     /*
      * Returns LUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
@@ -196,6 +196,9 @@ interface IStabilityPool {
      * The front end's compounded stake is equal to the sum of its depositors' compounded deposits.
      */
     function getCompoundedFrontEndStake(address _frontEnd) external view returns (uint);
+
+    /* adds collateral amount to stability pool collateral balance */
+    function processCollateralIncrease(uint _amount) external;
 
     /*
      * Fallback function

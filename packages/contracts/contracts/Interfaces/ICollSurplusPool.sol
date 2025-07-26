@@ -23,7 +23,7 @@ interface ICollSurplusPool {
         address _activePoolAddress
     ) external;
 
-    function getETH() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     function getCollateral(address _account) external view returns (uint);
 
@@ -32,4 +32,6 @@ interface ICollSurplusPool {
     function accountSurplus(address _account, uint _amount) external;
 
     function claimColl(address _account) external returns (uint256);
+
+    function processCollateralIncrease(uint _amount) external;
 }

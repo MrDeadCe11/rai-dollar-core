@@ -73,7 +73,7 @@ $ hardhat test
       ✓ addColl(), active Trove: adds the correct collateral amount to the Trove (194ms)
       ✓ addColl(), active Trove: Trove is in sortedList before and after (213ms)
       ✓ addColl(), active Trove: updates the stake and updates the total stakes (225ms)
-      ✓ addColl(), active Trove: applies pending rewards and updates user's L_ETH, L_LUSDDebt snapshots (736ms)
+      ✓ addColl(), active Trove: applies pending rewards and updates user's L_COLL, L_LUSDDebt snapshots (736ms)
       ✓ addColl(), reverts if trove is non-existent or closed (831ms)
       ✓ addColl(): can add collateral in Recovery Mode (252ms)
       ✓ withdrawColl(): reverts when withdrawal would leave trove with ICR < MCR (349ms)
@@ -88,7 +88,7 @@ $ hardhat test
       ✓ withdrawColl(): reduces ActivePool ETH and raw ether by correct amount (291ms)
       ✓ withdrawColl(): updates the stake and updates the total stakes (342ms)
       ✓ withdrawColl(): sends the correct amount of ETH to the user (289ms)
-      ✓ withdrawColl(): applies pending rewards and updates user's L_ETH, L_LUSDDebt snapshots (1205ms)
+      ✓ withdrawColl(): applies pending rewards and updates user's L_COLL, L_LUSDDebt snapshots (1205ms)
       ✓ withdrawLUSD(): reverts when withdrawal would leave trove with ICR < MCR (516ms)
       ✓ withdrawLUSD(): decays a non-zero base rate (1192ms)
       ✓ withdrawLUSD(): reverts if max fee > 100% (668ms)
@@ -216,7 +216,7 @@ $ hardhat test
       ✓ openTrove(): creates a stake and adds it to total stakes (281ms)
       ✓ openTrove(): inserts Trove to Sorted Troves list (370ms)
       ✓ openTrove(): Increases the activePool ETH and raw ether balance by correct amount (294ms)
-      ✓ openTrove(): records up-to-date initial snapshots of L_ETH and L_LUSDDebt (639ms)
+      ✓ openTrove(): records up-to-date initial snapshots of L_COLL and L_LUSDDebt (639ms)
       ✓ openTrove(): allows a user to open a Trove, then close it, then re-open it (687ms)
       ✓ openTrove(): increases the Trove's LUSD debt by the correct amount (129ms)
       ✓ openTrove(): increases LUSD debt in ActivePool by the debt of the trove (162ms)
@@ -245,7 +245,7 @@ $ hardhat test
         ✓ collChange is negative, debtChange is positive (381ms)
 
   Contract: CollSurplusPool
-    ✓ CollSurplusPool::getETH(): Returns the ETH balance of the CollSurplusPool after redemption (2203ms)
+    ✓ CollSurplusPool::getCollateral(): Returns the ETH balance of the CollSurplusPool after redemption (2203ms)
     ✓ CollSurplusPool: claimColl(): Reverts if caller is not Borrower Operations
     ✓ CollSurplusPool: claimColl(): Reverts if nothing to claim
     ✓ CollSurplusPool: claimColl(): Reverts if owner cannot receive ETH surplus (723ms)
@@ -627,18 +627,18 @@ issuance fraction after: 949066037374286
       ✓ setLQTYAddress(): reverts when called by non-owner, with wrong address, or twice (216ms)
 
   Contract: StabilityPool
-    ✓ getETH(): gets the recorded ETH balance
+    ✓ getCollateral(): gets the recorded ETH balance
     ✓ getTotalLUSDDeposits(): gets the recorded LUSD balance
 
   Contract: ActivePool
-    ✓ getETH(): gets the recorded ETH balance
+    ✓ getCollateral(): gets the recorded ETH balance
     ✓ getLUSDDebt(): gets the recorded LUSD balance
     ✓ increaseLUSD(): increases the recorded LUSD balance by the correct amount
     ✓ decreaseLUSD(): decreases the recorded LUSD balance by the correct amount
     ✓ sendETH(): decreases the recorded ETH balance by the correct amount
 
   Contract: DefaultPool
-    ✓ getETH(): gets the recorded LUSD balance
+    ✓ getCollateral(): gets the recorded LUSD balance
     ✓ getLUSDDebt(): gets the recorded LUSD balance
     ✓ increaseLUSD(): increases the recorded LUSD balance by the correct amount
     ✓ decreaseLUSD(): decreases the recorded LUSD balance by the correct amount (57ms)
@@ -1117,7 +1117,7 @@ gasUsed:  636956
     ✓ liquidate(): removes the Trove's stake from the total stakes (608ms)
     ✓ liquidate(): Removes the correct trove from the TroveOwners array, and moves the last array element to the new empty slot (1276ms)
     ✓ liquidate(): updates the snapshots of total stakes and total collateral (422ms)
-    ✓ liquidate(): updates the L_ETH and L_LUSDDebt reward-per-unit-staked totals (984ms)
+    ✓ liquidate(): updates the L_COLL and L_LUSDDebt reward-per-unit-staked totals (984ms)
     ✓ liquidate(): Liquidates undercollateralized trove if there are two troves in the system (503ms)
     ✓ liquidate(): reverts if trove is non-existent (303ms)
     ✓ liquidate(): reverts if trove has been closed (745ms)
@@ -1183,18 +1183,18 @@ gasUsed:  636956
     ✓ redeemCollateral(): a redemption made when base rate is zero increases the base rate (1187ms)
     ✓ redeemCollateral(): a redemption made when base rate is non-zero increases the base rate, for negligible time passed (1987ms)
     ✓ redeemCollateral(): lastFeeOpTime doesn't update if less time than decay interval has passed since the last fee operation [ @skip-on-coverage ] (2515ms)
-    ✓ redeemCollateral(): a redemption made at zero base rate send a non-zero ETHFee to LQTY staking contract (5136ms)
+    ✓ redeemCollateral(): a redemption made at zero base rate send a non-zero CollateralFee to LQTY staking contract (5136ms)
     ✓ redeemCollateral(): a redemption made at zero base increases the ETH-fees-per-LQTY-staked in LQTY Staking contract (1207ms)
-    ✓ redeemCollateral(): a redemption made at a non-zero base rate send a non-zero ETHFee to LQTY staking contract (1730ms)
+    ✓ redeemCollateral(): a redemption made at a non-zero base rate send a non-zero CollateralFee to LQTY staking contract (1730ms)
     ✓ redeemCollateral(): a redemption made at a non-zero base rate increases ETH-per-LQTY-staked in the staking contract (5971ms)
-    ✓ redeemCollateral(): a redemption sends the ETH remainder (ETHDrawn - ETHFee) to the redeemer (1113ms)
+    ✓ redeemCollateral(): a redemption sends the ETH remainder (ETHDrawn - CollateralFee) to the redeemer (1113ms)
     ✓ redeemCollateral(): a full redemption (leaving trove with 0 debt), closes the trove (1553ms)
     ✓ redeemCollateral(): emits correct debt and coll values in each redeemed trove's TroveUpdated event (1416ms)
     ✓ redeemCollateral(): a redemption that closes a trove leaves the trove's ETH surplus (collateral - ETH drawn) available for the trove owner to claim (5373ms)
     ✓ redeemCollateral(): a redemption that closes a trove leaves the trove's ETH surplus (collateral - ETH drawn) available for the trove owner after re-opening trove (2154ms)
     ✓ redeemCollateral(): reverts if fee eats up all returned collateral (1412ms)
     ✓ getPendingLUSDDebtReward(): Returns 0 if there is no pending LUSDDebt reward (618ms)
-    ✓ getPendingETHReward(): Returns 0 if there is no pending ETH reward (620ms)
+    ✓ getPendingCollateralReward(): Returns 0 if there is no pending ETH reward (620ms)
     ✓ computeICR(): Returns 0 if trove's coll is worth 0
     ✓ computeICR(): Returns 2^256-1 for ETH:USD = 100, coll = 1 ETH, debt = 100 LUSD
     ✓ computeICR(): returns correct ICR for ETH:USD = 100, coll = 200 ETH, debt = 30 LUSD

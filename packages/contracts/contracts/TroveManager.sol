@@ -30,7 +30,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     address gasPoolAddress;
 
-    ICollSurplusPool collSurplusPool;
+    ICollSurplusPool public override collSurplusPool;
 
     ILUSDToken public override lusdToken;
 
@@ -112,27 +112,27 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     uint public totalCollateralSnapshot;
 
     /*
-    * L_ETH and L_LUSDDebt track the sums of accumulated liquidation rewards per unit staked. During its lifetime, each stake earns:
+    * L_COLL and L_LUSDDebt track the sums of accumulated liquidation rewards per unit staked. During its lifetime, each stake earns:
     *
-    * An ETH gain of ( stake * [L_ETH - L_ETH(0)] )
+    * An collateral gain of ( stake * [L_COLL - L_COLL(0)] )
     * A LUSDDebt increase  of ( stake * [L_LUSDDebt - L_LUSDDebt(0)] )
     *
-    * Where L_ETH(0) and L_LUSDDebt(0) are snapshots of L_ETH and L_LUSDDebt for the active Trove taken at the instant the stake was made
+    * Where L_COLL(0) and L_LUSDDebt(0) are snapshots of L_COLL and L_LUSDDebt for the active Trove taken at the instant the stake was made
     */
-    uint public L_ETH;
+    uint public L_COLL;
     uint public L_LUSDDebt;
 
     // Map addresses with active troves to their RewardSnapshot
     mapping (address => RewardSnapshot) public rewardSnapshots;
 
-    // Object containing the ETH and LUSD snapshots for a given active trove
-    struct RewardSnapshot { uint ETH; uint LUSDDebt;}
+    // Object containing the collateral and LUSD snapshots for a given active trove
+    struct RewardSnapshot { uint collateral; uint LUSDDebt;}
 
     // Array of all active trove addresses - used to to compute an approximate hint off-chain, for the sorted list insertion
     address[] public TroveOwners;
 
     // Error trackers for the trove redistribution calculation
-    uint public lastETHError_Redistribution;
+    uint public lastCollateralError_Redistribution;
     uint public lastLUSDDebtError_Redistribution;
 
     /*
@@ -215,9 +215,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     struct RedemptionTotals {
         uint remainingLUSD;
         uint totalLUSDToRedeem;
-        uint totalETHDrawn;
-        uint ETHFee;
-        uint ETHToSendToRedeemer;
+        uint totalCollateralDrawn;
+        uint CollateralFee;
+        uint CollateralToSendToRedeemer;
         uint decayedBaseRate;
         uint price;
         uint par;
@@ -226,11 +226,35 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     struct SingleRedemptionValues {
         uint LUSDLot;
-        uint ETHLot;
+        uint CollateralLot;
         bool cancelledPartial;
     }
 
     // --- Events ---
+    /*
+    event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
+    event PriceFeedAddressChanged(address _newPriceFeedAddress);
+    event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
+    event ActivePoolAddressChanged(address _activePoolAddress);
+    event DefaultPoolAddressChanged(address _defaultPoolAddress);
+    event StabilityPoolAddressChanged(address _stabilityPoolAddress);
+    event GasPoolAddressChanged(address _gasPoolAddress);
+    event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
+    event SortedTrovesAddressChanged(address _sortedTrovesAddress);
+    event LQTYTokenAddressChanged(address _lqtyTokenAddress);
+    event LQTYStakingAddressChanged(address _lqtyStakingAddress);
+    event RelayerAddressChanged(address _relayerAddress);
+
+    event Liquidation(uint _liquidatedDebt, uint _liquidatedColl, uint _collGasCompensation, uint _LUSDGasCompensation);
+    event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _ETHSent, uint _CollateralFee);
+    event BaseRateUpdated(uint _baseRate);
+    event LastFeeOpTimeUpdated(uint _lastFeeOpTime);
+    event TotalStakesUpdated(uint _newTotalStakes);
+    event SystemSnapshotsUpdated(uint _totalStakesSnapshot, uint _totalCollateralSnapshot);
+    event LTermsUpdated(uint _L_COLL, uint _L_LUSDDebt);
+    event TroveSnapshotsUpdated(uint _L_COLL, uint _L_LUSDDebt);
+    event TroveIndexUpdated(address _borrower, uint _newIndex);
+    */
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint _stake, TroveManagerOperation _operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, TroveManagerOperation _operation);
     /*
@@ -533,7 +557,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         require(totals.totalDebtInSequence > 0, "TroveManager: nothing to liquidate");
  
-        // Move liquidated ETH and LUSD to the appropriate pools
+        // Move liquidated collateral and LUSD to the appropriate pools
 
         uint totalActualDebtToOffset = totals.totalDebtToOffset.mul(accumulatedRate).div(RATE_PRECISION);
 
@@ -696,24 +720,24 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         return newTotals;
     }
 
-    function _sendGasCompensation(IActivePool _activePool, address _liquidator, uint _LUSD, uint _ETH) internal {
+    function _sendGasCompensation(IActivePool _activePool, address _liquidator, uint _LUSD, uint _collateral) internal {
         if (_LUSD > 0) {
             lusdToken.returnFromPool(gasPoolAddress, _liquidator, _LUSD);
         }
 
-        if (_ETH > 0) {
-            _activePool.sendCollateral(_liquidator, _ETH);
+        if (_collateral > 0) {
+            _activePool.sendCollateral(_liquidator, _collateral);
         }
     }
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
-    function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _LUSD, uint _ETH) internal {
+    function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _LUSD, uint _collateral) internal {
         if (_LUSD > 0) {
             _defaultPool.decreaseLUSDDebt(_LUSD);
             _activePool.increaseLUSDDebt(_LUSD);
         }
-        if (_ETH > 0) {
-            _defaultPool.sendCollateralToActivePool(_ETH);
+        if (_collateral > 0) {
+            _defaultPool.sendCollateralToActivePool(_collateral);
         }
     }
 
@@ -737,17 +761,17 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
         singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDamount, _actualDebt(Troves[_borrower].debt).sub(LUSD_GAS_COMPENSATION));
 
-        // Get the ETHLot of equivalent value in USD
-        singleRedemption.ETHLot = singleRedemption.LUSDLot.mul(_par).div(_price);
+        // Get the CollateralLot of equivalent value in USD
+        singleRedemption.CollateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
 
         uint normDebt = _normalizedDebt(singleRedemption.LUSDLot);
         if (normDebt.mul(accumulatedRate).div(RATE_PRECISION) < _actualDebt(singleRedemption.LUSDLot)) {
             normDebt += 1;
         }
 
-        // Decrease the debt and collateral of the current Trove according to the LUSD lot and corresponding ETH to send
+        // Decrease the debt and collateral of the current Trove according to the LUSD lot and corresponding collateral to send
         uint newDebt = (Troves[_borrower].debt).sub(normDebt);
-        uint newColl = (Troves[_borrower].coll).sub(singleRedemption.ETHLot);
+        uint newColl = (Troves[_borrower].coll).sub(singleRedemption.CollateralLot);
 
         // Change from eq to lte
         // since sub of normalized debt above could make 1 wei less
@@ -802,14 +826,14 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     /*
     * Called when a full redemption occurs, and closes the trove.
-    * The redeemer swaps (debt - liquidation reserve) LUSD for (debt - liquidation reserve) worth of ETH, so the LUSD liquidation reserve left corresponds to the remaining debt.
+    * The redeemer swaps (debt - liquidation reserve) LUSD for (debt - liquidation reserve) worth of collateral, so the LUSD liquidation reserve left corresponds to the remaining debt.
     * In order to close the trove, the LUSD liquidation reserve is burned, and the corresponding debt is removed from the active pool.
     * The debt recorded on the trove's struct is zero'd elswhere, in _closeTrove.
-    * Any surplus ETH left in the trove, is sent to the Coll surplus pool, and can be later claimed by the borrower.
+    * Any surplus collateral left in the trove, is sent to the Coll surplus pool, and can be later claimed by the borrower.
     */
     function _redeemCloseTrove(ContractsCache memory _contractsCache, address _borrower, uint _LUSD, uint _Collateral) internal {
         _contractsCache.lusdToken.burn(gasPoolAddress, _LUSD);
-        // Update Active Pool LUSD, and send ETH to account
+        // Update Active Pool LUSD, and send collateral to account
         // subtract 1 more to ensure debt <= supply
         /*
         uint normDebt = _normalizedDebt(_LUSD);
@@ -821,7 +845,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         _contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(_LUSD)+1);
 
-        // send ETH from Active Pool to CollSurplus Pool
+        // send collateral from Active Pool to CollSurplus Pool
         _contractsCache.collSurplusPool.accountSurplus(_borrower, _Collateral);
         _contractsCache.activePool.sendCollateral(address(_contractsCache.collSurplusPool), _Collateral);
     }
@@ -938,64 +962,64 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             if (singleRedemption.cancelledPartial) break; // Partial redemption was cancelled (out-of-date hint, or new net debt < minimum), therefore we could not redeem from the last Trove
 
             totals.totalLUSDToRedeem  = totals.totalLUSDToRedeem.add(singleRedemption.LUSDLot);
-            totals.totalETHDrawn = totals.totalETHDrawn.add(singleRedemption.ETHLot);
+            totals.totalCollateralDrawn = totals.totalCollateralDrawn.add(singleRedemption.CollateralLot);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
             currentBorrower = nextUserToCheck;
         }
         //return;
-        require(totals.totalETHDrawn > 0, "TroveManager: Unable to redeem any amount");
+        require(totals.totalCollateralDrawn > 0, "TroveManager: Unable to redeem any amount");
 
         // Decay the baseRate due to time passed, and then increase it according to the size of this redemption.
         // Use the saved total LUSD supply value, from before it was reduced by the redemption.
-        aggregator.updateBaseRateFromRedemption(totals.totalETHDrawn, totals.price, totals.par, totals.totalLUSDSupplyAtStart);
+        _updateBaseRateFromRedemption(totals.totalCollateralDrawn, totals.price, totals.par, totals.totalLUSDSupplyAtStart);
 
-        // Calculate the ETH fee
-        totals.ETHFee = aggregator.getRedemptionFee(totals.totalETHDrawn);
+        // Calculate the collateral fee
+        totals.CollateralFee = _getRedemptionFee(totals.totalCollateralDrawn);
 
-        _requireUserAcceptsFee(totals.ETHFee, totals.totalETHDrawn, _maxFeePercentage);
+        _requireUserAcceptsFee(totals.CollateralFee, totals.totalCollateralDrawn, _maxFeePercentage);
 
-        // Send the ETH fee to the LQTY staking contract
-        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.ETHFee);
-        contractsCache.lqtyStaking.increaseF_ETH(totals.ETHFee);
+        // Send the collateral fee to the LQTY staking contract
+        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.CollateralFee);
+        contractsCache.lqtyStaking.increaseF_ETH(totals.CollateralFee);
 
-        totals.ETHToSendToRedeemer = totals.totalETHDrawn.sub(totals.ETHFee);
+        totals.CollateralToSendToRedeemer = totals.totalCollateralDrawn.sub(totals.CollateralFee);
 
-        emit Redemption(_LUSDamount, totals.totalLUSDToRedeem, totals.totalETHDrawn, totals.ETHFee);
+        emit Redemption(_LUSDamount, totals.totalLUSDToRedeem, totals.totalCollateralDrawn, totals.CollateralFee);
 
-        // Burn the total LUSD that is cancelled with debt, and send the redeemed ETH to msg.sender
+        // Burn the total LUSD that is cancelled with debt, and send the redeemed collateral to msg.sender
         contractsCache.lusdToken.burn(msg.sender, totals.totalLUSDToRedeem);
-        // Update Active Pool LUSD, and send ETH to account
+        // Update Active Pool LUSD, and send collateral to account
         contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalLUSDToRedeem));
-        contractsCache.activePool.sendCollateral(msg.sender, totals.ETHToSendToRedeemer);
+        contractsCache.activePool.sendCollateral(msg.sender, totals.CollateralToSendToRedeemer);
     }
 
     // --- Helper functions ---
 
     // Return the nominal collateral ratio (ICR) of a given Trove, without the price. Takes a trove's pending coll and debt rewards from redistributions into account.
     function getNominalICR(address _borrower) public view override returns (uint) {
-        (uint currentETH, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
+        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
 
-        uint NICR = LiquityMath._computeNominalCR(currentETH, currentLUSDDebt);
+        uint NICR = LiquityMath._computeNominalCR(currentCollateral, currentLUSDDebt);
         return NICR;
     }
 
     // Return the current collateral ratio (ICR) of a given Trove. Takes a trove's pending coll and debt rewards from redistributions into account.
     function getCurrentICR(address _borrower, uint _price) public view override returns (uint) {
-        (uint currentETH, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
+        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
         uint par = relayer.par();
-        uint ICR = LiquityMath._computeCR(currentETH, _actualDebt(currentLUSDDebt), _price, par);
+        uint ICR = LiquityMath._computeCR(currentCollateral, _actualDebt(currentLUSDDebt), _price, par);
         return ICR;
     }
 
     function _getCurrentTroveAmounts(address _borrower) internal view returns (uint, uint) {
-        uint pendingETHReward = getPendingETHReward(_borrower);
+        uint pendingCollateralReward = getPendingCollateralReward(_borrower);
         uint pendingLUSDDebtReward = getPendingLUSDDebtReward(_borrower);
 
-        uint currentETH = Troves[_borrower].coll.add(pendingETHReward);
+        uint currentCollateral = Troves[_borrower].coll.add(pendingCollateralReward);
         uint currentLUSDDebt = Troves[_borrower].debt.add(pendingLUSDDebtReward);
 
-        return (currentETH, currentLUSDDebt);
+        return (currentCollateral, currentLUSDDebt);
     }
 
     function applyPendingRewards(address _borrower) external override {
@@ -1009,17 +1033,15 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             _requireTroveIsActive(_borrower);
 
             // Compute pending rewards
-            uint pendingETHReward = getPendingETHReward(_borrower);
+            uint pendingCollateralReward = getPendingCollateralReward(_borrower);
             uint pendingLUSDDebtReward = getPendingLUSDDebtReward(_borrower);
 
             // Apply pending rewards to trove's state
-            Troves[_borrower].coll = Troves[_borrower].coll.add(pendingETHReward);
+            Troves[_borrower].coll = Troves[_borrower].coll.add(pendingCollateralReward);
             Troves[_borrower].debt = Troves[_borrower].debt.add(pendingLUSDDebtReward);
 
-            _updateTroveRewardSnapshots(_borrower);
-
             // Transfer from DefaultPool to ActivePool
-            _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, pendingLUSDDebtReward, pendingETHReward);
+            _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
 
             emit TroveUpdated(
                 _borrower,
@@ -1031,30 +1053,30 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         }
     }
 
-    // Update borrower's snapshots of L_ETH and L_LUSDDebt to reflect the current values
+    // Update borrower's snapshots of L_COLL and L_LUSDDebt to reflect the current values
     function updateTroveRewardSnapshots(address _borrower) external override {
         _requireCallerIsBorrowerOperations();
        return _updateTroveRewardSnapshots(_borrower);
     }
 
     function _updateTroveRewardSnapshots(address _borrower) internal {
-        rewardSnapshots[_borrower].ETH = L_ETH;
+        rewardSnapshots[_borrower].collateral = L_COLL;
         rewardSnapshots[_borrower].LUSDDebt = L_LUSDDebt;
-        emit TroveSnapshotsUpdated(L_ETH, L_LUSDDebt);
+        emit TroveSnapshotsUpdated(L_COLL, L_LUSDDebt);
     }
 
-    // Get the borrower's pending accumulated ETH reward, earned by their stake
-    function getPendingETHReward(address _borrower) public view override returns (uint) {
-        uint snapshotETH = rewardSnapshots[_borrower].ETH;
-        uint rewardPerUnitStaked = L_ETH.sub(snapshotETH);
+    // Get the borrower's pending accumulated collateral reward, earned by their stake
+    function getPendingCollateralReward(address _borrower) public view override returns (uint) {
+        uint snapshotCollateral = rewardSnapshots[_borrower].collateral;
+        uint rewardPerUnitStaked = L_COLL.sub(snapshotCollateral);
 
         if ( rewardPerUnitStaked == 0 || Troves[_borrower].status != Status.active) { return 0; }
 
         uint stake = Troves[_borrower].stake;
 
-        uint pendingETHReward = stake.mul(rewardPerUnitStaked).div(DECIMAL_PRECISION);
+        uint pendingCollateralReward = stake.mul(rewardPerUnitStaked).div(DECIMAL_PRECISION);
 
-        return pendingETHReward;
+        return pendingCollateralReward;
     }
     
     // Get the borrower's pending accumulated LUSD reward, earned by their stake
@@ -1084,7 +1106,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         */
         if (Troves[_borrower].status != Status.active) {return false;}
        
-        return (rewardSnapshots[_borrower].ETH < L_ETH);
+        return (rewardSnapshots[_borrower].collateral < L_COLL);
     }
 
     // Return the Troves entire debt and coll, including pending rewards from redistributions.
@@ -1094,16 +1116,16 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         public
         view
         override
-        returns (uint debt, uint coll, uint pendingLUSDDebtReward, uint pendingETHReward)
+        returns (uint debt, uint coll, uint pendingLUSDDebtReward, uint pendingCollateralReward)
     {
         debt = Troves[_borrower].debt;
         coll = Troves[_borrower].coll;
 
         pendingLUSDDebtReward = getPendingLUSDDebtReward(_borrower);
-        pendingETHReward = getPendingETHReward(_borrower);
+        pendingCollateralReward = getPendingCollateralReward(_borrower);
 
         debt = debt.add(pendingLUSDDebtReward);
-        coll = coll.add(pendingETHReward);
+        coll = coll.add(pendingCollateralReward);
     }
 
     /*
@@ -1164,7 +1186,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         /*
         * Add distributed coll and debt rewards-per-unit-staked to the running totals. Division uses a "feedback"
-        * error correction, to keep the cumulative error low in the running totals L_ETH and L_LUSDDebt:
+        * error correction, to keep the cumulative error low in the running totals L_COLL and L_LUSDDebt:
         *
         * 1) Form numerators which compensate for the floor division errors that occurred the last time this
         * function was called.
@@ -1173,21 +1195,21 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         * 4) Store these errors for use in the next correction when this function is called.
         * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
         */
-        uint ETHNumerator = _coll.mul(DECIMAL_PRECISION).add(lastETHError_Redistribution);
+        uint CollateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution);
         uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution);
 
         // Get the per-unit-staked terms
-        uint ETHRewardPerUnitStaked = ETHNumerator.div(totalStakes);
+        uint CollateralRewardPerUnitStaked = CollateralNumerator.div(totalStakes);
         uint LUSDDebtRewardPerUnitStaked = LUSDDebtNumerator.div(totalStakes);
 
-        lastETHError_Redistribution = ETHNumerator.sub(ETHRewardPerUnitStaked.mul(totalStakes));
+        lastCollateralError_Redistribution = CollateralNumerator.sub(CollateralRewardPerUnitStaked.mul(totalStakes));
         lastLUSDDebtError_Redistribution = LUSDDebtNumerator.sub(LUSDDebtRewardPerUnitStaked.mul(totalStakes));
 
         // Add per-unit-staked terms to the running totals
-        L_ETH = L_ETH.add(ETHRewardPerUnitStaked);
+        L_COLL = L_COLL.add(CollateralRewardPerUnitStaked);
         L_LUSDDebt = L_LUSDDebt.add(LUSDDebtRewardPerUnitStaked);
 
-        emit LTermsUpdated(L_ETH, L_LUSDDebt);
+        emit LTermsUpdated(L_COLL, L_LUSDDebt);
 
         // Transfer coll and debt from ActivePool to DefaultPool
         _activePool.decreaseLUSDDebt(_debt);
@@ -1210,7 +1232,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         Troves[_borrower].coll = 0;
         Troves[_borrower].debt = 0;
 
-        rewardSnapshots[_borrower].ETH = 0;
+        rewardSnapshots[_borrower].collateral = 0;
         rewardSnapshots[_borrower].LUSDDebt = 0;
 
         _removeTroveOwner(_borrower, TroveOwnersArrayLength);
@@ -1223,9 +1245,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     *
     * The calculation excludes a portion of collateral that is in the ActivePool:
     *
-    * the total ETH gas compensation from the liquidation sequence
+    * the total collateral gas compensation from the liquidation sequence
     *
-    * The ETH as compensation must be excluded as it is always sent out at the very end of the liquidation sequence.
+    * The collateral as compensation must be excluded as it is always sent out at the very end of the liquidation sequence.
     */
     function _updateSystemSnapshots_excludeCollRemainder(IActivePool _activePool, uint _collRemainder) internal {
         totalStakesSnapshot = totalStakes;
@@ -1288,6 +1310,115 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     function checkRecoveryMode(uint _price) external view override returns (bool) {
         return _checkRecoveryMode(_price, accumulatedRate);
     }
+
+    // --- Redemption fee functions ---
+
+    /*
+    * This function has two impacts on the baseRate state variable:
+    * 1) decays the baseRate based on time passed since last redemption or LUSD borrowing operation.
+    * then,
+    * 2) increases the baseRate based on the amount redeemed, as a proportion of total supply
+    */
+    function _updateBaseRateFromRedemption(uint _CollateralDrawn,  uint _price, uint _par, uint _totalLUSDSupply) internal returns (uint) {
+        uint decayedBaseRate = _calcDecayedBaseRate();
+
+        /* Convert the drawn collateral back to LUSD at face value rate (1 LUSD:1 USD), in order to get
+        * the fraction of total supply that was redeemed at face value. */
+        uint redeemedLUSDFraction = _CollateralDrawn.mul(_price).mul(DECIMAL_PRECISION).div(_totalLUSDSupply.mul(_par));
+
+        uint newBaseRate = decayedBaseRate.add(redeemedLUSDFraction.div(BETA));
+        newBaseRate = LiquityMath._min(newBaseRate, DECIMAL_PRECISION); // cap baseRate at a maximum of 100%
+        //assert(newBaseRate <= DECIMAL_PRECISION); // This is already enforced in the line above
+        assert(newBaseRate > 0); // Base rate is always non-zero after redemption
+
+        // Update the baseRate state variable
+        baseRate = newBaseRate;
+        emit BaseRateUpdated(newBaseRate);
+        //emit BaseRateUpdated(_totalLUSDSupply);
+        
+        _updateLastFeeOpTime();
+
+        return newBaseRate;
+    }
+
+    function getRedemptionRate() public view override returns (uint) {
+        return _calcRedemptionRate(baseRate);
+    }
+
+    function getRedemptionRateWithDecay() public view override returns (uint) {
+        return _calcRedemptionRate(_calcDecayedBaseRate());
+    }
+
+    function _calcRedemptionRate(uint _baseRate) internal pure returns (uint) {
+        return LiquityMath._min(
+            REDEMPTION_FEE_FLOOR.add(_baseRate),
+            DECIMAL_PRECISION // cap at a maximum of 100%
+        );
+    }
+
+    function _getRedemptionFee(uint _CollateralDrawn) internal view returns (uint) {
+        return _calcRedemptionFee(getRedemptionRate(), _CollateralDrawn);
+    }
+
+    function getRedemptionFeeWithDecay(uint _CollateralDrawn) external view override returns (uint) {
+        return _calcRedemptionFee(getRedemptionRateWithDecay(), _CollateralDrawn);
+    }
+
+    function _calcRedemptionFee(uint _redemptionRate, uint _CollateralDrawn) internal pure returns (uint) {
+        uint redemptionFee = _redemptionRate.mul(_CollateralDrawn).div(DECIMAL_PRECISION);
+        require(redemptionFee < _CollateralDrawn, "TroveManager: Fee would eat up all returned collateral");
+        return redemptionFee;
+    }
+
+    // --- Borrowing fee functions ---
+    /*
+    function getBorrowingRate() public view override returns (uint) {
+        return _calcBorrowingRate(baseRate);
+    }
+
+    function getBorrowingRateWithDecay() public view override returns (uint) {
+        return _calcBorrowingRate(_calcDecayedBaseRate());
+    }
+
+    function _calcBorrowingRate(uint _baseRate) internal pure returns (uint) {
+        return LiquityMath._min(
+            BORROWING_FEE_FLOOR.add(_baseRate),
+            MAX_BORROWING_FEE
+        );
+    }
+    */
+
+    /*
+    function getBorrowingFee(uint _LUSDDebt) external view override returns (uint) {
+        return _calcBorrowingFee(getBorrowingRate(), _LUSDDebt);
+    }
+
+    function getBorrowingFeeWithDecay(uint _LUSDDebt) external view override returns (uint) {
+        return _calcBorrowingFee(getBorrowingRateWithDecay(), _LUSDDebt);
+    }
+    */
+
+    /*
+    function _calcBorrowingFee(uint _borrowingRate, uint _LUSDDebt) internal pure returns (uint) {
+        return _borrowingRate.mul(_LUSDDebt).div(DECIMAL_PRECISION);
+    }
+    */
+
+
+    // Updates the baseRate state variable based on time elapsed since the last redemption or LUSD borrowing operation.
+    /*
+    function decayBaseRateFromBorrowing() external override {
+        _requireCallerIsBorrowerOperations();
+
+        uint decayedBaseRate = _calcDecayedBaseRate();
+        assert(decayedBaseRate <= DECIMAL_PRECISION);  // The baseRate can decay to 0
+
+        baseRate = decayedBaseRate;
+        emit BaseRateUpdated(decayedBaseRate);
+
+        _updateLastFeeOpTime();
+    }
+    */
 
     function _calcRevenuePayments(uint256 payment) internal view returns (uint256 stakePayment, uint256 spPayment) {
         stakePayment = stakeRevenueAllocation * payment / 1e18;

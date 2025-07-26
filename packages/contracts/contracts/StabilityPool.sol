@@ -302,7 +302,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     // --- Getters for public variables. Required by IPool interface ---
 
-    function getETH() external view override returns (uint) {
+    function getCollateral() external view override returns (uint) {
         return ETH;
     }
 
@@ -675,11 +675,11 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         Snapshots memory snapshots = depositSnapshots[_depositor];
 
-        uint ETHGain = _getETHGainFromSnapshots(initialDeposit, snapshots);
+        uint ETHGain = _getCollateralGainFromSnapshots(initialDeposit, snapshots);
         return ETHGain;
     }
 
-    function _getETHGainFromSnapshots(uint initialDeposit, Snapshots memory snapshots) internal view returns (uint) {
+    function _getCollateralGainFromSnapshots(uint initialDeposit, Snapshots memory snapshots) internal view returns (uint) {
         /*
         * Grab the sum 'S' from the scale at which the stake was made. The ETH gain may span up to one scale change.
         * If it does, the second portion of the ETH gain is scaled by 1e9.
@@ -1001,10 +1001,16 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     // --- Fallback function ---
 
-    receive() external payable {
+    // receive() external payable {
+    //     _requireCallerIsActivePool();
+    //     ETH = ETH.add(msg.value);
+    //     StabilityPoolETHBalanceUpdated(ETH);
+    // }
+
+    function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
-        StabilityPoolETHBalanceUpdated(ETH);
+        ETH = ETH.add(_amount);
+        emit StabilityPoolETHBalanceUpdated(ETH);
     }
 
     function distributeToSP(uint256 lusdGain) external override {

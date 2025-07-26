@@ -63,7 +63,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     /* Returns the ETH state variable at ActivePool address.
        Not necessarily equal to the raw ether balance - ether can be forcibly sent to contracts. */
-    function getETH() external view override returns (uint) {
+    function getCollateral() external view override returns (uint) {
         return ETH;
     }
 
@@ -124,6 +124,12 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         require(
             msg.sender == activePoolAddress,
             "CollSurplusPool: Caller is not Active Pool");
+    }
+
+    function processCollateralIncrease(uint _amount) external override {
+        _requireCallerIsActivePool();
+        ETH = ETH.add(_amount);
+        emit EtherSent(address(this), _amount);
     }
 
     // --- Fallback function ---

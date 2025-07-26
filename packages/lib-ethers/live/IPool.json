@@ -102,7 +102,7 @@
     },
     {
       "inputs": [],
-      "name": "getETH",
+      "name": "getCollateral",
       "outputs": [
         {
           "internalType": "uint256",

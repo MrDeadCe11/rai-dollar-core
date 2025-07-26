@@ -27,15 +27,15 @@ interface ITroveManager is ILiquityBase {
     event LQTYStakingAddressChanged(address _lqtyStakingAddress);
 
     event Liquidation(uint _liquidatedDebt, uint _liquidatedColl, uint _collGasCompensation, uint _LUSDGasCompensation);
-    event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _ETHSent, uint _ETHFee);
+    event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _ETHSent, uint _CollateralFee);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, uint8 operation);
     event BaseRateUpdated(uint _baseRate);
     event LastFeeOpTimeUpdated(uint _lastFeeOpTime);
     event TotalStakesUpdated(uint _newTotalStakes);
     event SystemSnapshotsUpdated(uint _totalStakesSnapshot, uint _totalCollateralSnapshot);
-    event LTermsUpdated(uint _L_ETH, uint _L_LUSDDebt);
-    event TroveSnapshotsUpdated(uint _L_ETH, uint _L_LUSDDebt);
+    event LTermsUpdated(uint _L_COLL, uint _L_LUSDDebt);
+    event TroveSnapshotsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveIndexUpdated(address _borrower, uint _newIndex);
 
     // --- Functions ---
@@ -90,7 +90,7 @@ interface ITroveManager is ILiquityBase {
 
     function applyPendingRewards(address _borrower) external;
 
-    function getPendingETHReward(address _borrower) external view returns (uint);
+    function getPendingCollateralReward(address _borrower) external view returns (uint);
 
     function getPendingLUSDDebtReward(address _borrower) external view returns (uint);
     function getPendingActualLUSDDebtReward(address _borrower) external view returns (uint);

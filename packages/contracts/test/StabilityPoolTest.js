@@ -408,7 +408,7 @@ contract('StabilityPool', async accounts => {
 
       //check non-zero LUSD and ETHGain in the Stability Pool
       const LUSDinSP = await stabilityPool.getTotalLUSDDeposits()
-      const ETHinSP = await stabilityPool.getETH()
+      const ETHinSP = await stabilityPool.getCollateral()
       assert.isTrue(LUSDinSP.gt(mv._zeroBN))
       assert.isTrue(ETHinSP.gt(mv._zeroBN))
 
@@ -464,8 +464,8 @@ contract('StabilityPool', async accounts => {
 
       const activeDebt_Before = (await activePool.getLUSDDebt()).toString()
       const defaultedDebt_Before = (await defaultPool.getLUSDDebt()).toString()
-      const activeColl_Before = (await activePool.getETH()).toString()
-      const defaultedColl_Before = (await defaultPool.getETH()).toString()
+      const activeColl_Before = (await activePool.getCollateral()).toString()
+      const defaultedColl_Before = (await defaultPool.getCollateral()).toString()
       const TCR_Before = (await th.getTCR(contracts)).toString()
 
       // D makes an SP deposit
@@ -474,8 +474,8 @@ contract('StabilityPool', async accounts => {
 
       const activeDebt_After = (await activePool.getLUSDDebt()).toString()
       const defaultedDebt_After = (await defaultPool.getLUSDDebt()).toString()
-      const activeColl_After = (await activePool.getETH()).toString()
-      const defaultedColl_After = (await defaultPool.getETH()).toString()
+      const activeColl_After = (await activePool.getCollateral()).toString()
+      const defaultedColl_After = (await defaultPool.getCollateral()).toString()
       const TCR_After = (await th.getTCR(contracts)).toString()
 
       // Check total system debt, collateral and TCR have not changed after a Stability deposit is made
@@ -1715,14 +1715,14 @@ contract('StabilityPool', async accounts => {
       await stabilityPool.provideToSP(dec(10000, 18), frontEnd_1, { from: alice })
       assert.equal(await stabilityPool.getDepositorETHGain(alice), 0)
 
-      const ETHinSP_Before = (await stabilityPool.getETH()).toString()
+      const ETHinSP_Before = (await stabilityPool.getCollateral()).toString()
 
       // Alice attempts second withdrawal
       await stabilityPool.withdrawFromSP(dec(10000, 18), { from: alice })
       assert.equal(await stabilityPool.getDepositorETHGain(alice), 0)
 
       // Check ETH in pool does not change
-      const ETHinSP_1 = (await stabilityPool.getETH()).toString()
+      const ETHinSP_1 = (await stabilityPool.getCollateral()).toString()
       assert.equal(ETHinSP_Before, ETHinSP_1)
 
       // Third deposit
@@ -1807,8 +1807,8 @@ contract('StabilityPool', async accounts => {
       const [,drip] = await th.getEmittedDripValues(liquidationTx_1)
 
       //Get ActivePool and StabilityPool Ether before retrieval:
-      const active_ETH_Before = await activePool.getETH()
-      const stability_ETH_Before = await stabilityPool.getETH()
+      const active_ETH_Before = await activePool.getCollateral()
+      const stability_ETH_Before = await stabilityPool.getCollateral()
 
 
       //const collToAdd = th.getRawEventArgByName(liquidationTx, stabilityPoolInterface, stabilityPool.address, "Offset", "collToAdd");
@@ -1830,8 +1830,8 @@ contract('StabilityPool', async accounts => {
       // Alice retrieves all of her deposit
       await stabilityPool.withdrawFromSP(dec(15000, 18), { from: alice })
 
-      const active_ETH_After = await activePool.getETH()
-      const stability_ETH_After = await stabilityPool.getETH()
+      const active_ETH_After = await activePool.getCollateral()
+      const stability_ETH_After = await stabilityPool.getCollateral()
 
       const active_ETH_Difference = (active_ETH_Before.sub(active_ETH_After))
       const stability_ETH_Difference = (stability_ETH_Before.sub(stability_ETH_After))
@@ -1993,7 +1993,7 @@ contract('StabilityPool', async accounts => {
 
       //check non-zero LUSD and ETHGain in the Stability Pool
       const LUSDinSP = await stabilityPool.getTotalLUSDDeposits()
-      const ETHinSP = await stabilityPool.getETH()
+      const ETHinSP = await stabilityPool.getCollateral()
       assert.isTrue(LUSDinSP.gt(mv._zeroBN))
       assert.isTrue(ETHinSP.gt(mv._zeroBN))
 
@@ -2049,8 +2049,8 @@ contract('StabilityPool', async accounts => {
 
       const activeDebt_Before = (await activePool.getLUSDDebt()).toString()
       const defaultedDebt_Before = (await defaultPool.getLUSDDebt()).toString()
-      const activeColl_Before = (await activePool.getETH()).toString()
-      const defaultedColl_Before = (await defaultPool.getETH()).toString()
+      const activeColl_Before = (await activePool.getCollateral()).toString()
+      const defaultedColl_Before = (await defaultPool.getCollateral()).toString()
       const TCR_Before = (await th.getTCR(contracts)).toString()
 
       // Carol withdraws her Stability deposit 
@@ -2060,8 +2060,8 @@ contract('StabilityPool', async accounts => {
 
       const activeDebt_After = (await activePool.getLUSDDebt()).toString()
       const defaultedDebt_After = (await defaultPool.getLUSDDebt()).toString()
-      const activeColl_After = (await activePool.getETH()).toString()
-      const defaultedColl_After = (await defaultPool.getETH()).toString()
+      const activeColl_After = (await activePool.getCollateral()).toString()
+      const defaultedColl_After = (await defaultPool.getCollateral()).toString()
       const TCR_After = (await th.getTCR(contracts)).toString()
 
       // Check total system debt, collateral and TCR have not changed after a Stability deposit is made
@@ -2256,7 +2256,7 @@ contract('StabilityPool', async accounts => {
 
       const dennis_ETHBalance_Before = (web3.eth.getBalance(dennis)).toString()
       const dennis_Collateral_Before = ((await troveManager.Troves(dennis))[1]).toString()
-      const ETHinSP_Before = (await stabilityPool.getETH()).toString()
+      const ETHinSP_Before = (await stabilityPool.getCollateral()).toString()
 
       await priceFeed.setPrice(dec(200, 18))
 
@@ -2269,7 +2269,7 @@ contract('StabilityPool', async accounts => {
       // Check withdrawal does not alter Dennis' ETH balance or his trove's collateral
       const dennis_ETHBalance_After = (web3.eth.getBalance(dennis)).toString()
       const dennis_Collateral_After = ((await troveManager.Troves(dennis))[1]).toString()
-      const ETHinSP_After = (await stabilityPool.getETH()).toString()
+      const ETHinSP_After = (await stabilityPool.getCollateral()).toString()
 
       assert.equal(dennis_ETHBalance_Before, dennis_ETHBalance_After)
       assert.equal(dennis_Collateral_Before, dennis_Collateral_After)
@@ -2498,7 +2498,7 @@ contract('StabilityPool', async accounts => {
       assert.equal(LUSDinSP_After, expectedLUSDinSP)
 
       // Check ETH in SP has reduced to zero
-      const ETHinSP_After = (await stabilityPool.getETH()).toString()
+      const ETHinSP_After = (await stabilityPool.getCollateral()).toString()
       assert.isAtMost(th.getDifference(ETHinSP_After, '0'), 100000)
     })
 
@@ -3281,14 +3281,14 @@ contract('StabilityPool', async accounts => {
 
       assert.equal(await stabilityPool.getDepositorETHGain(alice), 0)
 
-      const ETHinSP_Before = (await stabilityPool.getETH()).toString()
+      const ETHinSP_Before = (await stabilityPool.getCollateral()).toString()
 
       // Alice attempts second withdrawal from SP to Trove - reverts, due to 0 ETH Gain
       const txPromise_A = stabilityPool.withdrawETHGainToTrove(alice, alice, { from: alice })
       await th.assertRevert(txPromise_A)
 
       // Check ETH in pool does not change
-      const ETHinSP_1 = (await stabilityPool.getETH()).toString()
+      const ETHinSP_1 = (await stabilityPool.getCollateral()).toString()
       assert.equal(ETHinSP_Before, ETHinSP_1)
 
       await priceFeed.setPrice(dec(200, 18));
@@ -3297,7 +3297,7 @@ contract('StabilityPool', async accounts => {
       await stabilityPool.withdrawFromSP(dec(15000, 18), { from: alice })
 
       // Check ETH in pool does not change
-      const ETHinSP_2 = (await stabilityPool.getETH()).toString()
+      const ETHinSP_2 = (await stabilityPool.getCollateral()).toString()
       assert.equal(ETHinSP_Before, ETHinSP_2)
     })
 
@@ -3353,14 +3353,14 @@ contract('StabilityPool', async accounts => {
       await priceFeed.setPrice(dec(200, 18));
 
       //check activePool and StabilityPool Ether before retrieval:
-      const active_ETH_Before = await activePool.getETH()
-      const stability_ETH_Before = await stabilityPool.getETH()
+      const active_ETH_Before = await activePool.getCollateral()
+      const stability_ETH_Before = await stabilityPool.getCollateral()
 
       // Alice retrieves redirects ETH gain to her Trove
       await stabilityPool.withdrawETHGainToTrove(alice, alice, { from: alice })
 
-      const active_ETH_After = await activePool.getETH()
-      const stability_ETH_After = await stabilityPool.getETH()
+      const active_ETH_After = await activePool.getCollateral()
+      const stability_ETH_After = await stabilityPool.getCollateral()
 
       const active_ETH_Difference = (active_ETH_After.sub(active_ETH_Before)) // AP ETH should increase
       const stability_ETH_Difference = (stability_ETH_Before.sub(stability_ETH_After)) // SP ETH should decrease
@@ -3542,7 +3542,7 @@ contract('StabilityPool', async accounts => {
       assert.equal(carol_expectedCollateral, carol_Collateral_After)
 
       // Check ETH in SP has reduced to zero
-      const ETHinSP_After = (await stabilityPool.getETH()).toString()
+      const ETHinSP_After = (await stabilityPool.getCollateral()).toString()
       assert.isAtMost(th.getDifference(ETHinSP_After, '0'), 100000)
     })
 

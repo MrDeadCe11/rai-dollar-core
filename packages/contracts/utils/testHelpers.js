@@ -347,6 +347,13 @@ class TestHelper {
     //return await contracts.troveManager.getTroveActualDebt(trove)
   }
 
+  static async mintCollateralTokens(contracts, accounts, amount) {  
+    for (const account of accounts) {
+      await contracts.collateralToken.mint(account, amount)
+    }
+  }
+
+
   static async getTroveStake(contracts, trove) {
     return (contracts.troveManager.getTroveStake(trove))
   }
@@ -410,10 +417,10 @@ class TestHelper {
         const LUSDAmount = redemptionTx.logs[i].args[0]
         const totalLUSDRedeemed = redemptionTx.logs[i].args[1]
         //const totalNLUSDRedeemed = redemptionTx.logs[i].args[2]
-        const totalETHDrawn = redemptionTx.logs[i].args[2]
-        const ETHFee = redemptionTx.logs[i].args[3]
+        const totalCollateralDrawn = redemptionTx.logs[i].args[2]
+        const CollateralFee = redemptionTx.logs[i].args[3]
 
-        return [LUSDAmount, totalLUSDRedeemed, totalETHDrawn, ETHFee]
+        return [LUSDAmount, totalLUSDRedeemed, totalCollateralDrawn, CollateralFee]
       }
     }
     throw ("The transaction logs do not contain a redemption event")
@@ -682,7 +689,7 @@ class TestHelper {
     // console.log(`account: ${account}`)
     const rawColl = (await contracts.troveManager.Troves(account))[1]
     const rawDebt = (await contracts.troveManager.Troves(account))[0]
-    const pendingETHReward = await contracts.troveManager.getPendingETHReward(account)
+    const pendingETHReward = await contracts.troveManager.getPendingCollateralReward(account)
     const pendingLUSDDebtReward = await contracts.troveManager.getPendingLUSDDebtReward(account)
     const entireColl = rawColl.add(pendingETHReward)
     const entireDebt = rawDebt.add(pendingLUSDDebtReward)

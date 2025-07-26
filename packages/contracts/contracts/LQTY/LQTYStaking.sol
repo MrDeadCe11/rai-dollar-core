@@ -163,13 +163,13 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
 
     // --- Reward-per-unit-staked increase functions. Called by Liquity core contracts ---
 
-    function increaseF_ETH(uint _ETHFee) external override {
+    function increaseF_ETH(uint _CollateralFee) external override {
         _requireCallerIsTroveManager();
-        uint ETHFeePerLQTYStaked;
+        uint CollateralFeePerLQTYStaked;
      
-        if (totalLQTYStaked > 0) {ETHFeePerLQTYStaked = _ETHFee.mul(DECIMAL_PRECISION).div(totalLQTYStaked);}
+        if (totalLQTYStaked > 0) {CollateralFeePerLQTYStaked = _CollateralFee.mul(DECIMAL_PRECISION).div(totalLQTYStaked);}
 
-        F_ETH = F_ETH.add(ETHFeePerLQTYStaked); 
+        F_ETH = F_ETH.add(CollateralFeePerLQTYStaked); 
         emit F_ETHUpdated(F_ETH);
     }
 

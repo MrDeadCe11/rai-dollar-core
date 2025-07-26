@@ -772,7 +772,7 @@ All data structures with the ‘public’ visibility specifier are ‘gettable�
 
 `getTroveOwnersCount()`: get the number of active Troves in the system.
 
-`getPendingETHReward(address _borrower)`: get the pending ETH reward from liquidation redistribution events, for the given Trove.
+`getPendingCollateralReward(address _borrower)`: get the pending ETH reward from liquidation redistribution events, for the given Trove.
 
 `getPendingLUSDDebtReward(address _borrower)`: get the pending Trove debt "reward" (i.e. the amount of extra debt assigned to the Trove) from liquidation redistribution events.
 

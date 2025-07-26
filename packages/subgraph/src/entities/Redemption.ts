@@ -41,9 +41,9 @@ export function finishCurrentRedemption(
   _attemptedLUSDAmount: BigInt,
   _actualLUSDAmount: BigInt,
   _ETHSent: BigInt,
-  _ETHFee: BigInt
+  _CollateralFee: BigInt
 ): void {
-  let fee = decimalize(_ETHFee);
+  let fee = decimalize(_CollateralFee);
 
   let currentRedemption = getCurrentRedemption(event);
   currentRedemption.tokensAttemptedToRedeem = decimalize(_attemptedLUSDAmount);
