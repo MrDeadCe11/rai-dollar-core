@@ -1040,6 +1040,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             Troves[_borrower].coll = Troves[_borrower].coll.add(pendingCollateralReward);
             Troves[_borrower].debt = Troves[_borrower].debt.add(pendingLUSDDebtReward);
 
+            _updateTroveRewardSnapshots(_borrower);
+
             // Transfer from DefaultPool to ActivePool
             _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
 
