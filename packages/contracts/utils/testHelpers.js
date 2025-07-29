@@ -203,6 +203,8 @@ class TestHelper {
   static applyLiquidationFee(ethAmount) {
     // just the gas compensation fee, not the penalty
     return ethAmount.mul(this.toBN(this.dec(995, 15))).div(MoneyValues._1e18BN)
+    // const divided = ethAmount.div(this.toBN(200))
+    // return ethAmount.sub(divided)
   }
 
   // --- Logging functions ---

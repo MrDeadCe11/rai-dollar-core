@@ -93,8 +93,9 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         ETH = ETH.sub(claimableColl);
         emit EtherSent(_account, claimableColl);
 
-        (bool success, ) = _account.call{ value: claimableColl }("");
-        require(success, "CollSurplusPool: sending ETH failed");
+        collateralToken.transfer(_account, claimableColl);
+        // (bool success, ) = _account.call{ value: claimableColl }("");
+        // require(success, "CollSurplusPool: sending ETH failed");
 
         return claimableColl;
     }
@@ -125,6 +126,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
             msg.sender == activePoolAddress,
             "CollSurplusPool: Caller is not Active Pool");
     }
+    
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsActivePool();
