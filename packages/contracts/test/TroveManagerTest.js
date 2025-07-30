@@ -110,6 +110,7 @@ contract('TroveManager', async accounts => {
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+    // await troveManager.drip();
 
   })
 
@@ -3075,7 +3076,7 @@ contract('TroveManager', async accounts => {
 
     //const totalDeposits = bob_Deposit_Before.add(A_spDeposit)
     const totalDeposits = prev_deposits.add(lusdGain)
-
+    
     // TODO increased tolerance for both of these from 1e6 to 4e6. is this ok? 
     console.log("diff", th.getDifference(alice_Deposit_After, newA_spDeposit.sub(liquidatedB_debt.mul(newA_spDeposit).div(totalDeposits))))
     assert.isAtMost(th.getDifference(alice_Deposit_After, newA_spDeposit.sub(liquidatedB_debt.mul(newA_spDeposit).div(totalDeposits))), 4000000)
@@ -4660,7 +4661,7 @@ contract('TroveManager', async accounts => {
     // start Dennis with a high ICR
     await openTrove({ ICR: toBN(dec(100, 18)), extraLUSDAmount: redemptionAmount, extraParams: { from: dennis } })
 
-    const dennis_ETHBalance_Before = toBN(await web3.eth.getBalance(dennis))
+    const dennis_ETHBalance_Before = toBN(await collateralToken.balanceOf(dennis))
 
     const dennis_LUSDBalance_Before = await lusdToken.balanceOf(dennis)
 
@@ -4718,7 +4719,7 @@ contract('TroveManager', async accounts => {
     assert.equal(bob_debt_After, '0')
     assert.equal(carol_debt_After, '0')
 
-    const dennis_ETHBalance_After = toBN(await web3.eth.getBalance(dennis))
+    const dennis_ETHBalance_After = toBN(await collateralToken.balanceOf(dennis))
     const receivedETH = dennis_ETHBalance_After.sub(dennis_ETHBalance_Before)
 
     const expectedTotalETHDrawn = redemptionAmount.div(toBN(200)) // convert redemptionAmount LUSD to ETH, at ETH:USD price 200
@@ -4756,7 +4757,7 @@ contract('TroveManager', async accounts => {
     // start Dennis with a high ICR
     await openTrove({ ICR: toBN(dec(100, 18)), extraLUSDAmount: redemptionAmount, extraParams: { from: dennis } })
 
-    const dennis_ETHBalance_Before = toBN(await web3.eth.getBalance(dennis))
+    const dennis_ETHBalance_Before = toBN(await collateralToken.balanceOf(dennis))
 
     const dennis_LUSDBalance_Before = await lusdToken.balanceOf(dennis)
 
@@ -4814,7 +4815,7 @@ contract('TroveManager', async accounts => {
     assert.equal(bob_debt_After, '0')
     assert.equal(carol_debt_After, '0')
 
-    const dennis_ETHBalance_After = toBN(await web3.eth.getBalance(dennis))
+    const dennis_ETHBalance_After = toBN(await collateralToken.balanceOf(dennis))
     const receivedETH = dennis_ETHBalance_After.sub(dennis_ETHBalance_Before)
 
     const expectedTotalETHDrawn = redemptionAmount.div(toBN(200)) // convert redemptionAmount LUSD to ETH, at ETH:USD price 200
@@ -5254,7 +5255,7 @@ contract('TroveManager', async accounts => {
   it("redeemCollateral(): can redeem if there is zero active debt but non-zero debt in DefaultPool", async () => {
     // --- SETUP ---
 
-    const amount = await getOpenTroveLUSDAmount(dec(110, 18))
+    const amount = await getOpenTroveLUSDAmount(dec(210, 18))
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: alice } })
     await openTrove({ ICR: toBN(dec(133, 16)), extraLUSDAmount: amount, extraParams: { from: bob } })
 
@@ -5268,17 +5269,16 @@ contract('TroveManager', async accounts => {
 
     // --- TEST --- 
 
-    const carol_ETHBalance_Before = toBN(await web3.eth.getBalance(carol))
+    const carol_CollateralBalance_Before = toBN(await collateralToken.balanceOf(carol))
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
-
     const redemptionTx = await troveManager.redeemCollateral(
       amount,
       alice,
       '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
-      '10367038690476190477',
+      '5329616687500000000',
       0,
       th._100pct,
       {
@@ -5288,13 +5288,18 @@ contract('TroveManager', async accounts => {
     )
 
     const CollateralFee = th.getEmittedRedemptionValues(redemptionTx)[3]
+    const par = await relayer.par() // Get current par value
 
-    const carol_ETHBalance_After = toBN(await web3.eth.getBalance(carol))
+    const carol_ETHBalance_After = toBN(await collateralToken.balanceOf(carol))
 
-    const expectedTotalETHDrawn = toBN(amount).div(toBN(100)) // convert 100 LUSD to ETH at ETH:USD price of 100
+    // Calculate how much collateral should be redeemed for the given LUSD amount
+    // CollateralAmount = (LUSDAmount * par) / price
+    const expectedTotalETHDrawn = toBN(amount).mul(par).div(toBN(price))
+
     const expectedReceivedETH = expectedTotalETHDrawn.sub(CollateralFee)
 
-    const receivedETH = carol_ETHBalance_After.sub(carol_ETHBalance_Before)
+    const receivedETH = carol_ETHBalance_After.sub(carol_CollateralBalance_Before)
+
     assert.isTrue(expectedReceivedETH.eq(receivedETH))
 
     const carol_LUSDBalance_After = (await lusdToken.balanceOf(carol)).toString()

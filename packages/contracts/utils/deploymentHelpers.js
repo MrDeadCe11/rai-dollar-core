@@ -94,6 +94,7 @@ class DeploymentHelper {
   }
 
   static async deployLiquityCoreHardhat() {
+    const collateralToken = await CollateralToken.new("Hardhat Collateral Token", "HCT")
     const priceFeedTestnet = await PriceFeedTestnet.new()
     const sortedTroves = await SortedTroves.new()
     const aggregator = await Aggregator.new()
@@ -116,9 +117,9 @@ class DeploymentHelper {
     const marketOracleTestnet = await MarketOracleTestnet.new()
     const parControl = await ParControl.new()
     const rateControl = await RateControl.new()
-    const collateralToken = await CollateralToken.new("Hardhat Collateral Token", "HCT")
+    
 
-
+    CollateralToken.setAsDeployed(collateralToken)
     LUSDToken.setAsDeployed(lusdToken)
     DefaultPool.setAsDeployed(defaultPool)
     PriceFeedTestnet.setAsDeployed(priceFeedTestnet)
@@ -136,7 +137,7 @@ class DeploymentHelper {
     MarketOracleTestnet.setAsDeployed(marketOracleTestnet)
     ParControl.setAsDeployed(parControl)
     RateControl.setAsDeployed(rateControl)
-    CollateralToken.setAsDeployed(collateralToken)
+    
 
     const coreContracts = {
       priceFeedTestnet,
@@ -163,7 +164,7 @@ class DeploymentHelper {
 
   static async deployTesterContractsHardhat() {
     const testerContracts = {}
-
+    testerContracts.collateralToken = await CollateralToken.new("Test Collateral Token", "TCT")
     // Contract without testers (yet)
     testerContracts.priceFeedTestnet = await PriceFeedTestnet.new()
     testerContracts.sortedTroves = await SortedTroves.new()
@@ -191,7 +192,7 @@ class DeploymentHelper {
     testerContracts.rateControl = await RateControl.new()
     testerContracts.parControl = await ParControl.new()
 
-    testerContracts.collateralToken = await CollateralToken.new("Test Collateral Token", "TCT")
+
 
     return testerContracts
   }
