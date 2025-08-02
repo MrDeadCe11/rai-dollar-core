@@ -41,7 +41,7 @@ interface IBorrowerOperations {
         address _lqtyStakingAddress,
         address _relayerAddress
     ) external;
-
+    function collateralToken() external view returns (IERC20);
     function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;

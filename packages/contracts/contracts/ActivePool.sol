@@ -10,6 +10,7 @@ import "./Dependencies/console.sol";
 import "./Dependencies/IERC20.sol";
 import "./Interfaces/IPool.sol";
 import "./Interfaces/ITroveManager.sol";
+import "./Interfaces/IBorrowerOperations.sol";
 /*
  * The Active Pool holds the ETH collateral and LUSD debt (but not LUSD tokens) for all active troves.
  *
@@ -40,7 +41,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Contract setters ---
 
     function setAddresses(
-        address _collateralTokenAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _stabilityPoolAddress,
@@ -49,18 +49,20 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         external
         onlyOwner
     {
-        checkContract(_collateralTokenAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_stabilityPoolAddress);
         checkContract(_defaultPoolAddress);
 
-        collateralToken = IERC20(_collateralTokenAddress);
+        
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         stabilityPoolAddress = _stabilityPoolAddress;
         defaultPoolAddress = _defaultPoolAddress;
+        collateralToken = IBorrowerOperations(_borrowerOperationsAddress).collateralToken();
         collSurplusPoolAddress = address(ITroveManager(troveManagerAddress).collSurplusPool());
+
+        checkContract(address(collateralToken));
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);

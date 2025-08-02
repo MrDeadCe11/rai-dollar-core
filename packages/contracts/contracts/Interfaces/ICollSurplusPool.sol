@@ -17,7 +17,6 @@ interface ICollSurplusPool {
     // --- Contract setters ---
 
     function setAddresses(
-        address _collateralTokenAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress

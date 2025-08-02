@@ -31,7 +31,7 @@ interface ITroveManager is ILiquityBase {
     event RelayerAddressChanged(address _relayerAddress);
 
     event Liquidation(uint _liquidatedDebt, uint _liquidatedColl, uint _collGasCompensation, uint _LUSDGasCompensation);
-    event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _ETHSent, uint _CollateralFee);
+    event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _CollateralSent, uint _CollateralFee);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, uint8 operation);
     event BaseRateUpdated(uint _baseRate);
@@ -114,7 +114,7 @@ interface ITroveManager is ILiquityBase {
         uint debt, 
         uint coll, 
         uint pendingLUSDDebtReward, 
-        uint pendingETHReward
+        uint pendingCollateralReward
     );
 
     function drip() external;
@@ -122,6 +122,19 @@ interface ITroveManager is ILiquityBase {
     function closeTrove(address _borrower) external;
 
     function removeStake(address _borrower) external;
+
+    function getRedemptionRate() external view returns (uint);
+    function getRedemptionRateWithDecay() external view returns (uint);
+
+    function getRedemptionFeeWithDecay(uint _CollateralDrawn) external view returns (uint);
+
+    //function getBorrowingRate() external view returns (uint);
+    //function getBorrowingRateWithDecay() external view returns (uint);
+
+    //function getBorrowingFee(uint LUSDDebt) external view returns (uint);
+    //function getBorrowingFeeWithDecay(uint _LUSDDebt) external view returns (uint);
+
+    //function decayBaseRateFromBorrowing() external;
 
     function getTroveStatus(address _borrower) external view returns (uint);
     

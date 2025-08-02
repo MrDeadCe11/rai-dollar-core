@@ -1517,7 +1517,6 @@ class TestHelper {
   }
   static async performRedemptionTx(redeemer, price, contracts, LUSDAmount, maxFee = 0, gasPrice_toUse = 0) {
     const redemptionhint = await contracts.hintHelpers.getRedemptionHints(LUSDAmount, price, gasPrice_toUse)
-
     const firstRedemptionHint = redemptionhint[0]
     const partialRedemptionNewICR = redemptionhint[1]
     //console.log("partialRedemptionNewICR", partialRedemptionNewICR.toString())

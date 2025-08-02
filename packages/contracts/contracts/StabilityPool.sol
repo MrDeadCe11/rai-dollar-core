@@ -13,6 +13,7 @@ import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/SafeMath.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
+import "./Dependencies/IERC20.sol";
 //import "./Dependencies/console.sol";
 
 /*
@@ -149,6 +150,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     ISortedTroves public sortedTroves;
 
     ICommunityIssuance public communityIssuance;
+
+    IERC20 public collateralToken;
 
     uint256 internal ETH;  // deposited ether tracker
 
@@ -288,7 +291,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         priceFeed = IPriceFeed(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
-
+        collateralToken = borrowerOperations.collateralToken();
+        
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
@@ -356,7 +360,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss); // LUSD Loss required for event log
 
-        _sendETHGainToDepositor(depositorETHGain);
+        _sendCollateralGainToDepositor(depositorETHGain);
      }
 
     /*  withdrawFromSP():
@@ -404,7 +408,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss);  // LUSD Loss required for event log
 
-        _sendETHGainToDepositor(depositorETHGain);
+        _sendCollateralGainToDepositor(depositorETHGain);
     }
 
     /* withdrawETHGainToTrove:
@@ -844,15 +848,16 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         emit StabilityPoolLUSDBalanceUpdated(newTotalLUSDDeposits);
     }
 
-    function _sendETHGainToDepositor(uint _amount) internal {
+    function _sendCollateralGainToDepositor(uint _amount) internal {
         if (_amount == 0) {return;}
         uint newETH = ETH.sub(_amount);
         ETH = newETH;
         emit StabilityPoolETHBalanceUpdated(newETH);
         emit EtherSent(msg.sender, _amount);
 
-        (bool success, ) = msg.sender.call{ value: _amount }("");
-        require(success, "StabilityPool: sending ETH failed");
+        // (bool success, ) = msg.sender.call{ value: _amount }("");
+        // require(success, "StabilityPool: sending ETH failed");
+        collateralToken.transfer(msg.sender, _amount);
     }
 
     // Send LUSD to user and decrease LUSD in Pool

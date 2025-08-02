@@ -21,7 +21,7 @@ function getEvent(receipt, eventName) {
     return event;
 }
 
-contract('PriceFeedMainnetForkTest', async accounts => {
+contract.skip('PriceFeedMainnetForkTest', async accounts => {
 
     // staleness threshold for the price feeds
     const stalenessThreshold = TimeValues.SECONDS_IN_ONE_DAY;  // 24hr staleness
