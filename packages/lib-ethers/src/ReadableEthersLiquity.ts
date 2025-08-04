@@ -263,7 +263,7 @@ export class ReadableEthersLiquity implements ReadableLiquity {
     ] = await Promise.all([
       stabilityPool.deposits(address, { ...overrides }),
       stabilityPool.getCompoundedLUSDDeposit(address, { ...overrides }),
-      stabilityPool.getDepositorETHGain(address, { ...overrides }),
+      stabilityPool.getDepositorCollateralGain(address, { ...overrides }),
       stabilityPool.getDepositorLQTYGain(address, { ...overrides })
     ]);
 

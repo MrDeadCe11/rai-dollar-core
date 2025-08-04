@@ -808,7 +808,7 @@ The number of Troves to consider for redemption can be capped by passing a non-z
 
 `registerFrontEnd(uint _kickbackRate)`: Registers an address as a front end and sets their chosen kickback rate in range `[0,1]`.
 
-`getDepositorETHGain(address _depositor)`: returns the accumulated ETH gain for a given Stability Pool depositor
+`getDepositorCollateralGain(address _depositor)`: returns the accumulated ETH gain for a given Stability Pool depositor
 
 `getDepositorLQTYGain(address _depositor)`: returns the accumulated LQTY gain for a given Stability Pool depositor
 
@@ -1294,7 +1294,7 @@ The decay parameter is tuned such that the fee changes by a factor of 0.99 per h
 
 LQTY holders may `stake` and `unstake` their LQTY in the `LQTYStaking.sol` contract. 
 
-When a fee event occurs, the fee in LUSD or ETH is sent to the staking contract, and a reward-per-unit-staked sum (`F_ETH`, or `F_LUSD`) is incremented. A LQTY stake earns a share of the fee equal to its share of the total LQTY staked, at the instant the fee occurred.
+When a fee event occurs, the fee in LUSD or ETH is sent to the staking contract, and a reward-per-unit-staked sum (`F_Collateral`, or `F_LUSD`) is incremented. A LQTY stake earns a share of the fee equal to its share of the total LQTY staked, at the instant the fee occurred.
 
 This staking formula and implementation follows the basic [“Batog” pull-based reward distribution](http://batog.info/papers/scalable-reward-distribution.pdf).
 

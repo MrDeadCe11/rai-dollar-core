@@ -980,7 +980,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // Send the collateral fee to the LQTY staking contract
         contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.CollateralFee);
-        contractsCache.lqtyStaking.increaseF_ETH(totals.CollateralFee);
+        contractsCache.lqtyStaking.increaseF_Collateral(totals.CollateralFee);
 
         totals.CollateralToSendToRedeemer = totals.totalCollateralDrawn.sub(totals.CollateralFee);
 

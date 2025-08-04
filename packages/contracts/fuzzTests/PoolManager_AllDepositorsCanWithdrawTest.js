@@ -174,7 +174,7 @@ contract("PoolManager - random liquidations/deposits, then check all depositors 
     for (depositor of currentDepositors) {
       const initialDeposit = (await stabilityPool.deposits(depositor))[0]
       const finalDeposit = await stabilityPool.getCompoundedLUSDDeposit(depositor)
-      const ETHGain = await stabilityPool.getDepositorETHGain(depositor)
+      const ETHGain = await stabilityPool.getDepositorCollateralGain(depositor)
       const ETHinSP = (await stabilityPool.getCollateral()).toString()
       const LUSDinSP = (await stabilityPool.getTotalLUSDDeposits()).toString()
 

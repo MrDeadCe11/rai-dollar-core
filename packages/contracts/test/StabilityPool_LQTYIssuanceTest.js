@@ -151,7 +151,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(B_pendingLQTYGain, '0')
 
       // Check depositor B has a pending ETH gain
-      const B_pendingETHGain = await stabilityPool.getDepositorETHGain(B)
+      const B_pendingETHGain = await stabilityPool.getDepositorCollateralGain(B)
       assert.isTrue(B_pendingETHGain.gt(toBN('0')))
     })
 

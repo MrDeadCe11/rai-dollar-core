@@ -941,7 +941,7 @@ alice deposit: 0
       ✓ withdrawFromSP(): Request to withdraw > caller's deposit only withdraws the caller's compounded deposit (1260ms)
       ✓ withdrawFromSP(): Request to withdraw 2^256-1 LUSD only withdraws the caller's compounded deposit (1229ms)
       ✓ withdrawFromSP(): caller can withdraw full deposit and ETH gain during Recovery Mode (4371ms)
-      ✓ getDepositorETHGain(): depositor does not earn further ETH gains from liquidations while their compounded deposit == 0:  (1831ms)
+      ✓ getDepositorCollateralGain(): depositor does not earn further ETH gains from liquidations while their compounded deposit == 0:  (1831ms)
       ✓ withdrawFromSP(): triggers LQTY reward event - increases the sum G (982ms)
       ✓ withdrawFromSP(), partial withdrawal: doesn't change the front end tag (1421ms)
       ✓ withdrawFromSP(), partial withdrawal: depositor receives LQTY rewards (1155ms)

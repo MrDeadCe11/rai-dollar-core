@@ -111,8 +111,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyStaking.stake(dec(100, 18), {from: A})
 
     // Check ETH fee per unit staked is zero
-    const F_ETH_Before = await lqtyStaking.F_ETH()
-    assert.equal(F_ETH_Before, '0')
+    const F_Collateral_Before = await lqtyStaking.F_Collateral()
+    assert.equal(F_Collateral_Before, '0')
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)
     // B redeems
@@ -126,12 +126,12 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.isTrue(emittedCollateralFee.gt(toBN('0')))
 
     // Check ETH fee per unit staked has increased by correct amount
-    const F_ETH_After = await lqtyStaking.F_ETH()
+    const F_Collateral_After = await lqtyStaking.F_Collateral()
 
     // Expect fee per unit staked = fee/100, since there is 100 LUSD totalStaked
-    const expected_F_ETH_After = emittedCollateralFee.div(toBN('100')) 
+    const expected_F_Collateral_After = emittedCollateralFee.div(toBN('100')) 
 
-    assert.isTrue(expected_F_ETH_After.eq(F_ETH_After))
+    assert.isTrue(expected_F_Collateral_After.eq(F_Collateral_After))
   })
 
   it("ETH fee per LQTY staked doesn't change when a redemption fee is triggered and totalStakes == 0", async () => {
@@ -148,8 +148,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyToken.transfer(A, dec(100, 18), {from: multisig, gasPrice: GAS_PRICE})
 
     // Check ETH fee per unit staked is zero
-    const F_ETH_Before = await lqtyStaking.F_ETH()
-    assert.equal(F_ETH_Before, '0')
+    const F_Collateral_Before = await lqtyStaking.F_Collateral()
+    assert.equal(F_Collateral_Before, '0')
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)
     // B redeems
@@ -163,8 +163,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.isTrue(emittedCollateralFee.gt(toBN('0')))
 
     // Check ETH fee per unit staked has not increased 
-    const F_ETH_After = await lqtyStaking.F_ETH()
-    assert.equal(F_ETH_After, '0')
+    const F_Collateral_After = await lqtyStaking.F_Collateral()
+    assert.equal(F_Collateral_After, '0')
   })
 
   it("LUSD fee per LQTY staked increases when a redemption fee is triggered and totalStakes > 0", async () => {
@@ -185,7 +185,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyStaking.stake(dec(100, 18), {from: A})
 
     // Check LUSD fee per unit staked is zero
-    const F_LUSD_Before = await lqtyStaking.F_ETH()
+    const F_LUSD_Before = await lqtyStaking.F_Collateral()
     assert.equal(F_LUSD_Before, '0')
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)
@@ -225,7 +225,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyToken.transfer(A, dec(100, 18), {from: multisig})
 
     // Check LUSD fee per unit staked is zero
-    const F_LUSD_Before = await lqtyStaking.F_ETH()
+    const F_LUSD_Before = await lqtyStaking.F_Collateral()
     assert.equal(F_LUSD_Before, '0')
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)
