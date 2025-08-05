@@ -22,7 +22,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     address public troveManagerAddress;
     address public activePoolAddress;
-    uint256 internal ETH;  // deposited ETH tracker
+    uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;  // debt
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
@@ -57,8 +57,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     *
     * Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
     */
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getCollateral() external view override returns (uint) {
+        return CT;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -69,13 +69,28 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function sendETHToActivePool(uint _amount) external override {
         _requireCallerIsTroveManager();
-        address activePool = activePoolAddress; // cache to save an SLOAD
-        ETH = ETH.sub(_amount);
-        emit DefaultPoolETHBalanceUpdated(ETH);
-        emit EtherSent(activePool, _amount);
+        IActivePool activePool = IActivePool(activePoolAddress);
+        CT = CT.sub(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
+        emit CollateralSent(activePoolAddress, _amount);
+        
+        // transfer collateral to active pool
+        collateralToken.transfer(activePoolAddress, _amount);
+        // process collateral increase
+        activePool.processCollateralIncrease(_amount);
+    }
 
-        (bool success, ) = activePool.call{ value: _amount }("");
-        require(success, "DefaultPool: sending ETH failed");
+    function addCollateral(address _account, uint _amount) external override {
+        _requireCallerIsTroveMorActivePool();
+        CT = CT.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
+        collateralToken.transferFrom(_account, address(this), _amount);
+    }
+
+    function processCollateralIncrease(uint _amount) external override {
+        _requireCallerIsTroveMorActivePool();
+        CT = CT.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
     }
 
     function increaseLUSDDebt(uint _amount) external override {
@@ -100,11 +115,4 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
     }
 
-    // --- Fallback function ---
-
-    receive() external payable {
-        _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
-        emit DefaultPoolETHBalanceUpdated(ETH);
-    }
 }

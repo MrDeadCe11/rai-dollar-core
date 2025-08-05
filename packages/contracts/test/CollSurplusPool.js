@@ -21,6 +21,7 @@ contract('CollSurplusPool', async accounts => {
   let borrowerOperations
   let priceFeed
   let collSurplusPool
+  let collateralToken
 
   let contracts
 
@@ -40,15 +41,18 @@ contract('CollSurplusPool', async accounts => {
     priceFeed = contracts.priceFeedTestnet
     collSurplusPool = contracts.collSurplusPool
     borrowerOperations = contracts.borrowerOperations
+    collateralToken = contracts.collateralToken
+    // mint tokens
+    await th.mintCollateralTokens(contracts, accounts.slice(0, 10), dec(10, 24))
 
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
   })
 
-  it("CollSurplusPool::getETH(): Returns the ETH balance of the CollSurplusPool after redemption", async () => {
-    const ETH_1 = await collSurplusPool.getETH()
-    assert.equal(ETH_1, '0')
+  it("CollSurplusPool::getCollateral(): Returns the Collateral Token balance of the CollSurplusPool after redemption", async () => {
+    const COLL_1 = await collSurplusPool.getCollateral()
+    assert.equal(COLL_1, '0')
 
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price)
@@ -62,8 +66,8 @@ contract('CollSurplusPool', async accounts => {
     // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus
     await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=5)
 
-    const ETH_2 = await collSurplusPool.getETH()
-    th.assertIsApproximatelyEqual(ETH_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    const COLL_2 = await collSurplusPool.getCollateral()
+    th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
   })
 
   it("CollSurplusPool: claimColl(): Reverts if caller is not Borrower Operations", async () => {
@@ -73,8 +77,8 @@ contract('CollSurplusPool', async accounts => {
   it("CollSurplusPool: claimColl(): Reverts if nothing to claim", async () => {
     await th.assertRevert(borrowerOperations.claimCollateral({ from: A }), 'CollSurplusPool: No collateral available to claim')
   })
-
-  it("CollSurplusPool: claimColl(): Reverts if owner cannot receive ETH surplus", async () => {
+  // TODO: Skipped.  This test is not relevant for the collateral ERC20.
+  it.skip("CollSurplusPool: claimColl(): Reverts if owner cannot receive ETH surplus", async () => {
     const nonPayable = await NonPayable.new()
 
     const price = toBN(dec(100, 18))

@@ -245,8 +245,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _adjustTrove(msg.sender, 0, 0, false, _upperHint, _lowerHint);
     }
 
-    // Send ETH as collateral to a trove. Called by only the Stability Pool.
-    function moveETHGainToTrove(address _borrower, address _upperHint, address _lowerHint) external payable override {
+    // Send COLL as collateral to a trove. Called by only the Stability Pool.
+    function moveCollateralGainToTrove(address _borrower, uint256 _collateralToAdd, address _upperHint, address _lowerHint) external override {
         _requireCallerIsStabilityPool();
         _adjustTrove(_borrower, 0, 0, false, _upperHint, _lowerHint);
     }

@@ -24,7 +24,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     address public troveManagerAddress;
     address public stabilityPoolAddress;
     address public defaultPoolAddress;
-    uint256 internal ETH;  // deposited ether tracker
+    address public collSurplusPoolAddress;
+    uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;
 
     // --- Events ---
@@ -70,8 +71,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     *
     *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
     */
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getCollateral() external view override returns (uint) {
+        return CT;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -82,12 +83,31 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function sendETH(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        ETH = ETH.sub(_amount);
-        emit ActivePoolETHBalanceUpdated(ETH);
-        emit EtherSent(_account, _amount);
+        CT = CT.sub(_amount);
+        emit ActivePoolCollateralBalanceUpdated(CT);
+        emit CollateralSent(_account, _amount);
+        
+        // transfer collateral to account
+        collateralToken.transfer(_account, _amount);
+        
+        // process collateral increase if address is a pool
+        if (_isPool(_account)) {
+            IPool(_account).processCollateralIncrease(_amount);
+        } 
+    }
 
-        (bool success, ) = _account.call{ value: _amount }("");
-        require(success, "ActivePool: sending ETH failed");
+    function processCollateralIncrease(uint _amount) external override {
+        _requireCallerIsBOorTroveMorSPorDefaultPool();
+        CT = CT.add(_amount);
+        emit ActivePoolCollateralBalanceUpdated(CT);
+    }
+
+    function addCollateral(address _account, uint _amount) external override {
+        _requireCallerIsBOorTroveMorSPorDefaultPool();
+        CT = CT.add(_amount);
+
+        collateralToken.transferFrom(_account, address(this), _amount);
+        emit ActivePoolCollateralBalanceUpdated(CT);
     }
 
     function increaseLUSDDebt(uint _amount) external override {

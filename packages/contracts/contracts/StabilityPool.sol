@@ -150,7 +150,9 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     ICommunityIssuance public communityIssuance;
 
-    uint256 internal ETH;  // deposited ether tracker
+    IERC20 public collateralToken;
+
+    uint256 internal CT;  // deposited Collateral Token tracker
 
     // Tracker for LUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
     uint256 internal totalLUSDDeposits;
@@ -288,6 +290,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         priceFeed = IPriceFeed(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
+        collateralToken = borrowerOperations.collateralToken();
+
+        // give approval to active pool to spend collateral
+        collateralToken.approve(address(activePool), type(uint256).max);
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
@@ -302,8 +308,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     // --- Getters for public variables. Required by IPool interface ---
 
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getCollateral() external view override returns (uint) {
+        return CT;
     }
 
     function getTotalLUSDDeposits() external view override returns (uint) {
@@ -447,11 +453,11 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss);
         emit UserDepositChanged(msg.sender, compoundedLUSDDeposit);
 
-        ETH = ETH.sub(depositorETHGain);
-        emit StabilityPoolETHBalanceUpdated(ETH);
-        emit EtherSent(msg.sender, depositorETHGain);
+        CT = CT.sub(depositorCollateralGain);
+        emit StabilityPoolCollateralBalanceUpdated(CT);
+        emit CollateralSent(msg.sender, depositorCollateralGain);
 
-        borrowerOperations.moveETHGainToTrove{ value: depositorETHGain }(msg.sender, _upperHint, _lowerHint);
+        borrowerOperations.moveCollateralGainToTrove(msg.sender, depositorCollateralGain, _upperHint, _lowerHint);
     }
 
     // --- LQTY issuance functions ---
@@ -846,10 +852,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     function _sendETHGainToDepositor(uint _amount) internal {
         if (_amount == 0) {return;}
-        uint newETH = ETH.sub(_amount);
-        ETH = newETH;
-        emit StabilityPoolETHBalanceUpdated(newETH);
-        emit EtherSent(msg.sender, _amount);
+        uint newCollateral = CT.sub(_amount);
+        CT = newCollateral;
+        emit StabilityPoolCollateralBalanceUpdated(newCollateral);
+        emit CollateralSent(msg.sender, _amount);
 
         (bool success, ) = msg.sender.call{ value: _amount }("");
         require(success, "StabilityPool: sending ETH failed");
@@ -1003,8 +1009,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     receive() external payable {
         _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
-        StabilityPoolETHBalanceUpdated(ETH);
+        CT = CT.add(_amount);
+        emit StabilityPoolCollateralBalanceUpdated(CT);
     }
 
     function distributeToSP(uint256 lusdGain) external override {

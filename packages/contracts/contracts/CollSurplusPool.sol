@@ -19,7 +19,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     address public activePoolAddress;
 
     // deposited ether tracker
-    uint256 internal ETH;
+    uint256 internal CT;
     // Collateral surplus claimable by trove owners
     mapping (address => uint) internal balances;
 
@@ -58,10 +58,10 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         _renounceOwnership();
     }
 
-    /* Returns the ETH state variable at ActivePool address.
+    /* Returns the CT state variable at ActivePool address.
        Not necessarily equal to the raw ether balance - ether can be forcibly sent to contracts. */
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getCollateral() external view override returns (uint) {
+        return CT;
     }
 
     function getCollateral(address _account) external view override returns (uint) {
@@ -87,11 +87,19 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         balances[_account] = 0;
         emit CollBalanceUpdated(_account, 0);
 
-        ETH = ETH.sub(claimableColl);
-        emit EtherSent(_account, claimableColl);
+        CT = CT.sub(claimableColl);
+        emit CollateralSent(_account, claimableColl);
 
-        (bool success, ) = _account.call{ value: claimableColl }("");
-        require(success, "CollSurplusPool: sending ETH failed");
+        collateralToken.transfer(_account, claimableColl);
+
+        return claimableColl;
+    }
+
+    function addCollateral(address _account, uint _amount) external override {
+        _requireCallerIsActivePool();
+        CT = CT.add(_amount);
+        collateralToken.transferFrom(_account, address(this), _amount);
+        emit CollateralSent(address(this), _amount);
     }
 
     // --- 'require' functions ---
@@ -118,6 +126,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     receive() external payable {
         _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
+        CT = CT.add(_amount);
+        emit CollateralSent(address(this), _amount);
     }
+
 }
