@@ -82,15 +82,15 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     function sendCollateralToActivePool(uint _amount) external override {
         _requireCallerIsTMorLiquidations();
         if (_amount > 0) {
-        IActivePool activePool = IActivePool(activePoolAddress);
-        CT = CT.sub(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(CT);
-        emit CollateralSent(activePoolAddress, _amount);
-        
-        // transfer collateral to active pool
-        collateralToken.transfer(activePoolAddress, _amount);
-        // process collateral increase
-        activePool.processCollateralIncrease(_amount);
+            IActivePool activePool = IActivePool(activePoolAddress);
+            CT = CT.sub(_amount);
+            emit DefaultPoolCollateralBalanceUpdated(CT);
+            emit CollateralSent(activePoolAddress, _amount);
+            
+            // transfer collateral to active pool
+            collateralToken.transfer(activePoolAddress, _amount);
+            // process collateral increase
+            activePool.processCollateralIncrease(_amount);
         }
     }
 
@@ -142,5 +142,4 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
             msg.sender == activePoolAddress,
             "DefaultPool: Caller is neither TM nor ActivePool");
     }
-
 }
