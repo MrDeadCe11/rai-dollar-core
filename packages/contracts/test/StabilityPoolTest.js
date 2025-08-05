@@ -44,6 +44,7 @@ contract('StabilityPool', async accounts => {
   let borrowerOperations
   let lqtyToken
   let communityIssuance
+  let collateralToken
 
   let gasPriceInWei
 
@@ -76,7 +77,7 @@ contract('StabilityPool', async accounts => {
       defaultPool = contracts.defaultPool
       borrowerOperations = contracts.borrowerOperations
       hintHelpers = contracts.hintHelpers
-
+      collateralToken = contracts.collateralToken
       lqtyToken = LQTYContracts.lqtyToken
       communityIssuance = LQTYContracts.communityIssuance
 
@@ -87,6 +88,16 @@ contract('StabilityPool', async accounts => {
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
+      // mint tokens to accounts
+      await th.mintCollateralTokens (contracts, [owner,
+        defaulter_1, defaulter_2, defaulter_3,
+        whale,
+        alice, bob, carol, dennis, erin, flyn,
+        A, B, C, D, E, F,
+        frontEnd_1, frontEnd_2, frontEnd_3,
+      ], dec(10000, 18))
+      // mint extra tokens to the whale
+      await th.mintCollateralTokens (contracts, [whale], dec(1000, 24))
       // Register 3 front ends
       await th.registerFrontEnds(frontEnds, stabilityPool)
     })
@@ -332,8 +343,8 @@ contract('StabilityPool', async accounts => {
         assert.include(error.message, "revert")
       }
     })
-
-    it("provideToSP(): reverts if cannot receive ETH Gain", async () => {
+    // note: skipped because of switch to erc20 collateral
+    it.skip("provideToSP(): reverts if cannot receive ETH Gain", async () => {
       // --- SETUP ---
       // Whale deposits 1850 LUSD in StabilityPool
       await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: whale, value: dec(50, 'ether') } })
@@ -1333,15 +1344,18 @@ contract('StabilityPool', async accounts => {
 
       // A, B, C top up their deposits. Grab G at each stage, as it can increase a bit
       // between topups, because some block.timestamp time passes (and LQTY is issued) between ops
-      const G1 = await stabilityPool.scaleToG(currentScale)
+
+      // Capture G values after provideToSP calls to avoid race condition where LQTY issuance during
+      //  the transaction differs from the pre-transaction G value due to time passing between ops
       await stabilityPool.provideToSP(deposit_A, frontEnd_1, { from: A })
-
-      const G2 = await stabilityPool.scaleToG(currentScale)
+      const G1 = await stabilityPool.scaleToG(currentScale)
+      
       await stabilityPool.provideToSP(deposit_B, frontEnd_2, { from: B })
-
-      const G3 = await stabilityPool.scaleToG(currentScale)
+      const G2 = await stabilityPool.scaleToG(currentScale)
+      
       await stabilityPool.provideToSP(deposit_C, frontEnd_3, { from: C })
-
+      const G3 = await stabilityPool.scaleToG(currentScale)
+      
       const frontEnds = [frontEnd_1, frontEnd_2, frontEnd_3]
       const G_Values = [G1, G2, G3]
 
@@ -1434,7 +1448,7 @@ contract('StabilityPool', async accounts => {
       assert.equal(alice_initialDeposit, dec(100, 18))
       assert.equal(bob_initialDeposit, '0')
 
-      // whale deposits 1 LUSD so A can exit
+      // whale deposits 1 LUSD so A can exit))
       await openTrove({ extraLUSDAmount: toBN(dec(1, 24)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
       await stabilityPool.provideToSP(dec(1, 18), frontEnd_1, { from: whale })
 
@@ -2801,9 +2815,12 @@ contract('StabilityPool', async accounts => {
       await troveManager.liquidate(defaulter_1)
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
+      // approve stability pool to spend collateral
+      await collateralToken.approve(activePool.address, dec(1000, 24), { from: alice })
       const txAlice = await stabilityPool.withdrawCollateralGainToTrove(alice, alice, { from: alice })
       assert.isTrue(txAlice.receipt.status)
-
+      
+      await collateralToken.approve(activePool.address, dec(1000, 24), { from: bob })
       const txPromise_B = stabilityPool.withdrawCollateralGainToTrove(bob, bob, { from: bob })
       await th.assertRevert(txPromise_B)
     })

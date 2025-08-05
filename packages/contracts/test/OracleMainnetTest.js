@@ -21,7 +21,7 @@ function getEvent(receipt, eventName) {
     return event;
 }
 
-contract.skip('PriceFeedMainnetForkTest', async accounts => {
+contract('PriceFeedMainnetForkTest', async accounts => {
 
     // staleness threshold for the price feeds
     const stalenessThreshold = TimeValues.SECONDS_IN_ONE_DAY;  // 24hr staleness
@@ -81,7 +81,7 @@ contract.skip('PriceFeedMainnetForkTest', async accounts => {
         return mockedContract;
     }
 
-    describe("WSTETHPriceFeed", () => {
+    describe.skip("WSTETHPriceFeed", () => {
         beforeEach(async () => {
         // Reset fork state before each test
         await hre.network.provider.request({
@@ -309,7 +309,7 @@ contract.skip('PriceFeedMainnetForkTest', async accounts => {
         });
     });
 
-    describe("RETHPriceFeed", () => {
+    describe.skip("RETHPriceFeed", () => {
         beforeEach(async () => {
         // Reset fork state before each test
         await hre.network.provider.request({
@@ -574,7 +574,7 @@ contract.skip('PriceFeedMainnetForkTest', async accounts => {
         return wbtcUsdPrice;
     }
 
-    describe("WBTCPriceFeed", () => {
+    describe.skip("WBTCPriceFeed", () => {
         let wbtcPriceFeed;
         let chainlinkWbtcBtcOracle;
         let chainlinkBtcUsdOracle;
@@ -672,7 +672,7 @@ contract.skip('PriceFeedMainnetForkTest', async accounts => {
 
     });
 
-    describe("WETHPriceFeed", () => {
+    describe.skip("WETHPriceFeed", () => {
         let wethPriceFeed;
         let chainlinkEthUsdOracle;
         let weth;

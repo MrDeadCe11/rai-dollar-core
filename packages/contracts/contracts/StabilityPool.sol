@@ -293,6 +293,9 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
         collateralToken = borrowerOperations.collateralToken();
         
+        // give approval to active pool to spend collateral
+        collateralToken.approve(address(activePool), type(uint256).max);
+
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
