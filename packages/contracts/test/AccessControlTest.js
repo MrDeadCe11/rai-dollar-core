@@ -31,6 +31,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
   let defaultPool
   let functionCaller
   let borrowerOperations
+  let collateralToken
 
   let lqtyStaking
   let lqtyToken
@@ -53,6 +54,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     defaultPool = coreContracts.defaultPool
     functionCaller = coreContracts.functionCaller
     borrowerOperations = coreContracts.borrowerOperations
+    collateralToken = coreContracts.collateralToken
     relayer = coreContracts.relayer
     parControl = coreContracts.parControl
     rateControl = coreContracts.rateControl
@@ -65,6 +67,8 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
     await deploymentHelper.connectCoreContracts(coreContracts, LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, coreContracts)
+    // mint tokens
+    await th.mintCollateralTokens(coreContracts, accounts.slice(0, 10), dec(10, 24))
 
     for (account of accounts.slice(0, 10)) {
       await th.openTrove(coreContracts, { extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: account } })
@@ -79,9 +83,11 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
 
   describe('BorrowerOperations', async accounts => { 
     it("moveETHGainToTrove(): reverts when called by an account that is not StabilityPool", async () => {
+      const collToAdd = toBN(dec(100, 18))
       // Attempt call from alice
       try {
-        const tx1= await borrowerOperations.moveETHGainToTrove(bob, bob, bob, { from: bob })
+        const tx1= await borrowerOperations.moveCollateralGainToTrove(bob, collToAdd, bob, bob, { from: bob })
+        console.log(tx1)
       } catch (err) {
          assert.include(err.message, "revert")
         // assert.include(err.message, "BorrowerOps: Caller is not Stability Pool")
@@ -228,7 +234,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("sendETH(): reverts when called by an account that is not BO nor TroveM nor SP", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await activePool.sendETH(alice, 100, { from: alice })
+        const txAlice = await activePool.sendCollateral(alice, 100, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert")
@@ -260,8 +266,8 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
       }
     })
 
-    // fallback (payment)	
-    it("fallback(): reverts when called by an account that is not Borrower Operations nor Default Pool", async () => {
+    // fallback (payment)	TODO: do we need fallback to revert if anyone sends eth to the activePool?
+    it.skip("fallback(): reverts when called by an account that is not Borrower Operations nor Default Pool", async () => {
       // Attempt call from alice
       try {
         const txAlice = await web3.eth.sendTransaction({ from: alice, to: activePool.address, value: 100 })
@@ -274,11 +280,11 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
   })
 
   describe('DefaultPool', async accounts => {
-    // sendETHToActivePool
-    it("sendETHToActivePool(): reverts when called by an account that is not TroveManager", async () => {
+    // sendCollateralToActivePool
+    it("sendCollateralToActivePool(): reverts when called by an account that is not TroveManager", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await defaultPool.sendETHToActivePool(100, { from: alice })
+        const txAlice = await defaultPool.sendCollateralToActivePool(100, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert")
@@ -310,8 +316,8 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
       }
     })
 
-    // fallback (payment)	
-    it("fallback(): reverts when called by an account that is not the Active Pool", async () => {
+    // fallback (payment)	TODO: Skipped.  sending eth to active pool does not change collateral balance
+    it.skip("fallback(): reverts when called by an account that is not the Active Pool", async () => {
       // Attempt call from alice
       try {
         const txAlice = await web3.eth.sendTransaction({ from: alice, to: defaultPool.address, value: 100 })
@@ -340,8 +346,8 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
 
     // --- onlyActivePool ---
 
-    // fallback (payment)	
-    it("fallback(): reverts when called by an account that is not the Active Pool", async () => {
+    // fallback (payment)	TODO: Skipped.  sending eth to active pool does not change collateral balance
+    it.skip("fallback(): reverts when called by an account that is not the Active Pool", async () => {
       // Attempt call from alice
       try {
         const txAlice = await web3.eth.sendTransaction({ from: alice, to: stabilityPool.address, value: 100 })

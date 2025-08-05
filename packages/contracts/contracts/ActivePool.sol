@@ -28,7 +28,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     address public stabilityPoolAddress;
     address public defaultPoolAddress;
     address public collSurplusPoolAddress;
-    uint256 internal collateral;  // deposited collateral tracker
+    uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;
     // --- Events ---
 
@@ -80,7 +80,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
     */
     function getCollateral() external view override returns (uint) {
-        return collateral;
+        return CT;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -91,8 +91,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function sendCollateral(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        collateral = collateral.sub(_amount);
-        emit ActivePoolCollateralBalanceUpdated(collateral);
+        CT = CT.sub(_amount);
+        emit ActivePoolCollateralBalanceUpdated(CT);
         emit CollateralSent(_account, _amount);
         
         // transfer collateral to account
@@ -106,16 +106,16 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsBOorTroveMorSPorDefaultPool();
-        collateral = collateral.add(_amount);
-        emit ActivePoolCollateralBalanceUpdated(collateral);
+        CT = CT.add(_amount);
+        emit ActivePoolCollateralBalanceUpdated(CT);
     }
 
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSPorDefaultPool();
-        collateral = collateral.add(_amount);
+        CT = CT.add(_amount);
 
         collateralToken.transferFrom(_account, address(this), _amount);
-        emit ActivePoolCollateralBalanceUpdated(collateral);
+        emit ActivePoolCollateralBalanceUpdated(CT);
     }
 
     function increaseLUSDDebt(uint _amount) external override {

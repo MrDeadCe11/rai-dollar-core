@@ -254,7 +254,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     // Send COLL as collateral to a trove. Called by only the Stability Pool.
-    function moveCOLLGainToTrove(address _borrower, uint256 _collateralToAdd, address _upperHint, address _lowerHint) external override {
+    function moveCollateralGainToTrove(address _borrower, uint256 _collateralToAdd, address _upperHint, address _lowerHint) external override {
         _requireCallerIsStabilityPool();
         _adjustTrove(_borrower, _collateralToAdd, 0, 0, false, _upperHint, _lowerHint);
     }

@@ -24,7 +24,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     IERC20 public collateralToken;
     address public troveManagerAddress;
     address public activePoolAddress;
-    uint256 internal collateral;  // deposited collateral tracker
+    uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;  // debt
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
@@ -65,7 +65,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     * Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
     function getCollateral() external view override returns (uint) {
-        return collateral;
+        return CT;
     }
 
     function getLUSDDebt() external view override returns (uint) {
@@ -77,8 +77,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     function sendCollateralToActivePool(uint _amount) external override {
         _requireCallerIsTroveManager();
         IActivePool activePool = IActivePool(activePoolAddress);
-        collateral = collateral.sub(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(collateral);
+        CT = CT.sub(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
         emit CollateralSent(activePoolAddress, _amount);
         
         // transfer collateral to active pool
@@ -89,15 +89,15 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsTroveMorActivePool();
-        collateral = collateral.add(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(collateral);
+        CT = CT.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
         collateralToken.transferFrom(_account, address(this), _amount);
     }
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsTroveMorActivePool();
-        collateral = collateral.add(_amount);
-        emit DefaultPoolCollateralBalanceUpdated(collateral);
+        CT = CT.add(_amount);
+        emit DefaultPoolCollateralBalanceUpdated(CT);
     }
 
     function increaseLUSDDebt(uint _amount) external override {
@@ -129,11 +129,4 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
             "DefaultPool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
     }
 
-    // --- Fallback function ---
-
-    // receive() external payable {
-    //     _requireCallerIsActivePool();
-    //     ETH = ETH.add(msg.value);
-    //     emit DefaultPoolETHBalanceUpdated(ETH);
-    // }
 }

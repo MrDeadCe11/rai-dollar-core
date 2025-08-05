@@ -46,7 +46,7 @@ interface IBorrowerOperations {
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
 
-    function moveCOLLGainToTrove(address _user, uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
+    function moveCollateralGainToTrove(address _user, uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
 
     function withdrawColl(uint _amount, address _upperHint, address _lowerHint) external;
 

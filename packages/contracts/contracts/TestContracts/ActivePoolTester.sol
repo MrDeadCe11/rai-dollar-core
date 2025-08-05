@@ -11,6 +11,6 @@ contract ActivePoolTester is ActivePool {
     }
 
     function unprotectedPayable() external payable {
-        collateral = collateral.add(msg.value);
+        CT = CT.add(msg.value);
     }
 }

@@ -153,7 +153,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     IERC20 public collateralToken;
 
-    uint256 internal COLLATERAL;  // deposited collateral tracker
+    uint256 internal CT;  // deposited Collateral Token tracker
 
     // Tracker for LUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
     uint256 internal totalLUSDDeposits;
@@ -292,7 +292,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         priceFeed = IPriceFeed(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
         collateralToken = borrowerOperations.collateralToken();
-        
+
         // give approval to active pool to spend collateral
         collateralToken.approve(address(activePool), type(uint256).max);
 
@@ -310,7 +310,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     // --- Getters for public variables. Required by IPool interface ---
 
     function getCollateral() external view override returns (uint) {
-        return COLLATERAL;
+        return CT;
     }
 
     function getTotalLUSDDeposits() external view override returns (uint) {
@@ -454,11 +454,11 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         emit CollateralGainWithdrawn(msg.sender, depositorCollateralGain, LUSDLoss);
         emit UserDepositChanged(msg.sender, compoundedLUSDDeposit);
 
-        COLLATERAL = COLLATERAL.sub(depositorCollateralGain);
-        emit StabilityPoolCollateralBalanceUpdated(COLLATERAL);
+        CT = CT.sub(depositorCollateralGain);
+        emit StabilityPoolCollateralBalanceUpdated(CT);
         emit CollateralSent(msg.sender, depositorCollateralGain);
 
-        borrowerOperations.moveCOLLGainToTrove(msg.sender, depositorCollateralGain, _upperHint, _lowerHint);
+        borrowerOperations.moveCollateralGainToTrove(msg.sender, depositorCollateralGain, _upperHint, _lowerHint);
     }
 
     // --- LQTY issuance functions ---
@@ -853,8 +853,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     function _sendCollateralGainToDepositor(uint _amount) internal {
         if (_amount == 0) {return;}
-        uint newCollateral = COLLATERAL.sub(_amount);
-        COLLATERAL = newCollateral;
+        uint newCollateral = CT.sub(_amount);
+        CT = newCollateral;
         emit StabilityPoolCollateralBalanceUpdated(newCollateral);
         emit CollateralSent(msg.sender, _amount);
 
@@ -1007,8 +1007,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsActivePool();
-        COLLATERAL = COLLATERAL.add(_amount);
-        emit StabilityPoolCollateralBalanceUpdated(COLLATERAL);
+        CT = CT.add(_amount);
+        emit StabilityPoolCollateralBalanceUpdated(CT);
     }
 
     function distributeToSP(uint256 lusdGain) external override {

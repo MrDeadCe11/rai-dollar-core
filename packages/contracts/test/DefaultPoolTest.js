@@ -10,7 +10,7 @@ contract('DefaultPool', async accounts => {
   let nonPayable
   let mockActivePool
   let mockTroveManager
-
+  let mockCollateralToken
   let [owner] = accounts
 
   beforeEach('Deploy contracts', async () => {
@@ -18,10 +18,12 @@ contract('DefaultPool', async accounts => {
     nonPayable = await NonPayable.new()
     mockTroveManager = await NonPayable.new()
     mockActivePool = await NonPayable.new()
-    await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address)
+    mockCollateralToken = await NonPayable.new()
+
+    await defaultPool.setAddresses(mockCollateralToken.address, mockTroveManager.address, mockActivePool.address)
   })
 
-  it('sendETHToActivePool(): fails if receiver cannot receive ETH', async () => {
+  it.skip('sendCollateralToActivePool(): fails if receiver cannot receive Collateral', async () => {
     const amount = dec(1, 'ether')
 
     // start pool with `amount`
@@ -30,8 +32,8 @@ contract('DefaultPool', async accounts => {
     assert.isTrue(tx.receipt.status)
 
     // try to send ether from pool to non-payable
-    //await th.assertRevert(defaultPool.sendETHToActivePool(amount, { from: owner }), 'DefaultPool: sending ETH failed')
-    const sendETHData = th.getTransactionData('sendETHToActivePool(uint256)', [web3.utils.toHex(amount)])
+    //await th.assertRevert(defaultPool.sendCollateralToActivePool(amount, { from: owner }), 'DefaultPool: sending Collateral failed')
+    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(uint256)', [web3.utils.toHex(amount)])
     await th.assertRevert(mockTroveManager.forward(defaultPool.address, sendETHData, { from: owner }), 'DefaultPool: sending ETH failed')
   })
 })

@@ -20,7 +20,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     address public activePoolAddress;
     IERC20 public collateralToken;
     // deposited ether tracker
-    uint256 internal COLL;
+    uint256 internal CT;
     // Collateral surplus claimable by trove owners
     mapping (address => uint) internal balances;
 
@@ -62,10 +62,10 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         _renounceOwnership();
     }
 
-    /* Returns the COLL state variable at ActivePool address.
+    /* Returns the CT state variable at ActivePool address.
        Not necessarily equal to the raw ether balance - ether can be forcibly sent to contracts. */
     function getCollateral() external view override returns (uint) {
-        return COLL;
+        return CT;
     }
 
     function getCollateral(address _account) external view override returns (uint) {
@@ -91,7 +91,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         balances[_account] = 0;
         emit CollBalanceUpdated(_account, 0);
 
-        COLL = COLL.sub(claimableColl);
+        CT = CT.sub(claimableColl);
         emit CollateralSent(_account, claimableColl);
 
         collateralToken.transfer(_account, claimableColl);
@@ -101,7 +101,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     function addCollateral(address _account, uint _amount) external override {
         _requireCallerIsActivePool();
-        COLL = COLL.add(_amount);
+        CT = CT.add(_amount);
         collateralToken.transferFrom(_account, address(this), _amount);
         emit CollateralSent(address(this), _amount);
     }
@@ -129,7 +129,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsActivePool();
-        COLL = COLL.add(_amount);
+        CT = CT.add(_amount);
         emit CollateralSent(address(this), _amount);
     }
 
@@ -137,6 +137,6 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     // receive() external payable {
     //     _requireCallerIsActivePool();
-    //     COLL = COLL.add(msg.value);
+    //     CT = CT.add(msg.value);
     // }
 }
