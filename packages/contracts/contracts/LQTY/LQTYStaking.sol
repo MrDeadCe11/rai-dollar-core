@@ -11,6 +11,7 @@ import "../Interfaces/ILQTYToken.sol";
 import "../Interfaces/ILQTYStaking.sol";
 import "../Dependencies/LiquityMath.sol";
 import "../Interfaces/ILUSDToken.sol";
+import "../Dependencies/IERC20.sol";
 
 contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     using SafeMath for uint;
@@ -34,7 +35,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     
     ILQTYToken public lqtyToken;
     ILUSDToken public lusdToken;
-
+    IERC20 public collateralToken;
     address public troveManagerAddress;
     address public borrowerOperationsAddress;
     address public activePoolAddress;
@@ -63,7 +64,8 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         address _lusdTokenAddress,
         address _troveManagerAddress, 
         address _borrowerOperationsAddress,
-        address _activePoolAddress
+        address _activePoolAddress,
+        address _collateralTokenAddress
     ) 
         external 
         onlyOwner 
@@ -74,12 +76,14 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         checkContract(_troveManagerAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_activePoolAddress);
+        checkContract(_collateralTokenAddress);
 
         lqtyToken = ILQTYToken(_lqtyTokenAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
         troveManagerAddress = _troveManagerAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
         activePoolAddress = _activePoolAddress;
+        collateralToken = IERC20(_collateralTokenAddress);
 
         emit LQTYTokenAddressSet(_lqtyTokenAddress);
         emit LQTYTokenAddressSet(_lusdTokenAddress);
@@ -122,7 +126,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
          // Send accumulated LUSD and ETH gains to the caller
         if (currentStake != 0) {
             lusdToken.transfer(msg.sender, LUSDGain);
-            _sendETHGainToUser(ETHGain);
+            _sendCollateralGainToUser(ETHGain);
         }
     }
 
@@ -158,7 +162,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
 
         // Send accumulated LUSD and ETH gains to the caller
         lusdToken.transfer(msg.sender, LUSDGain);
-        _sendETHGainToUser(ETHGain);
+        _sendCollateralGainToUser(ETHGain);
     }
 
     // --- Reward-per-unit-staked increase functions. Called by Liquity core contracts ---
@@ -213,10 +217,11 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         emit StakerSnapshotsUpdated(_user, F_Collateral, F_LUSD);
     }
 
-    function _sendETHGainToUser(uint ETHGain) internal {
+    function _sendCollateralGainToUser(uint ETHGain) internal {
         emit CollateralSent(msg.sender, ETHGain);
-        (bool success, ) = msg.sender.call{value: ETHGain}("");
-        require(success, "LQTYStaking: Failed to send accumulated ETHGain");
+        collateralToken.transfer(msg.sender, ETHGain);
+        // (bool success, ) = msg.sender.call{value: ETHGain}("");
+        // require(success, "LQTYStaking: Failed to send accumulated ETHGain");
     }
 
     // --- 'require' functions ---

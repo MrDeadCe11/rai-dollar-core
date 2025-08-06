@@ -28,7 +28,8 @@ interface ILQTYStaking {
         address _lusdTokenAddress,
         address _troveManagerAddress, 
         address _borrowerOperationsAddress,
-        address _activePoolAddress
+        address _activePoolAddress,
+        address _collateralTokenAddress
     )  external;
 
     function stake(uint _LQTYamount) external;

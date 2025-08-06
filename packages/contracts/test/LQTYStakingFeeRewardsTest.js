@@ -45,6 +45,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
   let borrowerOperations
   let lqtyStaking
   let lqtyToken
+  let collateralToken
 
   let contracts
 
@@ -73,9 +74,12 @@ contract('LQTYStaking revenue share tests', async accounts => {
     defaultPool = contracts.defaultPool
     borrowerOperations = contracts.borrowerOperations
     hintHelpers = contracts.hintHelpers
+    collateralToken = contracts.collateralToken
 
     lqtyToken = LQTYContracts.lqtyToken
     lqtyStaking = LQTYContracts.lqtyStaking
+
+    await th.mintCollateralTokens(contracts, [owner, A, B, C, D, E, F, G, whale], web3.utils.toWei('15000', 'ether'))
   })
 
   it('stake(): reverts if amount is zero', async () => {
@@ -371,16 +375,16 @@ contract('LQTYStaking revenue share tests', async accounts => {
     const expectedTotalETHGain = emittedCollateralFee_1.add(emittedCollateralFee_2)
     //const expectedTotalLUSDGain = emittedLUSDFee_1.add(emittedLUSDFee_2)
 
-    const A_ETHBalance_Before = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_Before = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_Before = toBN(await lusdToken.balanceOf(A))
 
     // A un-stakes
     const GAS_Used = th.gasUsed(await lqtyStaking.unstake(dec(100, 18), {from: A, gasPrice: GAS_PRICE }))
 
-    const A_ETHBalance_After = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_After = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_After = toBN(await lusdToken.balanceOf(A))
 
-    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before).add(toBN(GAS_Used * GAS_PRICE))
+    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before)//.add(toBN(GAS_Used * GAS_PRICE))
     const A_LUSDGain = A_LUSDBalance_After.sub(A_LUSDBalance_Before)
     console.log("A_LUSDGain", A_LUSDGain.toString())
 
@@ -445,16 +449,16 @@ contract('LQTYStaking revenue share tests', async accounts => {
     const expectedTotalETHGain = emittedCollateralFee_1.add(emittedCollateralFee_2)
     //const expectedTotalLUSDGain = emittedLUSDFee_1.add(emittedLUSDFee_2)
 
-    const A_ETHBalance_Before = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_Before = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_Before = toBN(await lusdToken.balanceOf(A))
 
     // A tops up
     const GAS_Used = th.gasUsed(await lqtyStaking.stake(dec(50, 18), {from: A, gasPrice: GAS_PRICE }))
 
-    const A_ETHBalance_After = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_After = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_After = toBN(await lusdToken.balanceOf(A))
 
-    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before).add(toBN(GAS_Used * GAS_PRICE))
+    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before)//.add(toBN(GAS_Used * GAS_PRICE))
     const A_LUSDGain = A_LUSDBalance_After.sub(A_LUSDBalance_Before)
 
     expectedTotalLUSDGain = toBN('0')
@@ -693,13 +697,13 @@ contract('LQTYStaking revenue share tests', async accounts => {
     const expectedLUSDGain_C = toBN('0')
     const expectedLUSDGain_D = toBN('0')
 
-    const A_ETHBalance_Before = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_Before = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_Before = toBN(await lusdToken.balanceOf(A))
-    const B_ETHBalance_Before = toBN(await web3.eth.getBalance(B))
+    const B_ETHBalance_Before = toBN(await collateralToken.balanceOf(B))
     const B_LUSDBalance_Before = toBN(await lusdToken.balanceOf(B))
-    const C_ETHBalance_Before = toBN(await web3.eth.getBalance(C))
+    const C_ETHBalance_Before = toBN(await collateralToken.balanceOf(C))
     const C_LUSDBalance_Before = toBN(await lusdToken.balanceOf(C))
-    const D_ETHBalance_Before = toBN(await web3.eth.getBalance(D))
+    const D_ETHBalance_Before = toBN(await collateralToken.balanceOf(D))
     const D_LUSDBalance_Before = toBN(await lusdToken.balanceOf(D))
 
     // A-D un-stake
@@ -715,23 +719,23 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.equal((await lqtyStaking.totalLQTYStaked()), '0')
 
     // Get A-D ETH and LUSD balances
-    const A_ETHBalance_After = toBN(await web3.eth.getBalance(A))
+    const A_ETHBalance_After = toBN(await collateralToken.balanceOf(A))
     const A_LUSDBalance_After = toBN(await lusdToken.balanceOf(A))
-    const B_ETHBalance_After = toBN(await web3.eth.getBalance(B))
+    const B_ETHBalance_After = toBN(await collateralToken.balanceOf(B))
     const B_LUSDBalance_After = toBN(await lusdToken.balanceOf(B))
-    const C_ETHBalance_After = toBN(await web3.eth.getBalance(C))
+    const C_ETHBalance_After = toBN(await collateralToken.balanceOf(C))
     const C_LUSDBalance_After = toBN(await lusdToken.balanceOf(C))
-    const D_ETHBalance_After = toBN(await web3.eth.getBalance(D))
+    const D_ETHBalance_After = toBN(await collateralToken.balanceOf(D))
     const D_LUSDBalance_After = toBN(await lusdToken.balanceOf(D))
 
     // Get ETH and LUSD gains
-    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before).add(toBN(A_GAS_Used * GAS_PRICE))
+    const A_ETHGain = A_ETHBalance_After.sub(A_ETHBalance_Before)//.add(toBN(A_GAS_Used * GAS_PRICE))
     const A_LUSDGain = A_LUSDBalance_After.sub(A_LUSDBalance_Before)
-    const B_ETHGain = B_ETHBalance_After.sub(B_ETHBalance_Before).add(toBN(B_GAS_Used * GAS_PRICE))
+    const B_ETHGain = B_ETHBalance_After.sub(B_ETHBalance_Before)//.add(toBN(B_GAS_Used * GAS_PRICE))
     const B_LUSDGain = B_LUSDBalance_After.sub(B_LUSDBalance_Before)
-    const C_ETHGain = C_ETHBalance_After.sub(C_ETHBalance_Before).add(toBN(C_GAS_Used * GAS_PRICE))
+    const C_ETHGain = C_ETHBalance_After.sub(C_ETHBalance_Before)//.add(toBN(C_GAS_Used * GAS_PRICE))
     const C_LUSDGain = C_LUSDBalance_After.sub(C_LUSDBalance_Before)
-    const D_ETHGain = D_ETHBalance_After.sub(D_ETHBalance_Before).add(toBN(D_GAS_Used * GAS_PRICE))
+    const D_ETHGain = D_ETHBalance_After.sub(D_ETHBalance_Before)//.add(toBN(D_GAS_Used * GAS_PRICE))
     const D_LUSDGain = D_LUSDBalance_After.sub(D_LUSDBalance_Before)
 
     // Check gains match expected amounts
@@ -744,8 +748,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.isAtMost(th.getDifference(expectedETHGain_D, D_ETHGain), 1000)
     assert.isAtMost(th.getDifference(expectedLUSDGain_D, D_LUSDGain), 1000)
   })
- 
-  it("unstake(): reverts if caller has ETH gains and can't receive ETH",  async () => {
+  // not relevant to erc20 collateral
+  it.skip ("unstake(): reverts if caller has ETH gains and can't receive ETH",  async () => {
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: whale } })  
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })

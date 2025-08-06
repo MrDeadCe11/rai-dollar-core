@@ -493,7 +493,8 @@ class DeploymentHelper {
       coreContracts.lusdToken.address,
       coreContracts.troveManager.address, 
       coreContracts.borrowerOperations.address,
-      coreContracts.activePool.address
+      coreContracts.activePool.address,
+      coreContracts.collateralToken.address
     )
   
     await LQTYContracts.communityIssuance.setAddresses(
