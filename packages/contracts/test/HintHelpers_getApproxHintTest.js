@@ -21,6 +21,7 @@ contract('HintHelpers', async accounts => {
   let borrowerOperations
   let hintHelpers
   let priceFeed
+  let collateralToken
 
   let contracts
 
@@ -86,7 +87,8 @@ contract('HintHelpers', async accounts => {
     borrowerOperations = contracts.borrowerOperations
     hintHelpers = contracts.hintHelpers
     priceFeed = contracts.priceFeedTestnet
-  
+    collateralToken = contracts.collateralToken
+
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
@@ -94,6 +96,7 @@ contract('HintHelpers', async accounts => {
     numAccounts = 10
 
     await priceFeed.setPrice(dec(100, 18))
+    await th.mintCollateralTokens(contracts, accounts, web3.utils.toWei('15000', 'ether'))
     await makeTrovesInSequence(accounts, numAccounts) 
     // await makeTrovesInParallel(accounts, numAccounts)  
   })
