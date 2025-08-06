@@ -2,12 +2,12 @@
 
 pragma solidity 0.6.11;
 
-import "../TroveManager.sol";
+import "../TroveManagerNew.sol";
 
 /* Tester contract inherits from TroveManager, and provides external functions 
 for testing the parent's internal functions. */
 
-contract TroveManagerTester is TroveManager {
+contract TroveManagerTester is TroveManagerNew {
 
     function computeICR(uint _coll, uint _debt, uint _price) external view returns (uint) {
         uint par = relayer.par();

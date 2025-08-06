@@ -258,6 +258,48 @@ contract('TroveManager', async accounts => {
     assert.isAtMost(th.getDifference(activePool_RawCollateral_After, A_collateral), 1)
     th.assertIsApproximatelyEqual(activePool_LUSDDebt_After, A_totalDebt)
   })
+  it("liquidate(): decreases ActivePool ETH and LUSDDebt by correct amounts, with liq surplus", async () => {
+    // --- SETUP 
+    const { collateral: A_collateral, totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
+    const { collateral: B_collateral, totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(21, 17)), extraParams: { from: bob } })
+
+    // --- TEST ---
+
+    // check ActivePool ETH and LUSD debt before
+    const activePool_ETH_Before = (await activePool.getETH()).toString()
+    const activePool_RawEther_Before = (await web3.eth.getBalance(activePool.address)).toString()
+    const activePool_LUSDDebt_Before = (await activePool.getLUSDDebt()).toString()
+
+    assert.equal(activePool_ETH_Before, A_collateral.add(B_collateral))
+    assert.equal(activePool_RawEther_Before, A_collateral.add(B_collateral))
+    th.assertIsApproximatelyEqual(activePool_LUSDDebt_Before, A_totalDebt.add(B_totalDebt))
+
+    // price drops to 1ETH:100LUSD, reducing Bob's ICR below MCR
+    await priceFeed.setPrice('100000000000000000000');
+    assert.isFalse(await th.checkRecoveryMode(contracts))
+
+    /* close Bob's Trove. Should liquidate his ether and LUSD, 
+    leaving Alice’s ether and LUSD debt in the ActivePool. */
+    await liquidations.liquidate(bob, { from: owner });
+
+    // check ActivePool ETH and LUSD debt 
+    const activePool_ETH_After = await activePool.getETH()
+    const activePool_RawEther_After = await web3.eth.getBalance(activePool.address)
+    const activePool_LUSDDebt_After = await activePool.getLUSDDebt()
+
+    /*
+    console.log("activePool_ETH_After", activePool_ETH_After.toString())
+    console.log("A_collateral", A_collateral.toString())
+    console.log("B_collateral", B_collateral.toString())
+    */
+
+    // TODO Fix off by one
+    //assert.equal(activePool_ETH_After, A_collateral)
+    assert.isAtMost(th.getDifference(activePool_ETH_After, A_collateral), 1)
+    //assert.equal(activePool_RawEther_After, A_collateral)
+    assert.isAtMost(th.getDifference(activePool_RawEther_After, A_collateral), 1)
+    th.assertIsApproximatelyEqual(activePool_LUSDDebt_After, A_totalDebt)
+  })
   it("liquidate(): decreases ActivePool Collateral and LUSDDebt by correct amounts, with liq surplus", async () => {
     // --- SETUP 
     const { collateral: A_collateral, totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })

@@ -14,6 +14,9 @@ class TestInvariant {
     const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
     const supply = (await contracts.lusdToken.totalSupply()).sub(unprotectedSupply)
 
+    console.log("afterEach  debt" , debt.toString())
+    console.log("afterEach supply" , supply.toString())
+
     // system allows slightly more supply than debt due to rounding
     // this gap is corrected with each drip()
     return (supply.sub(debt).lte(toBN('3')) || debt.eq(toBN('0')))
