@@ -31,8 +31,6 @@ interface ICollSurplusPool {
 
     function addCollateral(address _account, uint _amount) external;
 
-    function addCollateral(address _account, uint _amount) external;
-
     function accountSurplus(address _account, uint _amount) external;
 
     function claimColl(address _account) external returns (uint256);

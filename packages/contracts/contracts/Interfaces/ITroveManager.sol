@@ -17,6 +17,7 @@ interface ITroveManager is ILiquityBase {
     
     // --- Events ---
 
+    event AggregatorAddressChanged(address _newAggregatorAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
@@ -41,6 +42,8 @@ interface ITroveManager is ILiquityBase {
     event LTermsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveSnapshotsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveIndexUpdated(address _borrower, uint _newIndex);
+
+    event AccInterestRateUpdated(uint256 rate);
 
     // --- Functions ---
 
