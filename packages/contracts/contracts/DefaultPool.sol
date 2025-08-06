@@ -7,7 +7,8 @@ import "./Dependencies/SafeMath.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
-
+import "./Dependencies/IERC20.sol";
+import "./Interfaces/IActivePool.sol";
 /*
  * The Default Pool holds the ETH and LUSD debt (but not LUSD tokens) from liquidations that have been redistributed
  * to active troves but not yet "applied", i.e. not yet recorded on a recipient active trove's struct.
@@ -20,6 +21,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     string constant public NAME = "DefaultPool";
 
+    IERC20 public collateralToken;
     address public troveManagerAddress;
     address public activePoolAddress;
     uint256 internal CT;  // deposited Collateral Token tracker
@@ -27,22 +29,27 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event DefaultPoolLUSDDebtUpdated(uint _LUSDDebt);
-    event DefaultPoolETHBalanceUpdated(uint _ETH);
+    event DefaultPoolCollateralBalanceUpdated(uint _COLLATERAL);
 
     // --- Dependency setters ---
 
     function setAddresses(
+        address _collateralTokenAddress,
         address _troveManagerAddress,
         address _activePoolAddress
     )
         external
         onlyOwner
     {
+        checkContract(_collateralTokenAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
 
+        collateralToken = IERC20(_collateralTokenAddress);
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
+
+        checkContract(address(collateralToken));
 
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
@@ -53,9 +60,9 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     // --- Getters for public variables. Required by IPool interface ---
 
     /*
-    * Returns the ETH state variable.
+    * Returns the collateral state variable.
     *
-    * Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
+    * Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
     function getCollateral() external view override returns (uint) {
         return CT;
@@ -67,7 +74,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     // --- Pool functionality ---
 
-    function sendETHToActivePool(uint _amount) external override {
+    function sendCollateralToActivePool(uint _amount) external override {
         _requireCallerIsTroveManager();
         IActivePool activePool = IActivePool(activePoolAddress);
         CT = CT.sub(_amount);
@@ -113,6 +120,13 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
+    }
+
+    function _requireCallerIsTroveMorActivePool() internal view {
+        require(
+            msg.sender == troveManagerAddress ||
+            msg.sender == activePoolAddress,
+            "DefaultPool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
     }
 
 }

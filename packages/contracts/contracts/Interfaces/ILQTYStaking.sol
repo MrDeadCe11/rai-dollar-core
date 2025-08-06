@@ -14,11 +14,11 @@ interface ILQTYStaking {
 
     event StakeChanged(address indexed staker, uint newStake);
     event StakingGainsWithdrawn(address indexed staker, uint LUSDGain, uint ETHGain);
-    event F_ETHUpdated(uint _F_ETH);
+    event F_CollateralUpdated(uint _F_Collateral);
     event F_LUSDUpdated(uint _F_LUSD);
     event TotalLQTYStakedUpdated(uint _totalLQTYStaked);
-    event EtherSent(address _account, uint _amount);
-    event StakerSnapshotsUpdated(address _staker, uint _F_ETH, uint _F_LUSD);
+    event CollateralSent(address _account, uint _amount);
+    event StakerSnapshotsUpdated(address _staker, uint _F_Collateral, uint _F_LUSD);
 
     // --- Functions ---
 
@@ -35,7 +35,7 @@ interface ILQTYStaking {
 
     function unstake(uint _LQTYamount) external;
 
-    function increaseF_ETH(uint _ETHFee) external; 
+    function increaseF_Collateral(uint _CollateralFee) external; 
 
     function increaseF_LUSD(uint _LQTYFee) external;  
 

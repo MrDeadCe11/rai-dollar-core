@@ -7,7 +7,7 @@ import "./IStabilityPool.sol";
 import "./ILUSDToken.sol";
 import "./ILQTYToken.sol";
 import "./ILQTYStaking.sol";
-import "./IRelayer.sol";
+import "./ICollSurplusPool.sol";
 
 
 // Common interface for the Trove Manager.
@@ -15,7 +15,6 @@ interface ITroveManager is ILiquityBase {
     
     // --- Events ---
 
-    event AggregatorAddressChanged(address _newAggregatorAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
@@ -41,12 +40,9 @@ interface ITroveManager is ILiquityBase {
     event TroveSnapshotsUpdated(uint _L_ETH, uint _L_LUSDDebt);
     event TroveIndexUpdated(address _borrower, uint _newIndex);
 
-    event AccInterestRateUpdated(uint256 rate);
-
     // --- Functions ---
 
     function setAddresses(
-        address _aggregatorAddress,
         address _borrowerOperationsAddress,
         address _activePoolAddress,
         address _defaultPoolAddress,
@@ -61,6 +57,7 @@ interface ITroveManager is ILiquityBase {
         address _relayerAddress
     ) external;
 
+    function collSurplusPool() external view returns (ICollSurplusPool);
     function stabilityPool() external view returns (IStabilityPool);
     function lusdToken() external view returns (ILUSDToken);
     function lqtyToken() external view returns (ILQTYToken);

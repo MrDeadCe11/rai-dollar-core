@@ -7,7 +7,8 @@ import "./Dependencies/SafeMath.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
-
+import "./Dependencies/IERC20.sol";
+import "./Interfaces/IBorrowerOperations.sol";
 
 contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     using SafeMath for uint256;
@@ -17,7 +18,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
-
+    IERC20 public collateralToken;
     // deposited ether tracker
     uint256 internal CT;
     // Collateral surplus claimable by trove owners
@@ -30,7 +31,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     event ActivePoolAddressChanged(address _newActivePoolAddress);
 
     event CollBalanceUpdated(address indexed _account, uint _newBalance);
-    event EtherSent(address _to, uint _amount);
+    event CollateralSent(address _to, uint _amount);
     
     // --- Contract setters ---
 
@@ -50,7 +51,10 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
+        collateralToken = IBorrowerOperations(_borrowerOperationsAddress).collateralToken();
 
+        checkContract(address(collateralToken));
+        
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
@@ -79,7 +83,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         emit CollBalanceUpdated(_account, newAmount);
     }
 
-    function claimColl(address _account) external override {
+    function claimColl(address _account) external override returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint claimableColl = balances[_account];
         require(claimableColl > 0, "CollSurplusPool: No collateral available to claim");
@@ -121,10 +125,9 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
             msg.sender == activePoolAddress,
             "CollSurplusPool: Caller is not Active Pool");
     }
+    
 
-    // --- Fallback function ---
-
-    receive() external payable {
+    function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsActivePool();
         CT = CT.add(_amount);
         emit CollateralSent(address(this), _amount);

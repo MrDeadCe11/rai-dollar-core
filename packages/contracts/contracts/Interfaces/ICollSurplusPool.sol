@@ -12,7 +12,7 @@ interface ICollSurplusPool {
     event ActivePoolAddressChanged(address _newActivePoolAddress);
 
     event CollBalanceUpdated(address indexed _account, uint _newBalance);
-    event EtherSent(address _to, uint _amount);
+    event CollateralSent(address _to, uint _amount);
 
     // --- Contract setters ---
 
@@ -22,11 +22,15 @@ interface ICollSurplusPool {
         address _activePoolAddress
     ) external;
 
-    function getETH() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     function getCollateral(address _account) external view returns (uint);
 
+    function addCollateral(address _account, uint _amount) external;
+
     function accountSurplus(address _account, uint _amount) external;
 
-    function claimColl(address _account) external;
+    function claimColl(address _account) external returns (uint256);
+
+    function processCollateralIncrease(uint _amount) external;
 }

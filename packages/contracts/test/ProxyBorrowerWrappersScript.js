@@ -410,7 +410,7 @@ contract('BorrowerWrappers', async accounts => {
     th.assertIsApproximatelyEqual(stakeAfter, stakeBefore.add(aliceExpLqtyGain), 400000)
 
     // Expect Alice has withdrawn all ETH gain
-    const alice_pendingETHGain = await stabilityPool.getDepositorETHGain(alice)
+    const alice_pendingETHGain = await stabilityPool.getDepositorCollateralGain(alice)
     assert.equal(alice_pendingETHGain, 0)
   })
 
@@ -522,7 +522,7 @@ contract('BorrowerWrappers', async accounts => {
     console.log("stakeAfter", stakeAfter.toString())
 
     // Expect Alice has withdrawn all ETH gain
-    const alice_pendingETHGain = await stabilityPool.getDepositorETHGain(alice)
+    const alice_pendingETHGain = await stabilityPool.getDepositorCollateralGain(alice)
     assert.equal(alice_pendingETHGain, 0)
   })
 
@@ -617,7 +617,7 @@ contract('BorrowerWrappers', async accounts => {
     console.log("stakeAfter", stakeAfter.toString())
 
     // Expect Alice has withdrawn all ETH gain
-    const alice_pendingETHGain = await stabilityPool.getDepositorETHGain(alice)
+    const alice_pendingETHGain = await stabilityPool.getDepositorCollateralGain(alice)
     assert.equal(alice_pendingETHGain, 0)
   })
 
@@ -696,7 +696,7 @@ contract('BorrowerWrappers', async accounts => {
     th.assertIsApproximatelyEqual(lqtyBalanceBefore, lqtyBalanceAfter)
 
     // Expect Alice has withdrawn all ETH gain
-    const alice_pendingETHGain = await stabilityPool.getDepositorETHGain(alice)
+    const alice_pendingETHGain = await stabilityPool.getDepositorCollateralGain(alice)
     assert.equal(alice_pendingETHGain, 0)
   })
 
@@ -813,7 +813,7 @@ contract('BorrowerWrappers', async accounts => {
     console.log("stakeAfter", stakeAfter.toString())
 
     // Expect Alice has withdrawn all ETH gain
-    const alice_pendingETHGain = await stabilityPool.getDepositorETHGain(alice)
+    const alice_pendingETHGain = await stabilityPool.getDepositorCollateralGain(alice)
     assert.equal(alice_pendingETHGain, 0)
   })
 

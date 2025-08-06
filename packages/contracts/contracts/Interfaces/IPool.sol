@@ -12,15 +12,19 @@ interface IPool {
     event ActivePoolAddressChanged(address _newActivePoolAddress);
     event DefaultPoolAddressChanged(address _newDefaultPoolAddress);
     event StabilityPoolAddressChanged(address _newStabilityPoolAddress);
-    event EtherSent(address _to, uint _amount);
+    event CollateralSent(address _to, uint _amount);
 
     // --- Functions ---
     
-    function getETH() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     function getLUSDDebt() external view returns (uint);
 
+    function addCollateral(address _account, uint _amount) external;
+    
     function increaseLUSDDebt(uint _amount) external;
 
     function decreaseLUSDDebt(uint _amount) external;
+
+    function processCollateralIncrease(uint _amount) external;
 }

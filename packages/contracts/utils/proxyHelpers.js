@@ -203,8 +203,8 @@ class TroveManagerProxy extends Proxy {
     return this.proxyFunction('relayer', [])
   }
 
-  async getPendingETHReward(...params) {
-    return this.proxyFunction('getPendingETHReward', params)
+  async getPendingCollateralReward(...params) {
+    return this.proxyFunction('getPendingCollateralReward', params)
   }
 
   async getPendingLUSDDebtReward(...params) {
@@ -235,8 +235,8 @@ class TroveManagerProxy extends Proxy {
     return this.proxyFunction('baseRate', [])
   }
 
-  async L_ETH() {
-    return this.proxyFunction('L_ETH', [])
+  async L_COLL() {
+    return this.proxyFunction('L_COLL', [])
   }
 
   async L_LUSDDebt() {
@@ -301,8 +301,8 @@ class StabilityPoolProxy extends Proxy {
     return this.proxyFunctionWithUser('deposits', user)
   }
 
-  async getDepositorETHGain(user) {
-    return this.proxyFunctionWithUser('getDepositorETHGain', user)
+  async getDepositorCollateralGain(user) {
+    return this.proxyFunctionWithUser('getDepositorCollateralGain', user)
   }
 }
 

@@ -409,7 +409,7 @@ def liquidate_troves(accounts, contracts, active_accounts, inactive_accounts, pr
         return [0, 0]
 
     stability_pool_previous = contracts.stabilityPool.getTotalLUSDDeposits() / 1e18
-    stability_pool_eth_previous = contracts.stabilityPool.getETH() / 1e18
+    stability_pool_eth_previous = contracts.stabilityPool.getCollateral() / 1e18
 
     while pending_liquidations(contracts, price_ether_current):
         try:
@@ -431,7 +431,7 @@ def liquidate_troves(accounts, contracts, active_accounts, inactive_accounts, pr
                 ICR = contracts.troveManager.getCurrentICR(trove, Wei(price_ether_current * 1e18))
                 print(f"ICR: {ICR}")
     stability_pool_current = contracts.stabilityPool.getTotalLUSDDeposits() / 1e18
-    stability_pool_eth_current = contracts.stabilityPool.getETH() / 1e18
+    stability_pool_eth_current = contracts.stabilityPool.getCollateral() / 1e18
 
     debt_liquidated = stability_pool_current - stability_pool_previous
     ether_liquidated = stability_pool_eth_current - stability_pool_eth_previous

@@ -37,7 +37,7 @@ interface IStabilityPool {
 
     // --- Events ---
     
-    event StabilityPoolETHBalanceUpdated(uint _newBalance);
+    event StabilityPoolCollateralBalanceUpdated(uint _newBalance);
     event StabilityPoolLUSDBalanceUpdated(uint _newBalance);
 
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
@@ -62,10 +62,10 @@ interface IStabilityPool {
     event UserDepositChanged(address indexed _depositor, uint _newDeposit);
     event FrontEndStakeChanged(address indexed _frontEnd, uint _newFrontEndStake, address _depositor);
 
-    event ETHGainWithdrawn(address indexed _depositor, uint _ETH, int _LUSDLoss);
+    event CollateralGainWithdrawn(address indexed _depositor, uint _ETH, int _LUSDLoss);
     event LQTYPaidToDepositor(address indexed _depositor, uint _LQTY);
     event LQTYPaidToFrontEnd(address indexed _frontEnd, uint _LQTY);
-    event EtherSent(address _to, uint _amount);
+    event CollateralSent(address _to, uint _amount);
     event DistributeToSP(uint P, uint newP, uint lusdGain, uint totalLUSDDeposits);
 
     // --- Functions ---
@@ -127,7 +127,7 @@ interface IStabilityPool {
      * - Leaves their compounded deposit in the Stability Pool
      * - Updates snapshots for deposit and tagged front end stake
      */
-    function withdrawETHGainToTrove(address _upperHint, address _lowerHint) external;
+    function withdrawCollateralGainToTrove(address _upperHint, address _lowerHint) external;
 
     /*
      * Initial checks:
@@ -153,7 +153,7 @@ interface IStabilityPool {
      * Returns the total amount of ETH held by the pool, accounted in an internal variable instead of `balance`,
      * to exclude edge cases like ETH received from a self-destruct.
      */
-    function getETH() external view returns (uint);
+    function getCollateral() external view returns (uint);
 
     /*
      * Returns LUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
@@ -170,7 +170,7 @@ interface IStabilityPool {
     /*
      * Calculates the ETH gain earned by the deposit since its last snapshots were taken.
      */
-    function getDepositorETHGain(address _depositor) external view returns (uint);
+    function getDepositorCollateralGain(address _depositor) external view returns (uint);
 
     /*
      * Calculate the LQTY gain earned by a deposit since its last snapshots were taken.
@@ -196,6 +196,9 @@ interface IStabilityPool {
      * The front end's compounded stake is equal to the sum of its depositors' compounded deposits.
      */
     function getCompoundedFrontEndStake(address _frontEnd) external view returns (uint);
+
+    /* adds collateral amount to stability pool collateral balance */
+    function processCollateralIncrease(uint _amount) external;
 
     /*
      * Fallback function

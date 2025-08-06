@@ -45,7 +45,7 @@
           "type": "uint256"
         }
       ],
-      "name": "EtherSent",
+      "name": "CollateralSent",
       "type": "event"
     },
     {
@@ -54,11 +54,11 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "_F_ETH",
+          "name": "_F_Collateral",
           "type": "uint256"
         }
       ],
-      "name": "F_ETHUpdated",
+      "name": "F_CollateralUpdated",
       "type": "event"
     },
     {
@@ -131,7 +131,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "_F_ETH",
+          "name": "_F_Collateral",
           "type": "uint256"
         },
         {
@@ -237,11 +237,11 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "_ETHFee",
+          "name": "_CollateralFee",
           "type": "uint256"
         }
       ],
-      "name": "increaseF_ETH",
+      "name": "increaseF_Collateral",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

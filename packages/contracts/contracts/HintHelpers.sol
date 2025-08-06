@@ -7,7 +7,7 @@ import "./Interfaces/ISortedTroves.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-import "./Dependencies/console.sol";
+// import "./Dependencies/console.sol";
 
 contract HintHelpers is LiquityBase, Ownable, CheckContract {
     string constant public NAME = "HintHelpers";
@@ -108,7 +108,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     uint maxRedeemableLUSD = LiquityMath._min(remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
 
                     uint ETH = troveManager.getTroveColl(currentTroveuser)
-                        .add(troveManager.getPendingETHReward(currentTroveuser));
+                        .add(troveManager.getPendingCollateralReward(currentTroveuser));
 
                     uint newColl = ETH.sub(maxRedeemableLUSD.mul(par).div(_price));
                     uint newDebt = netLUSDDebt.sub(maxRedeemableLUSD);

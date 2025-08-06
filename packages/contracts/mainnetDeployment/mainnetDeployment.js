@@ -580,9 +580,9 @@ async function mainnetDeploy(configParams) {
   th.logBN("Snapshot of total trove stakes before last liq. ", totalStakesSnapshot)
   th.logBN("Snapshot of total trove collateral before last liq. ", totalCollateralSnapshot)
 
-  const L_ETH = await liquityCore.troveManager.L_ETH()
+  const L_COLL = await liquityCore.troveManager.L_COLL()
   const L_LUSDDebt = await liquityCore.troveManager.L_LUSDDebt()
-  th.logBN("L_ETH", L_ETH)
+  th.logBN("L_COLL", L_COLL)
   th.logBN("L_LUSDDebt", L_LUSDDebt)
 
   // StabilityPool

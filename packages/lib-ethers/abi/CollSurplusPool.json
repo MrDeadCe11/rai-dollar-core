@@ -60,7 +60,7 @@
         "type": "uint256"
       }
     ],
-    "name": "EtherSent",
+    "name": "CollateralSent",
     "type": "event"
   },
   {
@@ -186,7 +186,7 @@
   },
   {
     "inputs": [],
-    "name": "getETH",
+    "name": "getCollateral",
     "outputs": [
       {
         "internalType": "uint256",

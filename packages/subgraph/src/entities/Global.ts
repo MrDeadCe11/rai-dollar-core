@@ -71,10 +71,10 @@ export function getRedemptionSequenceNumber(): i32 {
   return increaseCounter("redemptionCount");
 }
 
-export function updateTotalRedistributed(L_ETH: BigInt, L_LUSDDebt: BigInt): void {
+export function updateTotalRedistributed(L_COLL: BigInt, L_LUSDDebt: BigInt): void {
   let global = getGlobal();
 
-  global.rawTotalRedistributedCollateral = L_ETH;
+  global.rawTotalRedistributedCollateral = L_COLL;
   global.rawTotalRedistributedDebt = L_LUSDDebt;
   global.save();
 }
