@@ -105,7 +105,6 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // --- Dependency setters ---
 
     function setAddresses(
-        address _collateralTokenAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _defaultPoolAddress,
