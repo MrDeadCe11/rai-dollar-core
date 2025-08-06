@@ -1770,15 +1770,16 @@ contract('TroveManager', async accounts => {
 
     // calculating w/ totalLiquidatedDebt is one truncation, while internally, totalLiqColl is the sum of many truncations
     // so this can be off by a few wei
-    expTotalLiquidatedColl = totalLiquidatedDebt.mul(par).mul((await troveManager.LIQUIDATION_PENALTY())).div(toBN(price)).div(toBN(dec(1,18)))
+    expTotalLiquidatedColl = aliceLiquidatedColl.add(bobLiquidatedColl).add(carolLiquidatedColl) // totalLiquidatedDebt.mul(par).mul((await troveManager.LIQUIDATION_PENALTY())).div(toBN(price)).div(toBN(dec(1,18)))
     //expTotalLiquidatedColl = aliceLiquidatedColl.add(bobLiquidatedColl).add(carolLiquidatedColl)
 
     //console.log("exp total liq coll", aliceLiquidatedColl.add(bobLiquidatedColl).add(carolLiquidatedColl).toString())
     console.log("expTotalLiquidatedColl", expTotalLiquidatedColl.toString())
     console.log("totalLiquidatedColl", totalLiquidatedColl.toString())
 
-    // verify total liq coll
-    assert.isAtMost(th.getDifference(expTotalLiquidatedColl, totalLiquidatedColl), 1)
+    assert.isTrue(totalLiquidatedColl.eq(expTotalLiquidatedColl))
+    // // verify total liq coll
+    // assert.isAtMost(th.getDifference(expTotalLiquidatedColl, totalLiquidatedColl), 2)
 
     // verift total gas comp
     aliceCollGasComp = aliceCollateral.div(await troveManager.PERCENT_DIVISOR())

@@ -306,8 +306,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         lqtyToken = ILQTYToken(_lqtyTokenAddress);
         lqtyStaking = ILQTYStaking(_lqtyStakingAddress);
         relayer = IRelayer(_relayerAddress);
+        IERC20 collateralToken = activePool.collateralToken();
 
-        activePool.collateralToken().approve(address(activePool), type(uint256).max);
+        assert(address(collateralToken) != address(0));
+        
+        collateralToken.approve(address(activePool), type(uint256).max);
 
         emit AggregatorAddressChanged(_aggregatorAddress);
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);

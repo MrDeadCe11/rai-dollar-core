@@ -441,7 +441,8 @@ class DeploymentHelper {
       contracts.lusdToken.address,
       contracts.sortedTroves.address,
       contracts.priceFeedTestnet.address,
-      LQTYContracts.communityIssuance.address
+      LQTYContracts.communityIssuance.address,
+      contracts.collateralToken.address
     )
 
     await contracts.defaultPool.setAddresses(
