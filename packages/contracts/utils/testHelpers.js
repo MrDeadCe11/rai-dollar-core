@@ -332,6 +332,13 @@ class TestHelper {
     return issuedDebt
   }
 
+  static async getCollateralFromCollSurplusPool(contracts, account) {
+    const rawHex = await web3.eth.call({
+      to: contracts.collSurplusPool.address,
+      data: contracts.collSurplusPool.contract.methods.getCollateral(account).encodeABI()
+    });
+    return this.toBN(rawHex)
+  }
   // Adds the gas compensation (50 LUSD)
   static async getCompositeDebt(contracts, debt) {
     const compositeDebt = contracts.borrowerOperations.getCompositeDebt(debt)

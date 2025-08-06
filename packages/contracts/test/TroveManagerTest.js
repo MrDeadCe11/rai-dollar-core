@@ -609,7 +609,7 @@ contract('TroveManager', async accounts => {
 
     b_coll = (await troveManager.getEntireDebtAndColl(bob))[1]
     b_coll_pending = (await troveManager.getEntireDebtAndColl(bob))[3]
-    b_exp = B_collateral.mul(L_ETH_expected_1).div(mv._1e18BN)
+    b_exp = B_collateral.mul(L_COLL_expected_1).div(mv._1e18BN)
     console.log("b_coll", b_coll.toString())
     console.log("b_exp", b_exp.toString())
     console.log("b_coll_pending", b_coll_pending.toString())
@@ -793,7 +793,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 40000)
 
     // Check bob in-active, check whale active
@@ -807,26 +807,27 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
 
     // check bob eth difference, considering eth used in tx
     txCost = th.ethUsed(tx)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(txCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
   })
+  
   it("liquidate(): surplus collateral if liquidated by par above penalty", async () => {
     // disable rates to ensure ICR change is from par only
     await contracts.rateControl.setCoBias(0)
@@ -855,7 +856,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -869,22 +870,22 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
 
     // check bob eth difference, considering eth used in tx
     txCost = th.ethUsed(tx)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(txCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
@@ -912,7 +913,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -926,22 +927,22 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
 
     // check bob eth difference, considering eth used in tx
     txCost = th.ethUsed(tx)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(txCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
@@ -977,24 +978,25 @@ contract('TroveManager', async accounts => {
 
     // bob has been removed from list
     assert.isTrue(listSize_Before > listSize_After)
-
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    // bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
 
     // check bob eth difference, considering eth used in tx
     txCost = th.ethUsed(tx)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(txCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
@@ -1047,22 +1049,22 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
 
     // check bob eth difference, considering eth used in tx
     txCost = th.ethUsed(tx)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(txCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
@@ -1090,7 +1092,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -1104,16 +1106,16 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.eq(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("liquidate(): no surplus collateral if liquidated below penalty, redistribution", async () => {
     await troveManager.setLiqPenaltyRedist(toBN(dec(109, 16)));
@@ -1147,16 +1149,16 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has no surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.eq(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob can't claim surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("liquidate(): no surplus collateral if liquidated by par below penalty", async () => {
     // disable rates to ensure ICR change is from par only
@@ -1193,7 +1195,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -1207,16 +1209,16 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has no surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.eq(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("liquidate(): no surplus collateral if liquidated by rate below penalty", async () => {
     const spDeposit = toBN(dec(100, 21))
@@ -1245,7 +1247,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -1259,16 +1261,16 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.eq(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("liquidate(): no surplus collateral if liquidated at penalty", async () => {
     const spDeposit = toBN(dec(100, 21))
@@ -1293,7 +1295,7 @@ contract('TroveManager', async accounts => {
     gasComp = bobCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(collGasComp.eq(gasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
 
     // Check bob in-active, check whale active
@@ -1307,16 +1309,16 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_Before > listSize_After)
 
     // bob has no surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.eq(toBN('0')))
 
     assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
 
     // bob claims surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
   it("liquidate(): surplus collateral if A,B,C liquidated above penalty", async () => {
@@ -1359,7 +1361,7 @@ contract('TroveManager', async accounts => {
     carolGasComp = carolCollateral.div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(carolCollGasComp.eq(carolGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(aliceLiquidatedColl.add(bobLiquidatedColl).add(carolLiquidatedColl), ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -1376,73 +1378,73 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol has surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.gt(toBN('0')))
 
     // check total surplus
-    totalSurplus = await contracts.collSurplusPool.getETH()
+    totalSurplus = await collSurplusPool.getCollateral()
     assert.isTrue(totalSurplus.eq(aliceSurplus.add(bobSurplus).add(carolSurplus)))
 
     assert.isTrue(aliceLiquidatedColl.add(aliceCollGasComp).add(aliceSurplus).eq(aliceCollateral))
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
-    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(aliceAmount).eq(aliceSurplus))
     // bob claims surplus collateral
     tx_bob_claim = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
-    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(bobAmount).eq(bobSurplus))
     // carol claims surplus collateral
     tx_carol_claim = await borrowerOperations.claimCollateral({ from: carol, gasprice:0})
-    const carolAmount = th.getRawEventArgByName(tx_carol_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const carolAmount = th.getRawEventArgByName(tx_carol_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(carolAmount).eq(carolSurplus))
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
     // check carol eth difference, considering eth used in tx
     carolTxCost = th.ethUsed(tx_carol_claim)
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
-    assert.isTrue(carolBalanceDiff.eq(carolSurplus.sub(carolTxCost)))
+    assert.isTrue(carolBalanceDiff.eq(carolSurplus))
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
 
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
   it("liquidateTroves(): A,B,C same size troves. surplus collateral if A,B,C liquidated above penalty", async () => {
@@ -1473,7 +1475,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -1490,19 +1492,19 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol has surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.gt(toBN('0')))
 
     // check total surplus
-    totalSurplus = await contracts.collSurplusPool.getETH()
+    totalSurplus = await collSurplusPool.getCollateral()
     assert.isTrue(totalSurplus.eq(aliceSurplus.add(bobSurplus).add(carolSurplus)))
 
     aliceLiquidatedColl = totalLiquidatedColl.div(toBN('3'))
@@ -1516,9 +1518,9 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
@@ -1529,34 +1531,34 @@ contract('TroveManager', async accounts => {
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
     // check carol eth difference, considering eth used in tx
     carolTxCost = th.ethUsed(tx_carol_claim)
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
-    assert.isTrue(carolBalanceDiff.eq(carolSurplus.sub(carolTxCost)))
+    assert.isTrue(carolBalanceDiff.eq(carolSurplus))
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
   it("batchLiquidate(): A,B,C same size troves. surplus collateral if A,B,C liquidated above penalty", async () => {
@@ -1588,7 +1590,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -1605,19 +1607,19 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol has surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.gt(toBN('0')))
 
     // check total surplus
-    totalSurplus = await contracts.collSurplusPool.getETH()
+    totalSurplus = await collSurplusPool.getCollateral()
     assert.isTrue(totalSurplus.eq(aliceSurplus.add(bobSurplus).add(carolSurplus)))
 
     aliceLiquidatedColl = totalLiquidatedColl.div(toBN('3'))
@@ -1631,9 +1633,9 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
@@ -1644,34 +1646,34 @@ contract('TroveManager', async accounts => {
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
     // check carol eth difference, considering eth used in tx
     carolTxCost = th.ethUsed(tx_carol_claim)
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
-    assert.isTrue(carolBalanceDiff.eq(carolSurplus.sub(carolTxCost)))
+    assert.isTrue(carolBalanceDiff.eq(carolSurplus))
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
   it("liquidateTroves(): A,B,C different size troves, different ICRs. A,B,C have surplus collateral liquidated above penalty", async () => {
@@ -1733,7 +1735,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -1750,15 +1752,15 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol has surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.gt(toBN('0')))
 
     par = await relayer.par()
@@ -1790,9 +1792,9 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
@@ -1803,34 +1805,34 @@ contract('TroveManager', async accounts => {
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
     // check carol eth difference, considering eth used in tx
     carolTxCost = th.ethUsed(tx_carol_claim)
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
-    assert.isTrue(carolBalanceDiff.eq(carolSurplus.sub(carolTxCost)))
+    assert.isTrue(carolBalanceDiff.eq(carolSurplus))
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("batchLiquidate(): A,B,C different size troves, different ICRs. A,B,C have surplus collateral liquidated above penalty", async () => {
     const spDeposit = toBN(dec(100, 21))
@@ -1887,7 +1889,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -1904,15 +1906,15 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol has surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.gt(toBN('0')))
 
     par = await relayer.par()
@@ -1946,9 +1948,9 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
@@ -1959,34 +1961,34 @@ contract('TroveManager', async accounts => {
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
     // check carol eth difference, considering eth used in tx
     carolTxCost = th.ethUsed(tx_carol_claim)
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
-    assert.isTrue(carolBalanceDiff.eq(carolSurplus.sub(carolTxCost)))
+    assert.isTrue(carolBalanceDiff.eq(carolSurplus))
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
   })
   it("liquidateTroves(): A,B,C different size troves, different ICRs. Only A,B have surplus collateral", async () => {
     const spDeposit = toBN(dec(100, 21))
@@ -2044,7 +2046,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -2061,15 +2063,15 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol does not have surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.eq(toBN('0')))
 
     // verift total gas comp
@@ -2104,42 +2106,42 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
-    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(aliceAmount).eq(aliceSurplus))
     // bob claims surplus collateral
     tx_bob_claim = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
-    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(bobAmount).eq(bobSurplus))
     // carol can't claim surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
     // carol should gain no collateral
@@ -2147,7 +2149,7 @@ contract('TroveManager', async accounts => {
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
   it("batchLiquidate(): A,B,C different size troves, different ICRs. Only A,B have surplus collateral", async () => {
@@ -2206,7 +2208,7 @@ contract('TroveManager', async accounts => {
     totalGasComp = (aliceCollateral.add(bobCollateral).add(carolCollateral)).div(await troveManager.PERCENT_DIVISOR())
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
-    ethGain = await stabilityPool.getDepositorETHGain(whale)
+    ethGain = await stabilityPool.getDepositorCollateralGain(whale)
     assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
 
     // Check alice, bob, carol in-active, check whale active
@@ -2223,15 +2225,15 @@ contract('TroveManager', async accounts => {
     assert.isTrue(listSize_After == 1)
 
     // alice has surplus collateral
-    aliceSurplus = await contracts.collSurplusPool.getCollateral(alice)
+    aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
     assert.isTrue(aliceSurplus.gt(toBN('0')))
 
     // bob has surplus collateral
-    bobSurplus = await contracts.collSurplusPool.getCollateral(bob)
+    bobSurplus = await th.getCollateralFromCollSurplusPool(contracts, bob)
     assert.isTrue(bobSurplus.gt(toBN('0')))
 
     // carol does not have surplus collateral
-    carolSurplus = await contracts.collSurplusPool.getCollateral(carol)
+    carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
     assert.isTrue(carolSurplus.eq(toBN('0')))
 
     // verift total gas comp
@@ -2266,42 +2268,42 @@ contract('TroveManager', async accounts => {
     assert.isTrue(bobLiquidatedColl.add(bobCollGasComp).add(bobSurplus).eq(bobCollateral))
     assert.isTrue(carolLiquidatedColl.add(carolCollGasComp).add(carolSurplus).eq(carolCollateral))
 
-    aliceBalanceBefore = toBN(await web3.eth.getBalance(alice)) 
-    bobBalanceBefore = toBN(await web3.eth.getBalance(bob)) 
-    carolBalanceBefore = toBN(await web3.eth.getBalance(carol)) 
+    aliceBalanceBefore = toBN(await collateralToken.balanceOf(alice)) 
+    bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
+    carolBalanceBefore = toBN(await collateralToken.balanceOf(carol)) 
 
     // alice claims surplus collateral
     tx_alice_claim = await borrowerOperations.claimCollateral({ from: alice, gasprice:0})
-    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const aliceAmount = th.getRawEventArgByName(tx_alice_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(aliceAmount).eq(aliceSurplus))
     // bob claims surplus collateral
     tx_bob_claim = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
-    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "EtherSent", "_amount");
+    const bobAmount = th.getRawEventArgByName(tx_bob_claim, collSurplusPoolInterface, collSurplusPool.address, "CollateralSent", "_amount");
     assert.isTrue(toBN(bobAmount).eq(bobSurplus))
     // carol can't claim surplus collateral
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
 
     // check alice eth difference, considering eth used in tx
     aliceTxCost = th.ethUsed(tx_alice_claim)
-    aliceBalanceAfter = toBN(await web3.eth.getBalance(alice)) 
+    aliceBalanceAfter = toBN(await collateralToken.balanceOf(alice)) 
     aliceBalanceDiff = aliceBalanceAfter.sub(aliceBalanceBefore)
 
-    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus.sub(aliceTxCost)))
+    assert.isTrue(aliceBalanceDiff.eq(aliceSurplus))
 
     // alice 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: alice, gasprice:0}), "No collateral available to claim")
 
     // check bob eth difference, considering eth used in tx
     bobTxCost = th.ethUsed(tx_bob_claim)
-    bobBalanceAfter = toBN(await web3.eth.getBalance(bob)) 
+    bobBalanceAfter = toBN(await collateralToken.balanceOf(bob)) 
     bobBalanceDiff = bobBalanceAfter.sub(bobBalanceBefore)
 
-    assert.isTrue(bobBalanceDiff.eq(bobSurplus.sub(bobTxCost)))
+    assert.isTrue(bobBalanceDiff.eq(bobSurplus))
 
     // bob 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: bob, gasprice:0}), "No collateral available to claim")
 
-    carolBalanceAfter = toBN(await web3.eth.getBalance(carol)) 
+    carolBalanceAfter = toBN(await collateralToken.balanceOf(carol)) 
     carolBalanceDiff = carolBalanceAfter.sub(carolBalanceBefore)
 
     // carol should gain no collateral
@@ -2309,7 +2311,7 @@ contract('TroveManager', async accounts => {
 
     // carol 2nd attempt to withdraw fails
     assertRevert(borrowerOperations.claimCollateral({ from: carol, gasprice:0}), "No collateral available to claim")
-    assert.isTrue((await collSurplusPool.getETH()).eq(toBN('0')))
+    assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
 
   })
 
@@ -4208,7 +4210,7 @@ contract('TroveManager', async accounts => {
 
     // --- TEST ---
 
-    // Price drops to 1ETH:100LUSD, reducing A, B, C ICR below MCR
+    // Price drops to 1Collateral:100LUSD, reducing A, B, C ICR below MCR
     await priceFeed.setPrice(dec(100, 18));
     const price = await priceFeed.getPrice()
 
@@ -4263,7 +4265,7 @@ contract('TroveManager', async accounts => {
 
     // --- TEST ---
 
-    // Price drops to 1ETH:100LUSD, reducing A, B, C ICR below MCR
+    // Price drops to 1Collateral:100LUSD, reducing A, B, C ICR below MCR
     await priceFeed.setPrice(dec(100, 18));
     const price = await priceFeed.getPrice()
 
@@ -4318,7 +4320,7 @@ contract('TroveManager', async accounts => {
 
     // --- TEST ---
 
-    // Price drops to 1ETH:100LUSD, reducing A, B, C ICR below MCR
+    // Price drops to 1Collateral:100LUSD, reducing A, B, C ICR below MCR
     await priceFeed.setPrice(dec(100, 18));
     const price = await priceFeed.getPrice()
 
@@ -5649,15 +5651,15 @@ contract('TroveManager', async accounts => {
 
     // Attempt with maxFee > 5.5%
     const price = await priceFeed.getPrice()
-    const CollateralDrawn = attemptedLUSDRedemption.mul(mv._1e18BN).div(price)
-    const slightlyMoreThanFee = (await aggregator.getRedemptionFeeWithDecay(CollateralDrawn))
+    const collateralDrawn = attemptedLUSDRedemption.mul(mv._1e18BN).div(price)
+    const slightlyMoreThanFee = (await aggregator.getRedemptionFeeWithDecay(collateralDrawn))
     const tx1 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedLUSDRedemption, slightlyMoreThanFee)
     assert.isTrue(tx1.receipt.status)
 
     await aggregator.setBaseRate(0)  // Artificially zero the baseRate
     
     // Attempt with maxFee = 5.5%
-    const exactSameFee = (await aggregator.getRedemptionFeeWithDecay(ETHDrawn))
+    const exactSameFee = (await aggregator.getRedemptionFeeWithDecay(collateralDrawn))
     const tx2 = await th.redeemCollateralAndGetTxObject(C, contracts, attemptedLUSDRedemption, exactSameFee)
     assert.isTrue(tx2.receipt.status)
 
@@ -6586,12 +6588,12 @@ contract('TroveManager', async accounts => {
 
     // check A's Collateral balance has increased by 0.045 Collateral 
     const price = await priceFeed.getPrice()
-    const CollateralDrawn = redemptionAmount.mul(mv._1e18BN).div(price)
+    const collateralDrawn = redemptionAmount.mul(mv._1e18BN).div(price)
     th.assertIsApproximatelyEqual(
       A_balanceAfter.sub(A_balanceBefore),
-      CollateralDrawn.sub(
+      collateralDrawn.sub(
         toBN(dec(5, 15)).add(redemptionAmount.mul(mv._1e18BN).div(totalDebt).div(toBN(2)))
-          .mul(CollateralDrawn).div(mv._1e18BN)
+          .mul(collateralDrawn).div(mv._1e18BN)
       ), //.sub(toBN(gasUsed * GAS_PRICE)), // substract gas used for troveManager.redeemCollateral from expected received Collateral
       100000
     )

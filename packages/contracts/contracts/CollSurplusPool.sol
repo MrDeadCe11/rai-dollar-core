@@ -38,7 +38,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     function setAddresses(
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
-        address _activePoolAddress
+        address _activePoolAddress,
+        address _collateralTokenAddress
     )
         external
         override
@@ -47,13 +48,14 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
+        checkContract(_collateralTokenAddress);
 
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
-        collateralToken = IBorrowerOperations(_borrowerOperationsAddress).collateralToken();
+        collateralToken = IERC20(_collateralTokenAddress);
 
-        checkContract(address(collateralToken));
+        
         
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
@@ -64,7 +66,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     /* Returns the CT state variable at ActivePool address.
        Not necessarily equal to the raw ether balance - ether can be forcibly sent to contracts. */
-    function getCollateral() external view override returns (uint) {
+    function getCollateral() external view override returns (uint256) {
         return CT;
     }
 

@@ -96,8 +96,8 @@ class DeploymentHelper {
   static async deployLiquityCoreHardhat() {
     const collateralToken = await CollateralToken.new("Hardhat Collateral Token", "HCT")
     const priceFeedTestnet = await PriceFeedTestnet.new()
-    const sortedTroves = await SortedTroves.new()
     const aggregator = await Aggregator.new()
+    const sortedTroves = await SortedTroves.new()
     const troveManager = await TroveManager.new()
     const activePool = await ActivePool.new()
     const stabilityPool = await StabilityPool.new()
@@ -384,6 +384,30 @@ class DeploymentHelper {
     await contracts.functionCaller.setTroveManagerAddress(contracts.troveManager.address)
     await contracts.functionCaller.setSortedTrovesAddress(contracts.sortedTroves.address)
 
+    // set contracts in BorrowerOperations 
+    await contracts.borrowerOperations.setAddresses(
+      contracts.collateralToken.address,
+      contracts.troveManager.address,
+      contracts.activePool.address,
+      contracts.defaultPool.address,
+      contracts.stabilityPool.address,
+      contracts.gasPool.address,
+      contracts.collSurplusPool.address,
+      contracts.priceFeedTestnet.address,
+      contracts.sortedTroves.address,
+      contracts.lusdToken.address,
+      LQTYContracts.lqtyStaking.address,
+      contracts.relayer.address,
+    )
+
+    await contracts.activePool.setAddresses(
+      contracts.borrowerOperations.address,
+      contracts.troveManager.address,
+      contracts.stabilityPool.address,
+      contracts.defaultPool.address,
+      contracts.collSurplusPool.address,
+      contracts.collateralToken.address
+    )
     // set contracts in the Trove Manager
     await contracts.troveManager.setAddresses(
       contracts.aggregator.address,
@@ -407,21 +431,7 @@ class DeploymentHelper {
       contracts.lusdToken.address,
     )
 
-    // set contracts in BorrowerOperations 
-    await contracts.borrowerOperations.setAddresses(
-      contracts.collateralToken.address,
-      contracts.troveManager.address,
-      contracts.activePool.address,
-      contracts.defaultPool.address,
-      contracts.stabilityPool.address,
-      contracts.gasPool.address,
-      contracts.collSurplusPool.address,
-      contracts.priceFeedTestnet.address,
-      contracts.sortedTroves.address,
-      contracts.lusdToken.address,
-      LQTYContracts.lqtyStaking.address,
-      contracts.relayer.address,
-    )
+
 
     // set contracts in the Pools
     await contracts.stabilityPool.setAddresses(
@@ -434,23 +444,17 @@ class DeploymentHelper {
       LQTYContracts.communityIssuance.address
     )
 
-    await contracts.activePool.setAddresses(
-      contracts.borrowerOperations.address,
-      contracts.troveManager.address,
-      contracts.stabilityPool.address,
-      contracts.defaultPool.address
-    )
-
     await contracts.defaultPool.setAddresses(
       contracts.collateralToken.address,
       contracts.troveManager.address,
-      contracts.activePool.address,
+      contracts.activePool.address
     )
 
     await contracts.collSurplusPool.setAddresses(
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       contracts.activePool.address,
+      contracts.collateralToken.address
     )
 
     // set contracts in HintHelpers

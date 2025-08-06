@@ -22,7 +22,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     using SafeMath for uint256;
 
     string constant public NAME = "ActivePool";
-    IERC20 public collateralToken;
+    IERC20 public override collateralToken;
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public stabilityPoolAddress;
@@ -44,7 +44,9 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _stabilityPoolAddress,
-        address _defaultPoolAddress
+        address _defaultPoolAddress,
+        address _collSurplusPoolAddress,
+        address _collateralTokenAddress
     )
         external
         onlyOwner
@@ -59,10 +61,16 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         troveManagerAddress = _troveManagerAddress;
         stabilityPoolAddress = _stabilityPoolAddress;
         defaultPoolAddress = _defaultPoolAddress;
-        collateralToken = IBorrowerOperations(_borrowerOperationsAddress).collateralToken();
-        collSurplusPoolAddress = address(ITroveManager(troveManagerAddress).collSurplusPool());
+        collateralToken = IERC20(_collateralTokenAddress);
+        collSurplusPoolAddress = _collSurplusPoolAddress;
 
         checkContract(address(collateralToken));
+        assert(borrowerOperationsAddress != address(0));
+        assert(troveManagerAddress != address(0));
+        assert(stabilityPoolAddress != address(0));
+        assert(defaultPoolAddress != address(0));
+        assert(collSurplusPoolAddress != address(0));
+        assert(address(collateralToken) != address(0));
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);

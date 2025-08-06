@@ -3,6 +3,7 @@
 pragma solidity 0.6.11;
 
 import "./IPool.sol";
+import "../Dependencies/IERC20.sol";
 
 
 interface IActivePool is IPool {
@@ -13,5 +14,6 @@ interface IActivePool is IPool {
     event ActivePoolETHBalanceUpdated(uint _ETH);
 
     // --- Functions ---
+    function collateralToken() external view returns (IERC20);
     function sendCollateral(address _account, uint _amount) external;
 }
