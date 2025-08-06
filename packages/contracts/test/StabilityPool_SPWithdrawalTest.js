@@ -2029,7 +2029,6 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const bob_ETHWithdrawn = await th.getEventArgByName(txB, 'CollateralGainWithdrawn', '_collateral').toString()
       const carol_ETHWithdrawn = await th.getEventArgByName(txC, 'CollateralGainWithdrawn', '_collateral').toString()
       const dennis_ETHWithdrawn = await th.getEventArgByName(txD, 'CollateralGainWithdrawn', '_collateral').toString()
-
       // A, B, C should withdraw 0 - their deposits have been completely used up
       assert.equal(await lusdToken.balanceOf(alice), '0')
       assert.equal(await lusdToken.balanceOf(bob), '0')

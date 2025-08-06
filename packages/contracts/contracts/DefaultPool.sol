@@ -43,17 +43,15 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         external
         onlyOwner
     {
-        checkContract(_collateralTokenAddress);
         checkContract(_liquidationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
+        checkContract(_collateralTokenAddress);
 
-        collateralToken = IERC20(_collateralTokenAddress);
         liquidationsAddress = _liquidationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
-
-        checkContract(address(collateralToken));
+        collateralToken = IERC20(_collateralTokenAddress);
 
         emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);

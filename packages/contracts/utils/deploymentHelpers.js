@@ -400,6 +400,7 @@ class DeploymentHelper {
 
     // set contracts in BorrowerOperations 
     await contracts.borrowerOperations.setAddresses(
+      contracts.collateralToken.address,
       contracts.troveManager.address,
       contracts.activePool.address,
       contracts.defaultPool.address,

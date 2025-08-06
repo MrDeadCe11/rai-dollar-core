@@ -59,8 +59,6 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         activePoolAddress = _activePoolAddress;
         collateralToken = IERC20(_collateralTokenAddress);
 
-        
-        
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);

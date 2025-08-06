@@ -4,7 +4,6 @@ pragma solidity 0.6.11;
 
 import "../Dependencies/IERC20.sol";
 import "../Interfaces/ILiquityBase.sol";
-
 import "../Dependencies/IERC20.sol";
 
 // Common interface for the Trove Manager.

@@ -146,6 +146,10 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         return _pool == stabilityPoolAddress || _pool == defaultPoolAddress || _pool == collSurplusPoolAddress;
     }
 
+    function _isPool(address _pool) internal view returns (bool) {
+        return _pool == stabilityPoolAddress || _pool == defaultPoolAddress || _pool == collSurplusPoolAddress;
+    }
+
     // --- 'require' functions ---
 
     function _requireCallerIsBorrowerOperationsOrDefaultPool() internal view {

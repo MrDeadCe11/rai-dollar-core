@@ -276,7 +276,7 @@ contract('TroveManager', async accounts => {
     assert.equal(activePool_RawCollateral_Before, A_collateral.add(B_collateral))
     th.assertIsApproximatelyEqual(activePool_LUSDDebt_Before, A_totalDebt.add(B_totalDebt))
 
-    // price drops to 1ETH:100LUSD, reducing Bob's ICR below MCR
+    // price drops to 1CollateralToken:100LUSD, reducing Bob's ICR below MCR
     await priceFeed.setPrice('100000000000000000000');
     assert.isFalse(await th.checkRecoveryMode(contracts))
 
@@ -4175,7 +4175,7 @@ contract('TroveManager', async accounts => {
     // Confirm Whale is ICR >= 110% 
     assert.isTrue((await troveManager.getCurrentICR(whale, price)).gte(mv._MCR))
 
-  liquidationArray = [alice, bob, carol, dennis, erin]
+    liquidationArray = [alice, bob, carol, dennis, erin]
     await liquidations.batchLiquidate(liquidationArray);
 
     // Confirm troves A-C have been removed from the system
@@ -4192,7 +4192,7 @@ contract('TroveManager', async accounts => {
   })
 
   it('batchLiquidate(): succeeds if passed inactive trove', async () => {
-    // --- SETUP ---
+  // --- SETUP ---
     await openTrove({ ICR: toBN(dec(100, 18)), extraParams: { from: whale } })
 
     await openTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: alice } })
