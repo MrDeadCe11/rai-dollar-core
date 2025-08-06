@@ -34,9 +34,9 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     // --- Dependency setters ---
 
     function setAddresses(
-        address _collateralTokenAddress,
         address _troveManagerAddress,
-        address _activePoolAddress
+        address _activePoolAddress,
+        address _collateralTokenAddress
     )
         external
         onlyOwner

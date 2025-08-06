@@ -386,7 +386,6 @@ class DeploymentHelper {
 
     // set contracts in BorrowerOperations 
     await contracts.borrowerOperations.setAddresses(
-      contracts.collateralToken.address,
       contracts.troveManager.address,
       contracts.activePool.address,
       contracts.defaultPool.address,
@@ -398,6 +397,7 @@ class DeploymentHelper {
       contracts.lusdToken.address,
       LQTYContracts.lqtyStaking.address,
       contracts.relayer.address,
+      contracts.collateralToken.address
     )
 
     await contracts.activePool.setAddresses(
@@ -446,9 +446,9 @@ class DeploymentHelper {
     )
 
     await contracts.defaultPool.setAddresses(
-      contracts.collateralToken.address,
       contracts.troveManager.address,
-      contracts.activePool.address
+      contracts.activePool.address,
+      contracts.collateralToken.address
     )
 
     await contracts.collSurplusPool.setAddresses(

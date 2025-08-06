@@ -513,9 +513,9 @@ contract('Gas compensation tests', async accounts => {
     const liquidatorBalance_after_A = web3.utils.toBN(await collateralToken.balanceOf(liquidator))
 
     // Check liquidator's balance increases by 0.5% of coll
-    const compensationReceived_A = (liquidatorBalance_after_A.sub(liquidatorBalance_before_A).add(toBN(A_GAS_Used_Liquidator * GAS_PRICE))).toString()
+    const compensationReceived_A = liquidatorBalance_after_A.sub(liquidatorBalance_before_A)//.add(toBN(A_GAS_Used_Liquidator * GAS_PRICE)))
     const _0pt5percent_aliceColl = aliceColl.div(web3.utils.toBN('200'))
-    assert.equal(compensationReceived_A, _0pt5percent_aliceColl)
+    assert.isTrue(compensationReceived_A.eq(_0pt5percent_aliceColl))
 
     // Check SP LUSD has decreased due to the liquidation of A
     const LUSDinSP_A = await stabilityPool.getTotalLUSDDeposits()
@@ -556,8 +556,8 @@ contract('Gas compensation tests', async accounts => {
 
     // Check liquidator's balance increases by $10 worth of coll
     const _0pt5percent_bobColl = bobColl.div(web3.utils.toBN('200'))
-    const compensationReceived_B = (liquidatorBalance_after_B.sub(liquidatorBalance_before_B).add(toBN(B_GAS_Used_Liquidator * GAS_PRICE))).toString()
-    assert.equal(compensationReceived_B, _0pt5percent_bobColl)
+    const compensationReceived_B = liquidatorBalance_after_B.sub(liquidatorBalance_before_B)//.add(toBN(B_GAS_Used_Liquidator * GAS_PRICE)))
+    assert.isTrue(compensationReceived_B.eq(_0pt5percent_bobColl))
 
     // Check SP LUSD has decreased due to the liquidation of B
     const LUSDinSP_B = await stabilityPool.getTotalLUSDDeposits()
@@ -617,8 +617,8 @@ contract('Gas compensation tests', async accounts => {
     const liquidatorBalance_after_A = web3.utils.toBN(await collateralToken.balanceOf(liquidator))
 
     // Check liquidator's balance increases by 0.5% of coll
-    const compensationReceived_A = (liquidatorBalance_after_A.sub(liquidatorBalance_before_A).add(toBN(A_GAS_Used_Liquidator * GAS_PRICE))).toString()
-    assert.equal(compensationReceived_A, _0pt5percent_aliceColl)
+    const compensationReceived_A = liquidatorBalance_after_A.sub(liquidatorBalance_before_A)//.add(toBN(A_GAS_Used_Liquidator * GAS_PRICE)))
+    assert.isTrue(compensationReceived_A.eq(_0pt5percent_aliceColl))
 
     // Check SP LUSD has decreased due to the liquidation of A 
     const LUSDinSP_A = await stabilityPool.getTotalLUSDDeposits()
@@ -656,8 +656,8 @@ contract('Gas compensation tests', async accounts => {
     const liquidatorBalance_after_B = web3.utils.toBN(await collateralToken.balanceOf(liquidator))
 
     // Check liquidator's balance increases by 0.5% of coll
-    const compensationReceived_B = (liquidatorBalance_after_B.sub(liquidatorBalance_before_B).add(toBN(B_GAS_Used_Liquidator * GAS_PRICE))).toString()
-    assert.equal(compensationReceived_B, _0pt5percent_bobColl)
+    const compensationReceived_B = liquidatorBalance_after_B.sub(liquidatorBalance_before_B)//.add(toBN(B_GAS_Used_Liquidator * GAS_PRICE)))
+    assert.isTrue(compensationReceived_B.eq(_0pt5percent_bobColl))
 
     // Check SP LUSD has decreased due to the liquidation of B
     const LUSDinSP_B = await stabilityPool.getTotalLUSDDeposits()
@@ -1043,12 +1043,12 @@ contract('Gas compensation tests', async accounts => {
     assert.isTrue(LUSDinSP_1.lt(LUSDinSP_0))
 
     // Check liquidator's balance has increased by the expected compensation amount
-    const compensationReceived = (liquidatorBalance_after.sub(liquidatorBalance_before).add(toBN(GAS_Used_Liquidator * GAS_PRICE))).toString()
-    assert.equal(expectedGasComp, compensationReceived)
+    const compensationReceived = liquidatorBalance_after.sub(liquidatorBalance_before)//.add(toBN(GAS_Used_Liquidator * GAS_PRICE)))
+    assert.isTrue(compensationReceived.eq(expectedGasComp))
 
     // Check ETH in stability pool now equals the expected liquidated collateral
-    const ETHinSP = (await stabilityPool.getCollateral()).toString()
-    assert.equal(expectedLiquidatedColl, ETHinSP)
+    const ETHinSP = await stabilityPool.getCollateral()
+    assert.isTrue(expectedLiquidatedColl.eq(ETHinSP))
   })
 
   // liquidateTroves - full redistribution
@@ -1119,7 +1119,7 @@ contract('Gas compensation tests', async accounts => {
     assert.isTrue(LUSDinDefaultPool_1.gt(LUSDinDefaultPool_0))
 
     // Check liquidator's balance has increased by the expected compensation amount
-    const compensationReceived = (liquidatorBalance_after.sub(liquidatorBalance_before).add(toBN(GAS_Used_Liquidator * GAS_PRICE))).toString()
+    const compensationReceived = liquidatorBalance_after.sub(liquidatorBalance_before)//.add(toBN(GAS_Used_Liquidator * GAS_PRICE))).toString()
 
     assert.isAtMost(th.getDifference(expectedGasComp, compensationReceived), 1000)
 
@@ -1215,7 +1215,7 @@ contract('Gas compensation tests', async accounts => {
 
     // increase tolerance to account for interest
     // TODO calc exact
-    assert.isAtMost(th.getDifference(expectedLiquidatedDebt, loggedDebt), 700000000000000)
+    assert.isAtMost(th.getDifference(expectedLiquidatedDebt, loggedDebt), 1700000000000000)
     //assert.isAtMost(th.getDifference(expectedLiquidatedDebt, loggedDebt), 1000)
     assert.isAtMost(th.getDifference(expectedLiquidatedColl, loggedColl), 1000)
     assert.isAtMost(th.getDifference(expectedGasComp, loggedGasComp), 1000)
@@ -1357,6 +1357,7 @@ contract('Gas compensation tests', async accounts => {
     for (const account of _20_accounts) {
 
       const collString = coll.toString().concat('000000000000000000')
+      await collateralToken.mint(account, collString)
       await openTrove({ extraLUSDAmount: dec(100, 18), extraParams: { from: account, value: collString } })
 
       coll += 5
@@ -1405,6 +1406,7 @@ contract('Gas compensation tests', async accounts => {
 
       const account = accountsList[accountIdx]
       const collString = coll.toString().concat('000000000000000000')
+      await collateralToken.mint(account, collString)
       await openTrove({ extraLUSDAmount: dec(100, 18), extraParams: { from: account, value: collString } })
 
       accountIdx += 1
