@@ -37,7 +37,7 @@ contract LiquityBase is BaseMath, ILiquityBase {
 
     uint constant public BORROWING_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
-    IActivePool public activePool;
+    IActivePool public override activePool;
 
     IDefaultPool public defaultPool;
 

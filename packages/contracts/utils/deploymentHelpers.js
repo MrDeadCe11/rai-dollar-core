@@ -341,12 +341,13 @@ class DeploymentHelper {
     const proxies = await buildUserProxies(users)
 
     const borrowerWrappersScript = await BorrowerWrappersScript.new(
-      contracts.collateralToken.address,
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       LQTYContracts.lqtyStaking.address,
-      contracts.relayer.address
+      contracts.relayer.address,
+      contracts.collateralToken.address
     )
+
     contracts.borrowerWrappers = new BorrowerWrappersProxy(owner, proxies, borrowerWrappersScript.address)
 
     const borrowerOperationsScript = await BorrowerOperationsScript.new(contracts.borrowerOperations.address)

@@ -1245,7 +1245,7 @@ class TestHelper {
     { from: extraParams.from }
   )
 
-    const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, { from: extraParams.from})
+    const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, { from: extraParams.from })
 
     return {
       lusdAmount,

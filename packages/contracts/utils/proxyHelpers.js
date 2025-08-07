@@ -64,6 +64,7 @@ class Proxy {
 
   async forwardFunction(params, signature) {
     const proxy = this.getProxyFromParams(params)
+
     if (!proxy) {
       return this.proxyFunction(signature.slice(0, signature.indexOf('(')), params)
     }
@@ -92,11 +93,11 @@ class BorrowerOperationsProxy extends Proxy {
   }
 
   async openTrove(...params) {
-    return this.forwardFunction(params, 'openTrove(uint256,address,address)')
+    return this.forwardFunction(params, 'openTrove(uint256,uint256,address,address)')
   }
 
   async addColl(...params) {
-    return this.forwardFunction(params, 'addColl(address,address)')
+    return this.forwardFunction(params, 'addColl(uint256,address,address)')
   }
 
   async withdrawColl(...params) {
@@ -116,7 +117,7 @@ class BorrowerOperationsProxy extends Proxy {
   }
 
   async adjustTrove(...params) {
-    return this.forwardFunction(params, 'adjustTrove(uint256,uint256,uint256,bool,address,address)')
+    return this.forwardFunction(params, 'adjustTrove(uint256,uint256,uint256,uint256,bool,address,address)')
   }
 
   async claimRedeemedCollateral(...params) {

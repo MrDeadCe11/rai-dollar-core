@@ -3,9 +3,10 @@
 pragma solidity 0.6.11;
 
 import "../Dependencies/IERC20.sol";
+import "../Interfaces/ILiquityBase.sol";
 
 // Common interface for the Trove Manager.
-interface IBorrowerOperations {
+interface IBorrowerOperations is ILiquityBase {
 
     // --- Events ---
 
@@ -41,6 +42,7 @@ interface IBorrowerOperations {
         address _lqtyStakingAddress,
         address _relayerAddress
     ) external;
+
     function collateralToken() external view returns (IERC20);
     function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
 
