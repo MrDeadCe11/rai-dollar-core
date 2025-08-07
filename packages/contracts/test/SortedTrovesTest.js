@@ -85,6 +85,8 @@ contract('SortedTroves', async accounts => {
       await deploymentHelper.connectLQTYContracts(LQTYContracts)
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+
+      await th.mintCollateralTokens(contracts, accounts, toBN(dec(1000, 26)))
     })
 
     it('contains(): returns true for addresses that have opened troves', async () => {

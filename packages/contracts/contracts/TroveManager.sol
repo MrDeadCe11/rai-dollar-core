@@ -15,11 +15,10 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-//import "./LiquidationMath.sol";
 //import "./Dependencies/console.sol";
 
 contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
-    //string constant public NAME = "TroveManager";
+    string constant public NAME = "TroveManager";
 
     // --- Connected contract declarations ---
 
@@ -40,8 +39,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     ILQTYToken public override lqtyToken;
 
     ILQTYStaking public override lqtyStaking;
-
-    //IRelayer public override relayer;
 
     // A doubly linked list of Troves, sorted by their sorted by their collateral ratios
     ISortedTroves public sortedTroves;
@@ -95,7 +92,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     // Snapshot of the total collateral across the ActivePool and DefaultPool, immediately after the latest liquidation.
     uint public totalCollateralSnapshot;
-
 
     /*
     * L_COLL and L_LUSDDebt track the sums of accumulated liquidation rewards per unit staked. During its lifetime, each stake earns:
@@ -304,7 +300,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             emit TroveUpdated(_borrower, 0, 0, 0, TroveManagerOperation.redeemCollateral);
 
         } else {
-            //uint newNICR = LiquityMath._computeNominalCR(newColl, _actualDebt(newDebt));
             uint newNICR = LiquityMath._computeNominalCR(newColl, newDebt);
             /*
             * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
@@ -469,7 +464,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 hints
             );
 
-            //require(singleRedemption.cancelledPartial != true, "unexpected partial red");
             if (singleRedemption.cancelledPartial) break; // Partial redemption was cancelled (out-of-date hint, or new net debt < minimum), therefore we could not redeem from the last Trove
 
             totals.totalLUSDToRedeem  = totals.totalLUSDToRedeem.add(singleRedemption.LUSDLot);

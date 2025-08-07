@@ -456,7 +456,7 @@ class DeploymentHelper {
       contracts.sortedTroves.address,
       LQTYContracts.lqtyToken.address,
       LQTYContracts.lqtyStaking.address,
-      contracts.relayer.address,
+      contracts.relayer.address
     )
 
     // set contracts in the Pools
