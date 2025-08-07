@@ -55,6 +55,8 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         checkContract(_troveManagerAddress);
         checkContract(_stabilityPoolAddress);
         checkContract(_defaultPoolAddress);
+        checkContract(_collateralTokenAddress);
+        checkContract(_collSurplusPoolAddress);
 
         
         borrowerOperationsAddress = _borrowerOperationsAddress;
@@ -63,14 +65,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         defaultPoolAddress = _defaultPoolAddress;
         collateralToken = IERC20(_collateralTokenAddress);
         collSurplusPoolAddress = _collSurplusPoolAddress;
-
-        checkContract(address(collateralToken));
-        assert(borrowerOperationsAddress != address(0));
-        assert(troveManagerAddress != address(0));
-        assert(stabilityPoolAddress != address(0));
-        assert(defaultPoolAddress != address(0));
-        assert(collSurplusPoolAddress != address(0));
-        assert(address(collateralToken) != address(0));
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);

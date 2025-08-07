@@ -58,7 +58,8 @@ interface ITroveManager is ILiquityBase {
         address _sortedTrovesAddress,
         address _lqtyTokenAddress,
         address _lqtyStakingAddress,
-        address _relayerAddress
+        address _relayerAddress,
+        address _collateralTokenAddress
     ) external;
 
     function collSurplusPool() external view returns (ICollSurplusPool);
