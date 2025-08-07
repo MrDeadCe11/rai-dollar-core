@@ -34,6 +34,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
   let borrowerOperations
   let lqtyToken
   let communityIssuanceTester
+  let collateralToken
 
   let communityLQTYSupply
   let issuance_M1
@@ -67,7 +68,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
       troveManager = contracts.troveManager
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
-
+      collateralToken = contracts.collateralToken
       lqtyToken = LQTYContracts.lqtyToken
       communityIssuanceTester = LQTYContracts.communityIssuance
 
@@ -91,6 +92,8 @@ contract('StabilityPool - Small Liquidation', async accounts => {
         Month 5: 0.044093311972020200
         Month 6: 0.041651488815552900
       */
+
+      await th.mintCollateralTokensAndApproveActivePool(contracts, [A, B, C], dec(10000, 'ether'))
 
       issuance_M1 = toBN('55378538087966600').mul(communityLQTYSupply).div(toBN(dec(1, 18)))
       issuance_M2 = toBN('52311755607206100').mul(communityLQTYSupply).div(toBN(dec(1, 18)))
