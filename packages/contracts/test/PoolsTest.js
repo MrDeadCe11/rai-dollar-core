@@ -2,6 +2,7 @@ const StabilityPool = artifacts.require("./StabilityPool.sol")
 const ActivePool = artifacts.require("./ActivePool.sol")
 const DefaultPool = artifacts.require("./DefaultPool.sol")
 const NonPayable = artifacts.require("./NonPayable.sol")
+const CollateralToken = artifacts.require("./TestContracts/CollateralToken.sol")
 
 const testHelpers = require("../utils/testHelpers.js")
 
@@ -15,6 +16,7 @@ contract('StabilityPool', async accounts => {
   TODO: Replace with mock contracts, and later complete transactions from EOA
   */
   let stabilityPool
+  let collateralToken
 
   const [owner, alice] = accounts;
 
@@ -22,7 +24,8 @@ contract('StabilityPool', async accounts => {
     stabilityPool = await StabilityPool.new()
     const mockActivePoolAddress = (await NonPayable.new()).address
     const dumbContractAddress = (await NonPayable.new()).address
-    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress)
+    collateralToken = await CollateralToken.new("test", "test")
+    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -45,7 +48,8 @@ contract('ActivePool', async accounts => {
     activePool = await ActivePool.new()
     mockBorrowerOperations = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
-    await activePool.setAddresses(mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress)
+    collateralToken = await CollateralToken.new("test", "test")
+    await activePool.setAddresses(mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -89,28 +93,31 @@ contract('ActivePool', async accounts => {
   })
 
   // send raw ether
-  it('sendETH(): decreases the recorded ETH balance by the correct amount', async () => {
+  it('sendCollateral(): decreases the recorded ETH balance by the correct amount', async () => {
     // setup: give pool 2 ether
-    const activePool_initialBalance = web3.utils.toBN(await web3.eth.getBalance(activePool.address))
+    const activePool_initialBalance = web3.utils.toBN(await collateralToken.balanceOf(activePool.address))
     assert.equal(activePool_initialBalance, 0)
     // start pool with 2 ether
     //await web3.eth.sendTransaction({ from: mockBorrowerOperationsAddress, to: activePool.address, value: dec(2, 'ether') })
-    const tx1 = await mockBorrowerOperations.forward(activePool.address, '0x', { from: owner, value: dec(2, 'ether') })
+    await collateralToken.mint(owner, dec(2, 'ether'))
+    await collateralToken.approve(activePool.address, dec(2, 'ether'))
+    const startPoolData = th.getTransactionData('addCollateral(address,uint256)', [owner, web3.utils.toHex(dec(2, 'ether'))])
+    const tx1 = await mockBorrowerOperations.forward(activePool.address, startPoolData, { from: owner  })
     assert.isTrue(tx1.receipt.status)
 
-    const activePool_BalanceBeforeTx = web3.utils.toBN(await web3.eth.getBalance(activePool.address))
-    const alice_Balance_BeforeTx = web3.utils.toBN(await web3.eth.getBalance(alice))
+    const activePool_BalanceBeforeTx = web3.utils.toBN(await collateralToken.balanceOf(activePool.address))
+    const alice_Balance_BeforeTx = web3.utils.toBN(await collateralToken.balanceOf(alice))
 
     assert.equal(activePool_BalanceBeforeTx, dec(2, 'ether'))
 
     // send ether from pool to alice
-    //await activePool.sendETH(alice, dec(1, 'ether'), { from: mockBorrowerOperationsAddress })
-    const sendETHData = th.getTransactionData('sendETH(address,uint256)', [alice, web3.utils.toHex(dec(1, 'ether'))])
-    const tx2 = await mockBorrowerOperations.forward(activePool.address, sendETHData, { from: owner })
+    //await activePool.sendCollateral(alice, dec(1, 'ether'), { from: mockBorrowerOperationsAddress })
+    const sendCollateralData = th.getTransactionData('sendCollateral(address,uint256)', [alice, web3.utils.toHex(dec(1, 'ether'))])
+    const tx2 = await mockBorrowerOperations.forward(activePool.address, sendCollateralData, { from: owner })
     assert.isTrue(tx2.receipt.status)
 
-    const activePool_BalanceAfterTx = web3.utils.toBN(await web3.eth.getBalance(activePool.address))
-    const alice_Balance_AfterTx = web3.utils.toBN(await web3.eth.getBalance(alice))
+    const activePool_BalanceAfterTx = web3.utils.toBN(await collateralToken.balanceOf(activePool.address))
+    const alice_Balance_AfterTx = web3.utils.toBN(await collateralToken.balanceOf(alice))
 
     const alice_BalanceChange = alice_Balance_AfterTx.sub(alice_Balance_BeforeTx)
     const pool_BalanceChange = activePool_BalanceAfterTx.sub(activePool_BalanceBeforeTx)
@@ -127,8 +134,12 @@ contract('DefaultPool', async accounts => {
   beforeEach(async () => {
     defaultPool = await DefaultPool.new()
     mockTroveManager = await NonPayable.new()
-    mockActivePool = await NonPayable.new()
-    await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address)
+    const dumbContractAddress = (await NonPayable.new()).address
+    mockActivePool = await ActivePool.new()
+    collateralToken = await CollateralToken.new("test", "test")
+
+    await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address, collateralToken.address)
+    await mockActivePool.setAddresses(dumbContractAddress, mockTroveManager.address, dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded LUSD balance', async () => {
@@ -174,30 +185,32 @@ contract('DefaultPool', async accounts => {
   })
 
   // send raw ether
-  it('sendETHToActivePool(): decreases the recorded ETH balance by the correct amount', async () => {
+  it('sendCollateralToActivePool(): decreases the recorded ETH balance by the correct amount', async () => {
     // setup: give pool 2 ether
-    const defaultPool_initialBalance = web3.utils.toBN(await web3.eth.getBalance(defaultPool.address))
+    const defaultPool_initialBalance = web3.utils.toBN(await collateralToken.balanceOf(defaultPool.address))
     assert.equal(defaultPool_initialBalance, 0)
 
     // start pool with 2 ether
     //await web3.eth.sendTransaction({ from: mockActivePool.address, to: defaultPool.address, value: dec(2, 'ether') })
-    const tx1 = await mockActivePool.forward(defaultPool.address, '0x', { from: owner, value: dec(2, 'ether') })
+    await collateralToken.mint(owner, dec(2, 'ether'))
+    await collateralToken.approve(defaultPool.address, dec(2, 'ether'))
+    const startPoolData = th.getTransactionData('addCollateral(address,uint256)', [owner, web3.utils.toHex(dec(2, 'ether'))])
+    const tx1 = await mockTroveManager.forward(defaultPool.address, startPoolData, { from: owner  })
     assert.isTrue(tx1.receipt.status)
 
-    const defaultPool_BalanceBeforeTx = web3.utils.toBN(await web3.eth.getBalance(defaultPool.address))
-    const activePool_Balance_BeforeTx = web3.utils.toBN(await web3.eth.getBalance(mockActivePool.address))
+    const defaultPool_BalanceBeforeTx = web3.utils.toBN(await collateralToken.balanceOf(defaultPool.address))
+    const activePool_Balance_BeforeTx = web3.utils.toBN(await collateralToken.balanceOf(mockActivePool.address))
 
     assert.equal(defaultPool_BalanceBeforeTx, dec(2, 'ether'))
 
     // send ether from pool to alice
-    //await defaultPool.sendETHToActivePool(dec(1, 'ether'), { from: mockTroveManagerAddress })
-    const sendETHData = th.getTransactionData('sendETHToActivePool(uint256)', [web3.utils.toHex(dec(1, 'ether'))])
-    await mockActivePool.setPayable(true)
-    const tx2 = await mockTroveManager.forward(defaultPool.address, sendETHData, { from: owner })
+    //await defaultPool.sendCollateralToActivePool(dec(1, 'ether'), { from: mockTroveManagerAddress })
+    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(uint256)', [web3.utils.toHex(dec(1, 'ether'))])
+    const tx2 = await mockTroveManager.forward(defaultPool.address, sendCollateralData, { from: owner })
     assert.isTrue(tx2.receipt.status)
 
-    const defaultPool_BalanceAfterTx = web3.utils.toBN(await web3.eth.getBalance(defaultPool.address))
-    const activePool_Balance_AfterTx = web3.utils.toBN(await web3.eth.getBalance(mockActivePool.address))
+    const defaultPool_BalanceAfterTx = web3.utils.toBN(await collateralToken.balanceOf(defaultPool.address))
+    const activePool_Balance_AfterTx = web3.utils.toBN(await collateralToken.balanceOf(mockActivePool.address))
 
     const activePool_BalanceChange = activePool_Balance_AfterTx.sub(activePool_Balance_BeforeTx)
     const defaultPool_BalanceChange = defaultPool_BalanceAfterTx.sub(defaultPool_BalanceBeforeTx)
