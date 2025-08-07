@@ -15,13 +15,13 @@ const GAS_PRICE = 10000000
 
 contract('StabilityPool - LQTY Rewards', async accounts => {
 
-  const [
-    owner,
-    whale,
-    A, B, C, D, E, F, G, H,
-    defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5, defaulter_6,
-    frontEnd_1, frontEnd_2, frontEnd_3
-  ] = accounts;
+    const [
+      owner,
+      whale,
+      A, B, C, D, E, F, G, H,
+      defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5, defaulter_6,
+      frontEnd_1, frontEnd_2, frontEnd_3
+    ] = accounts;
 
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
 
@@ -30,11 +30,13 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
   let priceFeed
   let lusdToken
   let stabilityPool
+  let activePool
   let sortedTroves
   let troveManager
   let borrowerOperations
   let lqtyToken
   let communityIssuanceTester
+  let collateralToken
 
   let communityLQTYSupply
   let issuance_M1
@@ -65,11 +67,19 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       priceFeed = contracts.priceFeedTestnet
       lusdToken = contracts.lusdToken
       stabilityPool = contracts.stabilityPool
+      activePool = contracts.activePool
       sortedTroves = contracts.sortedTroves
       troveManager = contracts.troveManager
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
-
+      collateralToken = contracts.collateralToken
+      await th.mintCollateralTokensAndApproveActivePool(contracts, [
+        owner,
+        whale,
+        A, B, C, D, E, F, G, H,
+        defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5, defaulter_6,
+        frontEnd_1, frontEnd_2, frontEnd_3
+      ], dec(100, 24))
       lqtyToken = LQTYContracts.lqtyToken
       communityIssuanceTester = LQTYContracts.communityIssuance
 
@@ -157,15 +167,15 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
     it("withdrawFromSP(): reward term G does not update when no LQTY is issued", async () => {
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), A, A, { from: A, value: dec(1000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
+      await borrowerOperations.openTrove(dec(1000, 'ether'), dec(10000, 18), A, A, { from: A })
       await stabilityPool.provideToSP(dec(10000, 18), ZERO_ADDRESS, { from: A })
 
       const A_initialDeposit = ((await stabilityPool.deposits(A))[0]).toString()
       assert.equal(A_initialDeposit, dec(10000, 18))
 
       // defaulter opens trove
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_1, defaulter_1, { from: defaulter_1, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
 
       // ETH drops
       await priceFeed.setPrice(dec(100, 18))
@@ -209,12 +219,12 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(initialIssuance, 0)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(1, 22), A, A, { from: A, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(1, 22), B, B, { from: B, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(1, 22), C, C, { from: C, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(1, 22), D, D, { from: D, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(1, 22), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(1, 22), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(1, 22), C, C, { from: C })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(1, 22), D, D, { from: D })
 
       // Check all LQTY balances are initially 0
       assert.equal(await lqtyToken.balanceOf(A), 0)
@@ -284,12 +294,12 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(initialIssuance, 0)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(10000, 18)), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(10000, 18), A, A, { from: A, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(dec(20000, 18), B, B, { from: B, value: dec(300, 'ether') })
-      await borrowerOperations.openTrove(dec(30000, 18), C, C, { from: C, value: dec(400, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), D, D, { from: D, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(300, 'ether'), dec(20000, 18), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(400, 'ether'), dec(30000, 18), C, C, { from: C })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), D, D, { from: D })
 
       // Check all LQTY balances are initially 0
       assert.equal(await lqtyToken.balanceOf(A), 0)
@@ -378,15 +388,15 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(initialIssuance, 0)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(10000, 18), A, A, { from: A, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(dec(20000, 18), B, B, { from: B, value: dec(300, 'ether') })
-      await borrowerOperations.openTrove(dec(30000, 18), C, C, { from: C, value: dec(400, 'ether') })
-      await borrowerOperations.openTrove(dec(40000, 18), D, D, { from: D, value: dec(500, 'ether') })
-      await borrowerOperations.openTrove(dec(40000, 18), E, E, { from: E, value: dec(600, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(300, 'ether'), dec(20000, 18), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(300, 'ether'), dec(30000, 18), C, C, { from: C })
+      await borrowerOperations.openTrove(dec(400, 'ether'), dec(40000, 18), D, D, { from: D })
+      await borrowerOperations.openTrove(dec(400, 'ether'), dec(40000, 18), E, E, { from: E })
 
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(30000, 18)), defaulter_1, defaulter_1, { from: defaulter_1, value: dec(300, 'ether') })
+      await borrowerOperations.openTrove(dec(300, 'ether'), await getOpenTroveLUSDAmount(dec(30000, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
 
       // Check all LQTY balances are initially 0
       assert.equal(await lqtyToken.balanceOf(A), 0)
@@ -546,10 +556,10 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       const allDepositors = [A, B, C, D, E, F, G, H]
       // 4 Defaulters open trove with 200LUSD debt, and 200% ICR
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_1, defaulter_1, { from: defaulter_1, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_2, defaulter_2, { from: defaulter_2, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_3, defaulter_3, { from: defaulter_3, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_4, defaulter_4, { from: defaulter_4, value: dec(200, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
+      await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_3, defaulter_3, { from: defaulter_3 })
+      await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_4, defaulter_4, { from: defaulter_4 })
 
       // price drops by 50%: defaulter ICR falls to 100%
       await priceFeed.setPrice(dec(100, 18));
@@ -562,25 +572,25 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // A, B each borrow 10k LUSD
       const depositors_1 = [A, B]
       for (account of depositors_1) {
-        await borrowerOperations.openTrove(dec(10000, 18), account, account, { from: account, value: dec(200, 'ether') })
+        await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), account, account, { from: account })
       }
 
       // C, D each borrow 10k LUSD
       const depositors_2 = [C, D]
       for (account of depositors_2) {
-        await borrowerOperations.openTrove(dec(10000, 18), account, account, { from: account, value: dec(200, 'ether') })
+        await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), account, account, { from: account })
       }
 
       // Erin, Flyn each borrow 100 LUSD
       const depositors_3 = [E, F]
       for (account of depositors_3) {
-        await borrowerOperations.openTrove(dec(10000, 18), account, account, { from: account, value: dec(200, 'ether') })
+        await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), account, account, { from: account })
       }
 
       // Graham, Harriet each borrow 10k LUSD
       const depositors_4 = [G, H]
       for (account of depositors_4) {
-        await borrowerOperations.openTrove(dec(10000, 18), account, account, { from: account, value: dec(200, 'ether') })
+        await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), account, account, { from: account })
       }
 
       // A, B each deposit 10k LUSD
@@ -687,11 +697,11 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       const CIBalanceBefore = await lqtyToken.balanceOf(communityIssuanceTester.address)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(16000, 18), A, A, { from: A, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), B, B, { from: B, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(16000, 18), C, C, { from: C, value: dec(200, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(16000, 18), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(16000, 18), C, C, { from: C })
 
       const totalLQTYissuance_0 = await communityIssuanceTester.totalLQTYIssued()
       const G_0 = await stabilityPool.scaleToG(0)  // scales will not change in this test: no liquidations
@@ -806,26 +816,26 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // to increase P scale
       await rateControl.setCoBias(20000000000)
       // Whale opens Trove with 100 ETH
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(10000, 18)), whale, whale, { from: whale, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), whale, whale, { from: whale })
 
       const fiveDefaulters = [defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5]
 
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: A, value: dec(100000, 'ether') })
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: B, value: dec(100000, 'ether') })
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: C, value: dec(100000, 'ether') })
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: D, value: dec(100000, 'ether') })
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: E, value: dec(100000, 'ether') })
-      await borrowerOperations.openTrove(dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: F, value: dec(100000, 'ether') })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: A })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: B })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: C })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: D })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: E })
+      await borrowerOperations.openTrove(dec(100000, 'ether'), dec(100000, 18), ZERO_ADDRESS, ZERO_ADDRESS, { from: F })
 
       for (const defaulter of fiveDefaulters) {
         // Defaulters 1-5 each withdraw to 99999 debt (including gas comp)
         //await borrowerOperations.openTrove(await getOpenTroveLUSDAmount('99999000000000000000000'), defaulter, defaulter, { from: defaulter, value: dec(1000, 'ether') })
 
-        await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(99999, 18)), defaulter, defaulter, { from: defaulter, value: dec(1000, 'ether') })
+        await borrowerOperations.openTrove(dec(1000, 'ether'), await getOpenTroveLUSDAmount(dec(99999, 18)), defaulter, defaulter, { from: defaulter })
       }
 
       // Defaulter 6 withdraws to 10k debt (inc. gas comp)
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(100000, 18)), defaulter_6, defaulter_6, { from: defaulter_6, value: dec(1000, 'ether') })
+      await borrowerOperations.openTrove(dec(1000, 'ether'), await getOpenTroveLUSDAmount(dec(100000, 18)), defaulter_6, defaulter_6, { from: defaulter_6 })
 
       // Confirm all depositors have 0 LQTY
       for (const depositor of [A, B, C, D, E, F]) {
@@ -1026,13 +1036,13 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(initialIssuance, 0)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(10000, 18), A, A, { from: A, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), B, B, { from: B, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), C, C, { from: C, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), D, D, { from: D, value: dec(100, 'ether') })
-      await borrowerOperations.openTrove(dec(10000, 18), E, E, { from: E, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), C, C, { from: C })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), D, D, { from: D })
+      await borrowerOperations.openTrove(dec(100, 'ether'), dec(10000, 18), E, E, { from: E })
 
       // Check all LQTY balances are initially 0
       assert.equal(await lqtyToken.balanceOf(A), 0)
@@ -1171,19 +1181,19 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(initialIssuance, 0)
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
-      await borrowerOperations.openTrove(dec(10000, 18), A, A, { from: A, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(dec(60000, 18), B, B, { from: B, value: dec(800, 'ether') })
-      await borrowerOperations.openTrove(dec(30000, 18), C, C, { from: C, value: dec(400, 'ether') })
-      await borrowerOperations.openTrove(dec(40000, 18), D, D, { from: D, value: dec(500, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(10000, 18), A, A, { from: A })
+      await borrowerOperations.openTrove(dec(800, 'ether'), dec(60000, 18), B, B, { from: B })
+      await borrowerOperations.openTrove(dec(400, 'ether'), dec(30000, 18), C, C, { from: C })
+      await borrowerOperations.openTrove(dec(500, 'ether'), dec(40000, 18), D, D, { from: D })
 
-      await borrowerOperations.openTrove(dec(30000, 18), E, E, { from: E, value: dec(400, 'ether') })
+      await borrowerOperations.openTrove(dec(400, 'ether'), dec(30000, 18), E, E, { from: E })
 
       // D1, D2, D3 open troves with total debt 50k, 30k, 10k respectively (inc. gas comp)
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(50000, 18)), defaulter_1, defaulter_1, { from: defaulter_1, value: dec(500, 'ether') })
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_2, defaulter_2, { from: defaulter_2, value: dec(200, 'ether') })
-      await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_3, defaulter_3, { from: defaulter_3, value: dec(100, 'ether') })
+      await borrowerOperations.openTrove(dec(500, 'ether'), await getOpenTroveLUSDAmount(dec(50000, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
+      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_3, defaulter_3, { from: defaulter_3 })
 
       // Check all LQTY balances are initially 0
       assert.equal(await lqtyToken.balanceOf(A), 0)
@@ -1561,13 +1571,13 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await stabilityPool.registerFrontEnd(kickbackRate, { from: frontEnd_1 })
 
       // Whale opens Trove with 10k ETH
-      await borrowerOperations.openTrove(dec(10000, 18), whale, whale, { from: whale, value: dec(10000, 'ether') })
+      await borrowerOperations.openTrove(dec(10000, 'ether'), dec(10000, 18), whale, whale, { from: whale })
 
       const _4_Defaulters = [defaulter_1, defaulter_2, defaulter_3, defaulter_4]
 
       for (const defaulter of _4_Defaulters) {
         // Defaulters 1-4 each withdraw to 99999 debt (including gas comp)
-        await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(99999, 18)), defaulter, defaulter, { from: defaulter, value: dec(1000, 'ether') })
+        await borrowerOperations.openTrove(dec(1000, 'ether'), await getOpenTroveLUSDAmount(dec(99999, 18)), defaulter, defaulter, { from: defaulter })
       }
 
       // Confirm all would-be depositors have 0 LQTY
@@ -1583,14 +1593,14 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(await stabilityPool.currentScale(), '0')
 
       // A, B provides 5000 LUSD to SP
-      await borrowerOperations.openTrove(dec(5000, 18), A, A, { from: A, value: dec(200, 'ether') })
+      await borrowerOperations.openTrove(dec(200, 'ether'), dec(5000, 18), A, A, { from: A })
 
       await stabilityPool.provideToSP(dec(5000, 18), frontEnd_1, { from: A })
 
       total = await stabilityPool.getTotalLUSDDeposits()
       console.log("total", total.toString())
 
-      tx = await borrowerOperations.openTrove(dec(5000, 18), B, B, { from: B, value: dec(200, 'ether') })
+      tx = await borrowerOperations.openTrove(dec(200, 'ether'), dec(5000, 18), B, B, { from: B })
 
       total = await stabilityPool.getTotalLUSDDeposits()
       console.log("total", total.toString())
@@ -1621,7 +1631,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(await stabilityPool.currentScale(), '0')
 
       // C provides to SP
-      await borrowerOperations.openTrove(dec(99999, 18), C, C, { from: C, value: dec(2000, 'ether') })
+      await borrowerOperations.openTrove(dec(2000, 'ether'), dec(99999, 18), C, C, { from: C })
       await stabilityPool.provideToSP(dec(99999, 18), frontEnd_1, { from: C })
 
       // 1 month passes (M2)
@@ -1639,7 +1649,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(await stabilityPool.currentScale(), '1')
 
       // D provides to SP
-      await borrowerOperations.openTrove(dec(99999, 18), D, D, { from: D, value: dec(2000, 'ether') })
+      await borrowerOperations.openTrove(dec(2000, 'ether'), dec(99999, 18), D, D, { from: D })
       await stabilityPool.provideToSP(dec(99999, 18), frontEnd_1, { from: D })
 
       // 1 month passes (M3)
@@ -1654,7 +1664,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.equal(await stabilityPool.currentScale(), '1')
 
       // E provides to SP
-      await borrowerOperations.openTrove(dec(99999, 18), E, E, { from: E, value: dec(2000, 'ether') })
+      await borrowerOperations.openTrove(dec(2000, 'ether'), dec(99999, 18), E, E, { from: E })
       await stabilityPool.provideToSP(dec(99999, 18), frontEnd_1, { from: E })
 
       // 1 month passes (M4)

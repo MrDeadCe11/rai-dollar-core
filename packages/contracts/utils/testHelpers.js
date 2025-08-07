@@ -362,6 +362,16 @@ class TestHelper {
     }
   }
 
+  static async approveCollateralTokens(contracts, accounts, amount) {
+    for (const account of accounts) {
+      await contracts.collateralToken.approve(contracts.activePool.address, amount, { from: account })
+    }
+  }
+
+  static async mintCollateralTokensAndApproveActivePool(contracts, accounts, amount) {
+    await this.mintCollateralTokens(contracts, accounts, amount)
+    await this.approveCollateralTokens(contracts, accounts, amount)
+  }
 
   static async getTroveStake(contracts, trove) {
     return (contracts.troveManager.getTroveStake(trove))
