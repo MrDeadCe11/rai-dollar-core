@@ -305,7 +305,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         singleLiquidation.collToRedistribute,
         singleLiquidation.collSurplus) = getCappedOffsetAndRedistributionVals(offsetInputs);
 
-
         troveManager.closeTroveLiquidation(_borrower);
 
         if (singleLiquidation.collSurplus > 0) {

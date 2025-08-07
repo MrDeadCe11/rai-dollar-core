@@ -339,40 +339,10 @@ contract TroveManagerNew is LiquityBase, Ownable, CheckContract, ITroveManagerNe
         return TroveOwners[_index];
     }
 
-    // --- Trove Liquidation functions ---
-
-    // Single liquidation function. Closes the trove if its ICR is lower than the minimum collateral ratio.
-    function liquidate(address _borrower) external override {
-        liquidations.liquidate(_borrower);
-    }
-
-    // --- Inner single liquidation functions ---
-
-    /*
-    * Liquidate a sequence of troves. Closes a maximum number of n under-collateralized Troves,
-    * starting from the one with the lowest collateral ratio in the system, and moving upwards
-    */
-    function liquidateTroves(uint _n) external override {
-        liquidations.liquidateTroves(_n);
-    }
-
-    /*
-    * Attempt to liquidate a custom list of troves provided by the caller.
-    */
-    function batchLiquidate(address[] memory _troveArray) public override {
-        liquidations.batchLiquidate(_troveArray);
-    }
-
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
-    function movePendingTroveRewardsToActivePool(address _borrower) external override {
-        // requireCallerisLiquidations()
-
-        uint pendingETHReward = getPendingETHReward(_borrower);
-        uint pendingLUSDDebtReward = getPendingLUSDDebtReward(_borrower);
-
-        defaultPool.decreaseLUSDDebt(pendingLUSDDebtReward);
-        activePool.increaseLUSDDebt(pendingLUSDDebtReward);
-        defaultPool.sendETHToActivePool(pendingETHReward);
+    function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _LUSD, uint _ETH) external override {
+        _requireCallerIsLiquidations();
+        _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, _LUSD, _ETH);
     }
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool

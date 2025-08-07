@@ -1595,7 +1595,6 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated.  9900 LUSD liquidated. P altered by a factor of 1-(9900/10000) = 0.01.  Scale changed.
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-
       tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const expP2 = await th.getNewPAfterLiquidation(contracts, tx2, P1, liqDeposits, lastLUSDError)
       const P2 = await stabilityPool.P()

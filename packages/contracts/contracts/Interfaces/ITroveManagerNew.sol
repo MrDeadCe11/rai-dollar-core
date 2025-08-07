@@ -4,6 +4,8 @@ pragma solidity 0.6.11;
 
 import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
+import "./IActivePool.sol";
+import "./IDefaultPool.sol";
 import "./ILUSDToken.sol";
 import "./ILQTYToken.sol";
 import "./ILQTYStaking.sol";
@@ -77,15 +79,9 @@ interface ITroveManagerNew is ILiquityBase {
 
     function getCurrentICR(address _borrower, uint _price) external view returns (uint);
 
-    function liquidate(address _borrower) external;
-
     function redistributeDebtAndColl(uint _debt, uint _coll) external;
 
     function updateSystemSnapshots_excludeCollRemainder(uint _collRemainder) external;
-
-    function liquidateTroves(uint _n) external;
-
-    function batchLiquidate(address[] calldata _troveArray) external;
 
     function redeemCollateral(
         uint _LUSDAmount,
@@ -105,7 +101,7 @@ interface ITroveManagerNew is ILiquityBase {
 
     function applyPendingRewards(address _borrower) external;
 
-    function movePendingTroveRewardsToActivePool(address _borrower) external;
+    function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _debt, uint _coll) external;
 
     function getPendingETHReward(address _borrower) external view returns (uint);
 
