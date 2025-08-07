@@ -641,12 +641,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         coll = coll.add(pendingCollateralReward);
     }
 
-    /*
-    function getEntireSystemActualDebt() public view override returns (uint debt) {
-        return getEntireNormalizedSystemDebt().mul(accumulatedRate).div(RATE_PRECISION);
-    }
-    */
-
     function removeStake(address _borrower) external override {
         _requireCallerIsBOorLiq();
         return _removeStake(_borrower);

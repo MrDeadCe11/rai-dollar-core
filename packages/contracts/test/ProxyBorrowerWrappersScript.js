@@ -51,7 +51,7 @@ contract('BorrowerWrappers', async accounts => {
   let activePool
   let stabilityPool
   let defaultPool
-  let collSurplusPool
+  let cdefaulter_1ollSurplusPool
   let borrowerOperations
   let borrowerWrappers
   let lqtyTokenOriginal
@@ -259,7 +259,6 @@ contract('BorrowerWrappers', async accounts => {
     // price drops: defaulters' Troves fall below MCR, alice and whale Trove remain active
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price);
-
 
     // Defaulter trove closed
     const liquidationTX_1 = await liquidations.liquidate(defaulter_1, { from: owner })
