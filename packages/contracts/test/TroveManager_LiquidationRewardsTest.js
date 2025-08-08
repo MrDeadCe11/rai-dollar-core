@@ -559,6 +559,7 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     //Bob adds ETH to his trove
     const addedColl = toBN(dec(1, 'ether'))
     await collateralToken.approve(activePool.address, addedColl, { from: bob })
+>>>>>>> 0ff589b8 (fix bo.openTrove() calls)
     await borrowerOperations.addColl(addedColl, bob, bob, { from: bob })
 
     // Alice withdraws LUSD
