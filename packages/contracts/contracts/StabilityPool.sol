@@ -252,7 +252,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     event UserDepositChanged(address indexed _depositor, uint _newDeposit);
     event FrontEndStakeChanged(address indexed _frontEnd, uint _newFrontEndStake, address _depositor);
 
-    event CollateralGainWithdrawn(address indexed _depositor, uint collateral, int _LUSDLoss);
+    event CollateralGainWithdrawn(address indexed _depositor, uint _collateral, int _LUSDLoss);
     event LQTYPaidToDepositor(address indexed _depositor, uint _LQTY);
     event LQTYPaidToFrontEnd(address indexed _frontEnd, uint _LQTY);
     event CollateralSent(address _to, uint _amount);

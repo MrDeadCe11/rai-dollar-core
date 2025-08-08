@@ -621,8 +621,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // all normalized
         totals = _getTotalsFromBatchLiquidate(activePoolCached, defaultPoolCached, vars.price, vars.LUSDInSPForOffsets, _troveArray, par);
-
-        require(totals.totalDebtInSequence > 0, "TroveManager: nothing to liquidate");
+    
+        // require(totals.totalDebtInSequence > 0, "TroveManager: nothing to liquidate");
 
 
         uint totalActualDebtToOffset = totals.totalDebtToOffset.mul(accumulatedRate).div(RATE_PRECISION);
@@ -671,7 +671,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         for (vars.i = 0; vars.i < _troveArray.length; vars.i++) {
             vars.user = _troveArray[vars.i];
             vars.ICR = getCurrentICR(vars.user, _price);
-
+            // emit TroveLiquidated(address(vars.user), uint(vars.ICR), uint(MCR), TroveManagerOperation.liquidate);
             if (vars.ICR < MCR) {
                 singleLiquidation = _liquidate(_activePool, _defaultPool, vars.user, vars.remainingLUSDInSPForOffsets, _price, _par, accumulatedRate);
 
@@ -988,6 +988,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
         uint par = relayer.par();
         uint ICR = LiquityMath._computeCR(currentCollateral, _actualDebt(currentLUSDDebt), _price, par);
+         
         return ICR;
     }
 
