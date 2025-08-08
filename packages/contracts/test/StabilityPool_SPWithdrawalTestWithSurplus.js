@@ -82,29 +82,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
-      await th.mintCollateralTokensAndApproveActivePool(contracts, [owner,
-    defaulter_1,
-    defaulter_2,
-    defaulter_3,
-    defaulter_4,
-    defaulter_5,
-    defaulter_6,
-    whale,
-    alice,
-    bob,
-    carol,
-    dennis,
-    erin,
-    flyn,
-    graham,
-    harriet,
-    A,
-    B,
-    C,
-    D,
-    E,
-    F
-  ], toBN(dec(1000, 26)))
+      await th.mintCollateralTokens(contracts, accounts, toBN(dec(1000, 26)))
 
       // should trigger surplus for most tests
       // just adding these here(even with existing values) accrues more interest when drip() is called 
