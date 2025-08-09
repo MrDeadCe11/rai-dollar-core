@@ -56,7 +56,7 @@ contract('Pool Manager: Sum-Product rounding errors', async accounts => {
 
     // Defaulters liquidated
     for (let defaulter of defaulters) {
-      await troveManager.liquidate(defaulter, { from: owner });
+      await liquidations.liquidate(defaulter, { from: owner });
     }
 
     const SP_TotalDeposits = await stabilityPool.getTotalLUSDDeposits()

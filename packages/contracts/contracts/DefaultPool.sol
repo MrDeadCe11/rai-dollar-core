@@ -22,6 +22,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     string constant public NAME = "DefaultPool";
 
     IERC20 public collateralToken;
+    address public liquidationsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
     uint256 internal CT;  // deposited Collateral Token tracker
@@ -34,6 +35,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     // --- Dependency setters ---
 
     function setAddresses(
+        address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _collateralTokenAddress
@@ -42,15 +44,18 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         onlyOwner
     {
         checkContract(_collateralTokenAddress);
+        checkContract(_liquidationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
 
         collateralToken = IERC20(_collateralTokenAddress);
+        liquidationsAddress = _liquidationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
 
         checkContract(address(collateralToken));
 
+        emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
 
@@ -75,7 +80,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     // --- Pool functionality ---
 
     function sendCollateralToActivePool(uint _amount) external override {
-        _requireCallerIsTroveManager();
+        _requireCallerIsTMorLiquidations();
         IActivePool activePool = IActivePool(activePoolAddress);
         CT = CT.sub(_amount);
         emit DefaultPoolCollateralBalanceUpdated(CT);
@@ -107,6 +112,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
+        //_requireCallerIsLiquidations();
         _requireCallerIsTroveManager();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit DefaultPoolLUSDDebtUpdated(LUSDDebt);
@@ -120,6 +126,12 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
+    }
+
+    function _requireCallerIsTMorLiquidations() internal view {
+        require(msg.sender == troveManagerAddress || 
+               msg.sender == liquidationsAddress,
+                "DefaultPool: Caller is not TM or Liquidations");
     }
 
     function _requireCallerIsTroveMorActivePool() internal view {

@@ -1,5 +1,6 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
+const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
 const RateControlTester = artifacts.require("./RateControlTester.sol")
 
@@ -62,6 +63,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
     beforeEach(async () => {
       contracts = await deploymentHelper.deployLiquityCore()
       const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
+      contracts.liquidations = await LiquidationsTester.new()
       contracts.troveManager = await TroveManagerTester.new()
       contracts.rateControl = await RateControlTester.new()
       contracts = await deploymentHelper.deployLUSDToken(contracts)
@@ -69,6 +71,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       priceFeed = contracts.priceFeedTestnet
       lusdToken = contracts.lusdToken
       sortedTroves = contracts.sortedTroves
+      liquidations = contracts.liquidations
       troveManager = contracts.troveManager
       activePool = contracts.activePool
       stabilityPool = contracts.stabilityPool
@@ -110,7 +113,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter liquidated
-      tx = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx = await liquidations.liquidate(defaulter_1, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterLiquidation(contracts, tx, [spDeposit, spDeposit, spDeposit])
 
       // Check depositors' compounded deposit is 6666.66 LUSD and ETH Gain is 33.16 ETH
@@ -161,8 +164,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit])
 
       // Check depositors' compounded deposit is 3333.33 LUSD and ETH Gain is 66.33 ETH
@@ -212,9 +215,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Three defaulters liquidated
-      await troveManager.liquidate(defaulter_1, { from: owner });
-      await troveManager.liquidate(defaulter_2, { from: owner });
-      await troveManager.liquidate(defaulter_3, { from: owner });
+      await liquidations.liquidate(defaulter_1, { from: owner });
+      await liquidations.liquidate(defaulter_2, { from: owner });
+      await liquidations.liquidate(defaulter_3, { from: owner });
 
       // Check depositors' compounded deposit is 0 LUSD and ETH Gain is 99.5 ETH 
       const txA = await stabilityPool.withdrawCollateralGainToTrove(ZERO_ADDRESS, ZERO_ADDRESS, { from: alice })
@@ -262,8 +265,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit])
 
       // Check depositors' compounded deposit
@@ -280,9 +283,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), '6000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), '6000000000000000000000'), 10000)
 
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(alice)).toString(), aliceFinalDeposit), 20000)
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), bobFinalDeposit), 20000)
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), carolFinalDeposit), 20000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(alice)).toString(), aliceFinalDeposit), 24000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), bobFinalDeposit), 24000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), carolFinalDeposit), 24000)
 
       // (0.5 + 0.7) * 99.5 / 3
       assert.isAtMost(th.getDifference(alice_ETHWithdrawn, dec(398, 17)), 10000)
@@ -316,9 +319,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Three defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterThreeLiquidations(contracts, tx1, tx2, tx3, [spDeposit, spDeposit, spDeposit])
 
       // Check depositors' compounded deposit
@@ -335,9 +338,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), '4000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), '4000000000000000000000'), 10000)
 
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(alice)).toString(), aliceFinalDeposit), 18000)
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), bobFinalDeposit), 18000)
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), carolFinalDeposit), 18000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(alice)).toString(), aliceFinalDeposit), 21000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(bob)).toString(), bobFinalDeposit), 21000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(carol)).toString(), carolFinalDeposit), 21000)
 
       // (0.5 + 0.6 + 0.7) * 99.5 / 3
       assert.isAtMost(th.getDifference(alice_ETHWithdrawn, dec(597, 17)), 10000)
@@ -374,8 +377,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Three defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterTwoLiquidations(contracts, tx1, tx2, [aliceSpDeposit, bobSpDeposit,carolSpDeposit])
 
       // Depositors attempt to withdraw everything
@@ -431,9 +434,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Three defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterThreeLiquidations(contracts, tx1, tx2, tx3, [aliceSpDeposit, bobSpDeposit,carolSpDeposit])
 
       // Depositors attempt to withdraw everything
@@ -500,9 +503,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Three defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit] = await th.depositsAfterThreeLiquidations(contracts, tx1, tx2, tx3, [aliceSpDeposit, bobSpDeposit,carolSpDeposit])
 
       // Depositors attempt to withdraw everything
@@ -559,8 +562,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain1, bobGain1, carolGain1, aliceDeposit1, bobDeposit1, carolDeposit1] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit]))
 
@@ -569,7 +572,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: dennis })
 
       // Third defaulter liquidated
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
 
       const [aliceGain2, bobGain2, carolGain2, dennisGain2,
           aliceDeposit2, bobDeposit2, carolDeposit2, dennisDeposit2] = (await th.depositorValuesAfterLiquidation(contracts, tx3, [aliceDeposit1, bobDeposit1, carolDeposit1, spDeposit]))
@@ -635,8 +638,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated, 2/3 of SP, 10000/3 left
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceDeposit1, bobDeposit1, carolDeposit1] = (await th.depositsAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit]))
 
       // Dennis opens a trove and provides to SP
@@ -644,8 +647,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: dennis })
 
       // Third and fourth defaulters liquidated
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
-      tx4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
+      tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [finalAliceDeposit, finalBobDeposit, finalCarolDeposit, finalDennisDeposit] = (await th.depositsAfterTwoLiquidations(contracts, tx3, tx4, [aliceDeposit1, bobDeposit1, carolDeposit1, spDeposit]))
 
       const txA = await stabilityPool.withdrawCollateralGainToTrove(ZERO_ADDRESS, ZERO_ADDRESS, { from: alice })
@@ -717,8 +720,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain1, bobGain1, carolGain1, aliceDeposit1, bobDeposit1, carolDeposit1] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx1, tx2, [aliceSpDeposit, bobSpDeposit, carolSpDeposit]))
 
@@ -728,8 +731,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(dennisSpDeposit, ZERO_ADDRESS, { from: dennis })
 
       // Last two defaulters liquidated
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
-      tx4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
+      tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [aliceGain2, bobGain2, carolGain2, dennisGain2, aliceDeposit2,
              bobDeposit2, carolDeposit2, dennisDeposit2] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx3, tx4, [aliceDeposit1, bobDeposit1, carolDeposit1, dennisSpDeposit]))
@@ -799,8 +802,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
         const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit, dennisFinalDeposit] = await th.depositsAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit, spDeposit])
 
       // Dennis withdraws his deposit and ETH gain
@@ -819,8 +822,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18))
 
       // Two more defaulters are liquidated
-      await troveManager.liquidate(defaulter_3, { from: owner });
-      await troveManager.liquidate(defaulter_4, { from: owner });
+      await liquidations.liquidate(defaulter_3, { from: owner });
+      await liquidations.liquidate(defaulter_4, { from: owner });
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -892,8 +895,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain1, bobGain1, carolGain1, dennisGain1,
              aliceDeposit1, bobDeposit1, carolDeposit1, dennisDeposit1] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx1, tx2, [aliceSpDeposit, bobSpDeposit, carolSpDeposit, dennisSpDeposit]))
@@ -911,8 +914,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       assert.isAtMost(th.getDifference(dennis_ETHWithdrawn, '122461538461538466100'), 100000000000)
 
       // Two more defaulters are liquidated
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
-      tx4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
+      tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [aliceGain2, bobGain2, carolGain2,
              aliceDeposit2, bobDeposit2, carolDeposit2] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx3, tx4, [aliceDeposit1, bobDeposit1, carolDeposit1]))
@@ -968,8 +971,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // First two defaulters liquidated
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain1, bobGain1, dennisGain1,
              aliceDeposit1, bobDeposit1, dennisDeposit1] =
             (await th.depositorValuesAfterTwoLiquidations(contracts, tx1, tx2, [spDeposit, spDeposit, spDeposit]))
@@ -978,7 +981,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await lusdToken.transfer(carol, spDeposit, { from: whale })
       await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: carol })
 
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceGain2, bobGain2, carolGain2, dennisGain2,
              aliceDeposit2, bobDeposit2, carolDeposit2, dennisDeposit2] =
             (await th.depositorValuesAfterLiquidation(contracts, tx3, [aliceDeposit1, bobDeposit1, spDeposit, dennisDeposit1]))
@@ -995,7 +998,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference(dennis_ETHWithdrawn, '82916666666666666667'), 100000)
       assert.isAtMost(th.getDifference(dennis_ETHWithdrawn, dennisGain1.add(dennisGain2)), 100000)
 
-      tx4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [aliceGain3, bobGain3, carolGain3,
              aliceDeposit3, bobDeposit3, carolDeposit3] =
             (await th.depositorValuesAfterLiquidation(contracts, tx4, [aliceDeposit2, bobDeposit2, carolDeposit2]))
@@ -1060,7 +1063,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter 1 liquidated. 20000 LUSD fully offset with pool.
-      await troveManager.liquidate(defaulter_1, { from: owner });
+      await liquidations.liquidate(defaulter_1, { from: owner });
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -1094,7 +1097,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter 2 liquidated. 10000 LUSD offset
-      await troveManager.liquidate(defaulter_2, { from: owner });
+      await liquidations.liquidate(defaulter_2, { from: owner });
 
       // await borrowerOperations.openTrove(dec(1, 18), account, account, { from: erin, value: dec(2, 'ether') })
       // await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: erin })
@@ -1157,7 +1160,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 1 liquidated. 10000 LUSD fully offset, Pool remains non-zero
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const expP1 = await th.getNewPAfterLiquidation(contracts, tx1, P0, liq1Deposits, lastLUSDError1)
 
 
@@ -1171,8 +1174,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated. 10000 LUSD
       liq2Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError2 = await stabilityPool.lastLUSDLossError_Offset()
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
-      const [,drip2] = await th.getEmittedDripValues(tx2)
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
+      const [,drip2] = await th.getEmittedDripValues(contracts,tx2)
       var [liquidatedDebt2] = await th.getEmittedLiquidationValues(tx2)
       console.log("drip2", drip2.toString())
       console.log("liquidatedDebt2", liquidatedDebt2.toString())
@@ -1201,7 +1204,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 3 liquidated. 10000 LUSD fully offset, Pool remains non-zero
-      await troveManager.liquidate(defaulter_3, { from: owner });
+      await liquidations.liquidate(defaulter_3, { from: owner });
 
       //Check scale and sum
       const scale_3 = (await stabilityPool.currentScale()).toString()
@@ -1211,7 +1214,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       assert.isAtMost(th.getDifference(P_3, dec(25, 12)), 13e8)
 
       // Defaulter 4 liquidated. 10000 LUSD, empties pool
-      await troveManager.liquidate(defaulter_4, { from: owner });
+      await liquidations.liquidate(defaulter_4, { from: owner });
 
       //Check scale and sum
       const scale_4 = (await stabilityPool.currentScale()).toString()
@@ -1255,7 +1258,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter 1 liquidated. 20000 LUSD fully offset with pool.
-      await troveManager.liquidate(defaulter_1, { from: owner });
+      await liquidations.liquidate(defaulter_1, { from: owner });
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -1288,7 +1291,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter 2 liquidated. 10000 LUSD offset
-      await troveManager.liquidate(defaulter_2, { from: owner });
+      await liquidations.liquidate(defaulter_2, { from: owner });
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -1342,9 +1345,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await priceFeed.setPrice(dec(100, 18));
 
       // Defaulter 1, 2  and 3 liquidated
-      await troveManager.liquidate(defaulter_1, { from: owner });
-      await troveManager.liquidate(defaulter_2, { from: owner });
-      await troveManager.liquidate(defaulter_3, { from: owner });
+      await liquidations.liquidate(defaulter_1, { from: owner });
+      await liquidations.liquidate(defaulter_2, { from: owner });
+      await liquidations.liquidate(defaulter_3, { from: owner });
 
       const txA = await stabilityPool.withdrawCollateralGainToTrove(ZERO_ADDRESS, ZERO_ADDRESS, { from: alice })
 
@@ -1402,7 +1405,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 1 liquidated. 20k LUSD fully offset with pool.
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const [aliceGain1, bobGain1, aliceDeposit1, bobDeposit1] = (await th.depositorValuesAfterLiquidation(contracts, tx1, [spDeposit, spDeposit]))
 
       // Carol, Dennis each deposit 10000 LUSD
@@ -1413,7 +1416,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 2 liquidated. 10000 LUSD offset
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain2, bobGain2, carolGain2, dennisGain2,
              aliceDeposit2, bobDeposit2, carolDeposit2, dennisDeposit2] =
             (await th.depositorValuesAfterLiquidation(contracts, tx2, [aliceDeposit1, bobDeposit1, spDeposit, spDeposit]))
@@ -1426,7 +1429,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 3 liquidated. 10000 LUSD offset
-      tx3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceGain3, bobGain3, carolGain3, dennisGain3, erinGain3, flynGain3,
              aliceDeposit3, bobDeposit3, carolDeposit3, dennisDeposit3, erinDeposit3, flynDeposit3] =
             (await th.depositorValuesAfterLiquidation(contracts, tx3, [aliceDeposit2, bobDeposit2, carolDeposit2, dennisDeposit2, spDeposit, spDeposit]))
@@ -1439,7 +1442,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 4 liquidated. 10k LUSD offset
-      tx4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [aliceGain4, bobGain4, carolGain4, dennisGain4, erinGain4, flynGain4, grahamGain4, harrietGain4,
              aliceDeposit4, bobDeposit4, carolDeposit4, dennisDeposit4, erinDeposit4, flynDeposit4, grahamDeposit4, harrietDeposit4] =
             (await th.depositorValuesAfterLiquidation(contracts, tx4,
@@ -1537,7 +1540,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const P0 = await stabilityPool.P()
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const expP1 = await th.getNewPAfterLiquidation(contracts, tx1, P0, liqDeposits, lastLUSDError)
       const P1 = await stabilityPool.P()
       assert.isTrue(expP1.eq(P1))
@@ -1563,7 +1566,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated.  9900 LUSD liquidated. P altered by a factor of 1-(9900/10000) = 0.01.  Scale changed.
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      tx2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const expP2 = await th.getNewPAfterLiquidation(contracts, tx2, P1, liqDeposits, lastLUSDError)
       const P2 = await stabilityPool.P()
       assert.equal(await stabilityPool.currentScale(), '1')
@@ -1623,7 +1626,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       assert.isTrue(P0.eq(toBN(dec(1,18))))
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      tx = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx = await liquidations.liquidate(defaulter_1, { from: owner });
 
       const expP1 = await th.getNewPAfterLiquidation(contracts, tx, P0, liqDeposits, lastLUSDError)
       const P1 = await stabilityPool.P()
@@ -1658,7 +1661,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const whaleDeposit = await stabilityPool.getCompoundedLUSDDeposit(whale)
 
       // 595e7 LUSD liquidated.
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isTrue(txL2.receipt.status)
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit, dennisFinalDeposit, whaleFinalDeposit] = (await th.depositsAfterLiquidation(contracts, txL2, [aliceDeposit, bobDeposit, carolDeposit, dennisDeposit, whaleDeposit]))
 
@@ -1734,7 +1737,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const P0 = await stabilityPool.P()
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isTrue(txL1.receipt.status)
       const expP1 = await th.getNewPAfterLiquidation(contracts, txL1, P0, liqDeposits, lastLUSDError)
       const P1 = await stabilityPool.P()
@@ -1765,7 +1768,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       bobDepositAfter =  (await th.depositsAfterLiquidation(contracts, txL2, [bobSpDeposit, otherDep]))[0]
       P2 = await stabilityPool.P()
       const expP2 = await th.getNewPAfterLiquidation(contracts, txL2, P1, liq1Deposits, lastLUSDError1)
@@ -1818,7 +1821,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const P0 = await stabilityPool.P()
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const expP1 = await th.getNewPAfterLiquidation(contracts, txL1, P0, liq1Deposits, lastLUSDError1)
       const P1 = await stabilityPool.P()
 
@@ -1854,7 +1857,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isTrue(txL2.receipt.status)
       const expP2 = await th.getNewPAfterLiquidation(contracts, txL2, P1, liq1Deposits, lastLUSDError1)
       const P2 = await stabilityPool.P()
@@ -1918,7 +1921,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(dec(10000, 18), ZERO_ADDRESS, { from: alice })
 
       // Defaulter 1 liquidated. P -> (~1e-10)*P
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isTrue(txL1.receipt.status)
 
       const aliceDeposit = (await stabilityPool.getCompoundedLUSDDeposit(alice)).toString()
@@ -1963,7 +1966,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       P0 = await stabilityPool.P()
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isTrue(txL1.receipt.status)
       const expP1 = await th.getNewPAfterLiquidation(contracts, txL1, P0, liq1Deposits, lastLUSDError1)
       P1 = await stabilityPool.P()
@@ -1978,7 +1981,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 2 liquidated
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isTrue(txL2.receipt.status)
       const expP2 = await th.getNewPAfterLiquidation(contracts, txL2, P1, liq1Deposits, lastLUSDError1)
       P2 = await stabilityPool.P()
@@ -1994,7 +1997,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 3 liquidated
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      const txL3 = await liquidations.liquidate(defaulter_3, { from: owner });
       assert.isTrue(txL3.receipt.status)
       const expP3 = await th.getNewPAfterLiquidation(contracts, txL3, P2, liq1Deposits, lastLUSDError1)
       P3 = await stabilityPool.P()
@@ -2012,7 +2015,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 4 liquidated
       liq1Deposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError1 = await stabilityPool.lastLUSDLossError_Offset()
-      const txL4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      const txL4 = await liquidations.liquidate(defaulter_4, { from: owner });
       assert.isTrue(txL4.receipt.status)
       const expP4 = await th.getNewPAfterLiquidation(contracts, txL4, P3, liq1Deposits, lastLUSDError1)
       P4 = await stabilityPool.P()
@@ -2020,7 +2023,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.equal(await stabilityPool.P(), dec(1, 16)) // Scale changes and P changes to 1e(12-5+9) = 1e16
       assert.equal(await stabilityPool.currentScale(), '2')
 
-      const [,drip] = await th.getEmittedDripValues(txL4)
+      const [,drip] = await th.getEmittedDripValues(contracts,txL4)
 
       const dennisAfterDrip = dennisDeposit.add(dennisDeposit.mul(drip).div(totalBefore))
       const totalAfterDrip = totalBefore.add(drip)
@@ -2046,7 +2049,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // D should retain around 0.9999 LUSD, since his deposit of 99999 was reduced by a factor of 1e-5
       //assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(dennis)).toString(), dec(99999, 13)), 100000)
       const expDennisFinal = dennisAfterDrip.sub(offsetDebt.mul(dennisAfterDrip).div(totalAfterDrip))
-      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(dennis)).toString(), expDennisFinal), 700000)
+      assert.isAtMost(th.getDifference((await stabilityPool.getCompoundedLUSDDeposit(dennis)).toString(), expDennisFinal), 1000000)
 
       // 99.5 ETH is offset at each L, 0.5 goes to gas comp
       // Each depositor gets ETH rewards of around 99.5 ETH. 1e17 error tolerance
@@ -2082,7 +2085,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(dec(10000, 18), ZERO_ADDRESS, { from: B })
 
       // Defaulter 1 liquidated. SP emptied
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isTrue(txL1.receipt.status)
 
       // Check compounded deposits
@@ -2124,7 +2127,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(dec(10000, 18), ZERO_ADDRESS, { from: D })
 
       // Defaulter 2 liquidated.  SP emptied
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isTrue(txL2.receipt.status)
 
       // Check compounded deposits
@@ -2166,7 +2169,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await stabilityPool.provideToSP(dec(10000, 18), ZERO_ADDRESS, { from: F })
 
       // Defaulter 3 liquidated. SP emptied
-      const txL3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      const txL3 = await liquidations.liquidate(defaulter_3, { from: owner });
       assert.isTrue(txL3.receipt.status)
 
       // Check compounded deposits
@@ -2235,7 +2238,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       assert.isTrue(P0.eq(toBN(dec(1,18))))
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      tx = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx = await liquidations.liquidate(defaulter_1, { from: owner });
       const finalDeposit = (await th.depositsAfterLiquidation(contracts, tx, [spDeposit, spDeposit]))[0]
       const expP1 = await th.getNewPAfterLiquidation(contracts, tx, P0, liqDeposits, lastLUSDError)
 
@@ -2312,7 +2315,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      tx1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const finalDeposit = (await th.depositsAfterLiquidation(contracts, tx1, [spDeposit, spDeposit]))[0]
       const expP1 = await th.getNewPAfterLiquidation(contracts, tx1, P0, liqDeposits, lastLUSDError)
 

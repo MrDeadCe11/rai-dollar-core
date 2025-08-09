@@ -7,6 +7,7 @@ const dec = th.dec
 const toBN = th.toBN
 const getDifference = th.getDifference
 
+const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
 const LUSDToken = artifacts.require("LUSDToken")
 
@@ -53,9 +54,11 @@ contract('StabilityPool - Small Liquidation', async accounts => {
 
     beforeEach(async () => {
       contracts = await deploymentHelper.deployLiquityCore()
+      contracts.liquidations = await LiquidationsTester.new()
       contracts.troveManager = await TroveManagerTester.new()
       contracts.lusdToken = await LUSDToken.new(
         contracts.troveManager.address,
+        contracts.liquidations.address,
         contracts.stabilityPool.address,
         contracts.borrowerOperations.address
       )
@@ -65,6 +68,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
       lusdToken = contracts.lusdToken
       stabilityPool = contracts.stabilityPool
       sortedTroves = contracts.sortedTroves
+      liquidations = contracts.liquidations
       troveManager = contracts.troveManager
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
@@ -101,6 +105,8 @@ contract('StabilityPool - Small Liquidation', async accounts => {
       issuance_M4 = toBN('46678287282156100').mul(communityLQTYSupply).div(toBN(dec(1, 18)))
       issuance_M5 = toBN('44093311972020200').mul(communityLQTYSupply).div(toBN(dec(1, 18)))
       issuance_M6 = toBN('41651488815552900').mul(communityLQTYSupply).div(toBN(dec(1, 18)))
+
+      await th.mintCollateralTokens(contracts, accounts, toBN(dec(1000, 26)))
     })
 
     it("a small liquidation works", async () => {
@@ -123,7 +129,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
 
       let currentDeposits = await stabilityPool.getTotalLUSDDeposits() 
       console.log("currentDeposits at start =", currentDeposits.toString());
-      await troveManager.liquidate(B, {from: A})
+      await liquidations.liquidate(B, {from: A})
       currentDeposits = await stabilityPool.getTotalLUSDDeposits() 
       console.log("currentDeposits after 1st liq =", currentDeposits.toString());
 
@@ -140,7 +146,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
       currentDeposits = await stabilityPool.getTotalLUSDDeposits() 
       console.log("currentDeposits after withdraw =", currentDeposits.toString());
       await priceFeed.setPrice(dec(105, 18))
-      await troveManager.liquidate(C)
+      await liquidations.liquidate(C)
     })
 
   })

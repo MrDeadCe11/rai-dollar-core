@@ -8,6 +8,7 @@ interface ICollSurplusPool {
     // --- Events ---
     
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
+    event LiquidationsAddressChanged(address _newLiquidationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
 
@@ -18,6 +19,7 @@ interface ICollSurplusPool {
 
     function setAddresses(
         address _borrowerOperationsAddress,
+        address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _collateralTokenAddress

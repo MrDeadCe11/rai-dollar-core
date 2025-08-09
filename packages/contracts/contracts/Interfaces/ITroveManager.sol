@@ -4,6 +4,8 @@ pragma solidity 0.6.11;
 
 import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
+import "./IActivePool.sol";
+import "./IDefaultPool.sol";
 import "./ILUSDToken.sol";
 import "./ILQTYToken.sol";
 import "./ILQTYStaking.sol";
@@ -47,6 +49,7 @@ interface ITroveManager is ILiquityBase {
 
     function setAddresses(
         address _aggregatorAddress,
+        address _liquidationsAddress,
         address _borrowerOperationsAddress,
         address _activePoolAddress,
         address _defaultPoolAddress,
@@ -78,11 +81,9 @@ interface ITroveManager is ILiquityBase {
 
     function getCurrentICR(address _borrower, uint _price) external view returns (uint);
 
-    function liquidate(address _borrower) external;
+    function redistributeDebtAndColl(uint _debt, uint _coll) external;
 
-    function liquidateTroves(uint _n) external;
-
-    function batchLiquidate(address[] calldata _troveArray) external;
+    function updateSystemSnapshots_excludeCollRemainder(uint _collRemainder) external;
 
     function redeemCollateral(
         uint _LUSDAmount,
@@ -104,6 +105,8 @@ interface ITroveManager is ILiquityBase {
 
     function getPendingCollateralReward(address _borrower) external view returns (uint);
 
+    function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool, uint _debt, uint _coll) external;
+
     function getPendingLUSDDebtReward(address _borrower) external view returns (uint);
 
     function getPendingActualLUSDDebtReward(address _borrower) external view returns (uint);
@@ -121,6 +124,8 @@ interface ITroveManager is ILiquityBase {
 
     function closeTrove(address _borrower) external;
 
+    function closeTroveLiquidation(address _borrower) external;
+
     function removeStake(address _borrower) external;
 
     function getTroveStatus(address _borrower) external view returns (uint);
@@ -132,6 +137,8 @@ interface ITroveManager is ILiquityBase {
     function getTroveActualDebt(address _borrower) external view returns (uint);
 
     function getTroveColl(address _borrower) external view returns (uint);
+
+    function getTroveDebtAndColl(address _borrower) external view returns (uint, uint);
 
     function setTroveStatus(address _borrower, uint num) external;
 

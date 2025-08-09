@@ -16,11 +16,12 @@ contract('DefaultPool', async accounts => {
   beforeEach('Deploy contracts', async () => {
     defaultPool = await DefaultPool.new()
     nonPayable = await NonPayable.new()
+    mockLiquidations = await NonPayable.new()
     mockTroveManager = await NonPayable.new()
     mockActivePool = await NonPayable.new()
     mockCollateralToken = await NonPayable.new()
 
-    await defaultPool.setAddresses(mockCollateralToken.address, mockTroveManager.address, mockActivePool.address)
+    await defaultPool.setAddresses(mockLiquidations.address, mockTroveManager.address, mockActivePool.address, mockCollateralToken.address)
   })
 
   it.skip('sendCollateralToActivePool(): fails if receiver cannot receive Collateral', async () => {

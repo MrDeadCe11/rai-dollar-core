@@ -56,6 +56,7 @@ contract('Relayer', async accounts => {
     contracts.relayer = await RelayerTester.new()
     contracts.lusdToken = await LUSDTokenTester.new(
       contracts.troveManager.address,
+      contracts.liquidations.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )

@@ -348,6 +348,29 @@ class TestHelper {
     return this.toBN(rawHex)
   }
 
+  static async getCollateralFromCollSurplusPool(contracts, account) {
+    const rawHex = await web3.eth.call({
+      to: contracts.collSurplusPool.address,
+      data: contracts.collSurplusPool.contract.methods.getCollateral(account).encodeABI()
+    });
+    return this.toBN(rawHex)
+  }
+
+  static async getNominalICR(contracts, account) {
+    const rawHex = await web3.eth.call({
+      to: contracts.troveManager.address,
+      data: contracts.troveManager.contract.methods.getNominalICR(account).encodeABI()
+    });
+    return this.toBN(rawHex)
+  }
+
+  static async getCollateralFromCollSurplusPool(contracts, account) {
+    const rawHex = await web3.eth.call({
+      to: contracts.collSurplusPool.address,
+      data: contracts.collSurplusPool.contract.methods.getCollateral(account).encodeABI()
+    });
+    return this.toBN(rawHex)
+  }
   // Adds the gas compensation (50 LUSD)
   static async getCompositeDebt(contracts, debt) {
     const compositeDebt = contracts.borrowerOperations.getCompositeDebt(debt)
@@ -453,7 +476,7 @@ class TestHelper {
     }
     throw ("The transaction logs do not contain a redemption event")
   }
-  static getEmittedDripValues(tx) {
+  static getEmittedDripValuesOld(tx) {
     for (let i = 0; i < tx.logs.length; i++) {
       if (tx.logs[i].event === "Drip") {
 
@@ -464,6 +487,12 @@ class TestHelper {
       }
     }
     throw ("The transaction logs do not contain a drip event")
+  }
+  static async getEmittedDripValues(contracts, tx) {
+    const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
+    const spPayment = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
+    const stakePayment = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_stakeInterest"))
+    return [stakePayment, spPayment]
   }
 
   static getEmittedEtherSentValues(tx) {
@@ -780,7 +809,7 @@ class TestHelper {
   static async depositorValuesAfterLiquidation(contracts, tx, startDeposits, totalDeposits = null) {
       // retursn eth *gains* concatenated with SP deposits
       // does *not* return final eth balance, ie sp.getDepositorGain()
-      const [,drip] = await this.getEmittedDripValues(tx)
+      const [,drip] = await this.getEmittedDripValues(contracts, tx)
       const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var collToAdd = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "collToAdd"))
       var debtToOffset = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
@@ -893,7 +922,7 @@ class TestHelper {
   }
 
   static async ethGainsAfterLiquidation(contracts, tx, startDeposits, totalDeposits = null) {
-      const [,drip] = await this.getEmittedDripValues(tx)
+      const [,drip] = await this.getEmittedDripValues(contracts, tx)
       const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var collToAdd = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "collToAdd"))
       var debtToOffset = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
@@ -985,7 +1014,7 @@ class TestHelper {
   }
 
   static async depositsAfterLiquidation(contracts, tx, startDeposits, totalDeposits = null) {
-      const [,drip] = await this.getEmittedDripValues(tx)
+      const [,drip] = await this.getEmittedDripValues(contracts, tx)
       const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var offsetDebt = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
@@ -1064,7 +1093,9 @@ class TestHelper {
       // In liquidate() there are two P updates
       // first for drip, then for offset
       
-      const [,drip] = await this.getEmittedDripValues(tx)
+      //const [,drip] = await this.getEmittedDripValues(tx)
+      const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
+      const drip = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
       const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var offsetDebt = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
@@ -1264,7 +1295,7 @@ class TestHelper {
     { from: extraParams.from }
   )
 
-    const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, { from: extraParams.from })
+    const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, { from: extraParams.from})
 
     return {
       lusdAmount,

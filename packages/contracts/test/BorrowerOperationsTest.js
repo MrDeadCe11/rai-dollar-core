@@ -4,6 +4,7 @@ const testHelpers = require("../utils/testHelpers.js")
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol")
 const NonPayable = artifacts.require('NonPayable.sol')
 const AggregatorTester = artifacts.require("AggregatorTester")
+const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester")
 
@@ -74,6 +75,7 @@ contract('BorrowerOperations', async accounts => {
       contracts = await deploymentHelper.deployLiquityCore()
       contracts.borrowerOperations = await BorrowerOperationsTester.new()
       contracts.aggregator = await AggregatorTester.new()
+      contracts.liquidations = await LiquidationsTester.new()
       contracts.troveManager = await TroveManagerTester.new()
       contracts = await deploymentHelper.deployLUSDTokenTester(contracts)
       const LQTYContracts = await deploymentHelper.deployLQTYTesterContractsHardhat(bountyAddress, lpRewardsAddress, multisig)
@@ -92,6 +94,7 @@ contract('BorrowerOperations', async accounts => {
       lusdToken = contracts.lusdToken
       sortedTroves = contracts.sortedTroves
       aggregator = contracts.aggregator
+      liquidations = contracts.liquidations
       troveManager = contracts.troveManager
       activePool = contracts.activePool
       stabilityPool = contracts.stabilityPool
@@ -229,7 +232,7 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice('100000000000000000000');
 
       // Liquidate Carol's Trove,
-      const tx = await troveManager.liquidate(carol, { from: owner });
+      const tx = await liquidations.liquidate(carol, { from: owner });
 
       assert.isFalse(await sortedTroves.contains(carol))
 
@@ -315,7 +318,7 @@ contract('BorrowerOperations', async accounts => {
     //   await priceFeed.setPrice('100000000000000000000');
 
     //   // close Carol's Trove, liquidating her 5 ether and 900LUSD.
-    //   await troveManager.liquidate(carol, { from: owner });
+    //   await liquidations.liquidate(carol, { from: owner });
 
     //   // dennis tops up his trove by 1 Collateral
     //   await borrowerOperations.addColl(dennis, dennis, { from: dennis, value: dec(1, 'ether') })
@@ -358,7 +361,7 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice(dec(100, 18))
 
       // Bob gets liquidated
-      await troveManager.liquidate(bob)
+      await liquidations.liquidate(bob)
 
       assert.isFalse(await sortedTroves.contains(bob))
 
@@ -589,7 +592,7 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice('100000000000000000000');
 
       // close Carol's Trove, liquidating her 1 ether and 180LUSD.
-      await troveManager.liquidate(carol, { from: owner });
+      await liquidations.liquidate(carol, { from: owner });
 
       const L_COLL = await troveManager.L_COLL()
       const L_LUSDDebt = await troveManager.L_LUSDDebt()
@@ -2580,7 +2583,7 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice(dec(100, 18))
 
       // Liquidate Bob
-      await troveManager.liquidate(bob)
+      await liquidations.liquidate(bob)
       assert.isFalse(await sortedTroves.contains(bob))
 
       // Price bounces back
@@ -2600,7 +2603,7 @@ contract('BorrowerOperations', async accounts => {
       assert.isTrue(L_LUSDDebt_A_Snapshot.gt(toBN('0')))
 
       // Liquidate Carol
-      await troveManager.liquidate(carol)
+      await liquidations.liquidate(carol)
       assert.isFalse(await sortedTroves.contains(carol))
 
       // Get Alice's pending reward snapshots after Carol's liquidation. Check above 0
@@ -2813,7 +2816,7 @@ contract('BorrowerOperations', async accounts => {
       const price = await priceFeed.getPrice()
 
       // liquidate Carol's Trove, Alice and Bob earn rewards.
-      const liquidationTx = await troveManager.liquidate(carol, { from: owner });
+      const liquidationTx = await liquidations.liquidate(carol, { from: owner });
       const [liquidatedDebt_C, liquidatedColl_C, gasComp_C] = th.getEmittedLiquidationValues(liquidationTx)
 
       // Dennis opens a new Trove 
@@ -3636,7 +3639,7 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice(dec(100, 18));
 
       // close Carol's Trove, liquidating her 1 ether and 180LUSD.
-      const liquidationTx = await troveManager.liquidate(carol, { from: owner });
+      const liquidationTx = await liquidations.liquidate(carol, { from: owner });
       const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
 
       /* with total stakes = 10 ether, after liquidation, L_COLL should equal 1/10 ether per-ether-staked,
@@ -3888,7 +3891,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -3922,7 +3925,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -3956,7 +3959,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -3989,7 +3992,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -4022,7 +4025,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -4056,7 +4059,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -4090,7 +4093,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -4124,7 +4127,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)
@@ -4158,7 +4161,7 @@ contract('BorrowerOperations', async accounts => {
 
         await priceFeed.setPrice(dec(100, 18))
 
-        const liquidationTx = await troveManager.liquidate(bob)
+        const liquidationTx = await liquidations.liquidate(bob)
         assert.isFalse(await sortedTroves.contains(bob))
 
         const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(liquidationTx)

@@ -8,6 +8,7 @@ import "../Dependencies/IERC20.sol";
 
 interface IActivePool is IPool {
     // --- Events ---
+    event LiquidationsAddressChanged(address _newLiquidationsAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolLUSDDebtUpdated(uint _LUSDDebt);

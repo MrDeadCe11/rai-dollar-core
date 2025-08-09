@@ -16,6 +16,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     string constant public NAME = "CollSurplusPool";
 
     address public borrowerOperationsAddress;
+    address public liquidationsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
     IERC20 public collateralToken;
@@ -37,6 +38,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
 
     function setAddresses(
         address _borrowerOperationsAddress,
+        address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _collateralTokenAddress
@@ -46,11 +48,13 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         onlyOwner
     {
         checkContract(_borrowerOperationsAddress);
+        checkContract(_liquidationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
         checkContract(_collateralTokenAddress);
 
         borrowerOperationsAddress = _borrowerOperationsAddress;
+        liquidationsAddress = _liquidationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
         collateralToken = IERC20(_collateralTokenAddress);
@@ -58,6 +62,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         
         
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
+        emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
 
@@ -77,7 +82,8 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     // --- Pool functionality ---
 
     function accountSurplus(address _account, uint _amount) external override {
-        _requireCallerIsTroveManager();
+        //_requireCallerIsTroveManager();
+        _requireCallerIsTroveManagerOrLiq();
 
         uint newAmount = balances[_account].add(_amount);
         balances[_account] = newAmount;
@@ -116,10 +122,11 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
             "CollSurplusPool: Caller is not Borrower Operations");
     }
 
-    function _requireCallerIsTroveManager() internal view {
+    function _requireCallerIsTroveManagerOrLiq() internal view {
         require(
-            msg.sender == troveManagerAddress,
-            "CollSurplusPool: Caller is not TroveManager");
+            msg.sender == troveManagerAddress ||
+            msg.sender == liquidationsAddress,
+            "CollSurplusPool: Caller is not TroveManager or Liq");
     }
 
     function _requireCallerIsActivePool() internal view {

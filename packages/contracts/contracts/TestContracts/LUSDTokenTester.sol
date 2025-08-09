@@ -12,9 +12,11 @@ contract LUSDTokenTester is LUSDToken {
     
     constructor( 
         address _troveManagerAddress,
+        address _liquidationsAddress,
         address _stabilityPoolAddress,
         address _borrowerOperationsAddress
     ) public LUSDToken(_troveManagerAddress,
+                      _liquidationsAddress,
                       _stabilityPoolAddress,
                       _borrowerOperationsAddress) {}
     

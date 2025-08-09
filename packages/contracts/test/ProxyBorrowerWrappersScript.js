@@ -1,6 +1,7 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 
+const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
 const AggregatorTester = artifacts.require("AggregatorTester")
 const RateControlTester = artifacts.require("RateControlTester")
@@ -50,7 +51,7 @@ contract('BorrowerWrappers', async accounts => {
   let activePool
   let stabilityPool
   let defaultPool
-  let collSurplusPool
+  let cdefaulter_1ollSurplusPool
   let borrowerOperations
   let borrowerWrappers
   let lqtyTokenOriginal
@@ -69,6 +70,7 @@ contract('BorrowerWrappers', async accounts => {
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.aggregator = await AggregatorTester.new()
+    contracts.liquidations = await LiquidationsTester.new()
     contracts.troveManager = await TroveManagerTester.new()
     contracts.rateControl = await RateControlTester.new()
     contracts = await deploymentHelper.deployLUSDToken(contracts)
@@ -88,6 +90,7 @@ contract('BorrowerWrappers', async accounts => {
     lusdToken = contracts.lusdToken
     sortedTroves = contracts.sortedTroves
     aggregator = contracts.aggregator
+    liquidations = contracts.liquidations
     troveManager = contracts.troveManager
     activePool = contracts.activePool
     stabilityPool = contracts.stabilityPool
@@ -99,7 +102,6 @@ contract('BorrowerWrappers', async accounts => {
     lqtyToken = LQTYContracts.lqtyToken
     communityIssuance = LQTYContracts.communityIssuance
       
-
     troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
     stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", stabilityPool.address)).interface;
 
@@ -258,8 +260,18 @@ contract('BorrowerWrappers', async accounts => {
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price);
 
+    console.log("Status", (await troveManager.getTroveStatus(defaulter_1)).toString())
+    console.log("Trove", (await troveManager.Troves(defaulter_1))[3].toString())
+
+    console.log("troveManager.address", contracts.troveManager.address)
+    console.log("liquidations.troveManager.address", (await contracts.liquidations.troveManager()))
+    //console.log("bo.troveManager.address", (await contracts.borrowerOperations.troveManager()))
+
+    s = await liquidations.getTroveStatus(defaulter_1);
+    console.log("troveStatus in liquidations", s.toString())
     // Defaulter trove closed
-    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, { from: owner })
+    const liquidationTX_1 = await liquidations.liquidate(defaulter_1, { from: owner })
+    //const liquidationTX_1 = await liquidations.liquidate(defaulter_1)
     const [liquidatedDebt_1] = await th.getEmittedLiquidationValues(liquidationTX_1)
 
     // Bob tries to claims SP rewards in behalf of Alice
@@ -310,7 +322,7 @@ contract('BorrowerWrappers', async accounts => {
     await priceFeed.setPrice(price);
 
     // Defaulter trove closed
-    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, { from: owner })
+    const liquidationTX_1 = await liquidations.liquidate(defaulter_1, { from: owner })
     const [liquidatedDebt_1] = await th.getEmittedLiquidationValues(liquidationTX_1)
     const [aliceGain, whaelGain, aliceFinalDeposit, whaleFinalDeposit] =
           (await th.depositorValuesAfterLiquidation(contracts, liquidationTX_1, [compoundedLUSDDeposit_A_1, compoundedLUSDDeposit_whale_1]))

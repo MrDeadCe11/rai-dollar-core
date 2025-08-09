@@ -33,6 +33,7 @@ contract('CollSurplusPool', async accounts => {
     contracts.troveManager = await TroveManagerTester.new()
     contracts.lusdToken = await LUSDToken.new(
       contracts.troveManager.address,
+      contracts.liquidations.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )

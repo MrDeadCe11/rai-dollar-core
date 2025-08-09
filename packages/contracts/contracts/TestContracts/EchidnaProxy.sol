@@ -3,12 +3,14 @@
 pragma solidity 0.6.11;
 
 import "../TroveManager.sol";
+import "../Liquidations.sol";
 import "../BorrowerOperations.sol";
 import "../StabilityPool.sol";
 import "../LUSDToken.sol";
 
 contract EchidnaProxy {
     TroveManager troveManager;
+    Liquidations liquidations;
     BorrowerOperations borrowerOperations;
     StabilityPool stabilityPool;
     LUSDToken lusdToken;
@@ -32,15 +34,15 @@ contract EchidnaProxy {
     // TroveManager
 
     function liquidatePrx(address _user) external {
-        troveManager.liquidate(_user);
+        liquidations.liquidate(_user);
     }
 
     function liquidateTrovesPrx(uint _n) external {
-        troveManager.liquidateTroves(_n);
+        liquidations.liquidateTroves(_n);
     }
 
     function batchLiquidateTrovesPrx(address[] calldata _troveArray) external {
-        troveManager.batchLiquidate(_troveArray);
+        liquidations.batchLiquidate(_troveArray);
     }
 
     function redeemCollateralPrx(

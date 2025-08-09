@@ -1,5 +1,7 @@
+const { ethers } = require("hardhat")
 const SortedTroves = artifacts.require("./SortedTroves.sol")
 const TroveManager = artifacts.require("./TroveManager.sol")
+const Liquidations = artifacts.require("./Liquidations.sol")
 const PriceFeedTestnet = artifacts.require("./PriceFeedTestnet.sol")
 const LUSDToken = artifacts.require("./LUSDToken.sol")
 const ActivePool = artifacts.require("./ActivePool.sol");
@@ -30,6 +32,7 @@ const ActivePoolTester = artifacts.require("./ActivePoolTester.sol")
 const DefaultPoolTester = artifacts.require("./DefaultPoolTester.sol")
 const LiquityMathTester = artifacts.require("./LiquityMathTester.sol")
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol")
+const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
@@ -99,6 +102,7 @@ class DeploymentHelper {
     const aggregator = await Aggregator.new()
     const sortedTroves = await SortedTroves.new()
     const troveManager = await TroveManager.new()
+    const liquidations = await Liquidations.new()
     const activePool = await ActivePool.new()
     const stabilityPool = await StabilityPool.new()
     const gasPool = await GasPool.new()
@@ -109,6 +113,7 @@ class DeploymentHelper {
     const hintHelpers = await HintHelpers.new()
     const lusdToken = await LUSDToken.new(
       troveManager.address,
+      liquidations.address,
       stabilityPool.address,
       borrowerOperations.address
     )
@@ -126,6 +131,7 @@ class DeploymentHelper {
     SortedTroves.setAsDeployed(sortedTroves)
     Aggregator.setAsDeployed(aggregator)
     TroveManager.setAsDeployed(troveManager)
+    Liquidations.setAsDeployed(liquidations)
     ActivePool.setAsDeployed(activePool)
     StabilityPool.setAsDeployed(stabilityPool)
     GasPool.setAsDeployed(gasPool)
@@ -145,6 +151,7 @@ class DeploymentHelper {
       sortedTroves,
       aggregator,
       troveManager,
+      liquidations,
       activePool,
       stabilityPool,
       gasPool,
@@ -179,10 +186,12 @@ class DeploymentHelper {
     testerContracts.math = await LiquityMathTester.new()
     testerContracts.borrowerOperations = await BorrowerOperationsTester.new()
     testerContracts.troveManager = await TroveManagerTester.new()
+    testerContracts.liquidations = await LiquidationsTester.new()
     testerContracts.functionCaller = await FunctionCaller.new()
     testerContracts.hintHelpers = await HintHelpers.new()
     testerContracts.lusdToken =  await LUSDTokenTester.new(
       testerContracts.troveManager.address,
+      testerContracts.liquidations.address,
       testerContracts.stabilityPool.address,
       testerContracts.borrowerOperations.address
     )
@@ -260,6 +269,7 @@ class DeploymentHelper {
     const sortedTroves = await SortedTroves.new()
     const aggregator = await Aggregator.new()
     const troveManager = await TroveManager.new()
+    const liquidations = await Liquidations.new()
     const activePool = await ActivePool.new()
     const stabilityPool = await StabilityPool.new()
     const gasPool = await GasPool.new()
@@ -281,6 +291,7 @@ class DeploymentHelper {
       sortedTroves,
       aggregator,
       troveManager,
+      liquidations,
       activePool,
       stabilityPool,
       gasPool,
@@ -322,6 +333,7 @@ class DeploymentHelper {
   static async deployLUSDToken(contracts) {
     contracts.lusdToken = await LUSDToken.new(
       contracts.troveManager.address,
+      contracts.liquidations.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )
@@ -331,6 +343,7 @@ class DeploymentHelper {
   static async deployLUSDTokenTester(contracts) {
     contracts.lusdToken = await LUSDTokenTester.new(
       contracts.troveManager.address,
+      contracts.liquidations.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )
@@ -341,6 +354,7 @@ class DeploymentHelper {
     const proxies = await buildUserProxies(users)
 
     const borrowerWrappersScript = await BorrowerWrappersScript.new(
+      contracts.collateralToken.address,
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       LQTYContracts.lqtyStaking.address,
@@ -402,6 +416,7 @@ class DeploymentHelper {
     )
 
     await contracts.activePool.setAddresses(
+      contracts.liquidations.address,
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       contracts.stabilityPool.address,
@@ -412,6 +427,7 @@ class DeploymentHelper {
     // set contracts in the Trove Manager
     await contracts.troveManager.setAddresses(
       contracts.aggregator.address,
+      contracts.liquidations.address,
       contracts.borrowerOperations.address,
       contracts.activePool.address,
       contracts.defaultPool.address,
@@ -427,8 +443,26 @@ class DeploymentHelper {
       contracts.collateralToken.address
     )
 
-    // set contracts in the Aggregator
-    await contracts.aggregator.setAddresses(
+    // set contracts in the Liquidations
+    await contracts.liquidations.setAddresses(
+      contracts.troveManager.address,
+      contracts.borrowerOperations.address,
+      contracts.activePool.address,
+      contracts.defaultPool.address,
+      contracts.stabilityPool.address,
+      contracts.gasPool.address,
+      contracts.collSurplusPool.address,
+      contracts.priceFeedTestnet.address,
+      contracts.lusdToken.address,
+      contracts.sortedTroves.address,
+      LQTYContracts.lqtyToken.address,
+      LQTYContracts.lqtyStaking.address,
+      contracts.relayer.address,
+      contracts.collateralToken.address
+    )
+
+    // set contracts in the Liquidations
+    await contracts.liquidations.setAddresses(
       contracts.troveManager.address,
       contracts.lusdToken.address,
     )
@@ -438,6 +472,7 @@ class DeploymentHelper {
     // set contracts in the Pools
     await contracts.stabilityPool.setAddresses(
       contracts.borrowerOperations.address,
+      contracts.liquidations.address,
       contracts.troveManager.address,
       contracts.activePool.address,
       contracts.lusdToken.address,
@@ -445,9 +480,12 @@ class DeploymentHelper {
       contracts.priceFeedTestnet.address,
       LQTYContracts.communityIssuance.address,
       contracts.collateralToken.address
+      LQTYContracts.communityIssuance.address,
+      contracts.collateralToken.address
     )
 
     await contracts.defaultPool.setAddresses(
+      contracts.liquidations.address,
       contracts.troveManager.address,
       contracts.activePool.address,
       contracts.collateralToken.address
@@ -455,6 +493,7 @@ class DeploymentHelper {
 
     await contracts.collSurplusPool.setAddresses(
       contracts.borrowerOperations.address,
+      contracts.liquidations.address,
       contracts.troveManager.address,
       contracts.activePool.address,
       contracts.collateralToken.address

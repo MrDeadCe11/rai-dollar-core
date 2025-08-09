@@ -76,6 +76,7 @@ interface IStabilityPool {
      */
     function setAddresses(
         address _borrowerOperationsAddress,
+        address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _lusdTokenAddress,

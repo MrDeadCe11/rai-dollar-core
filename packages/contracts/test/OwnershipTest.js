@@ -79,7 +79,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
   describe('TroveManager', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(troveManager, 14)
+      await testSetAddresses(troveManager, 15)
     })
   })
 
@@ -91,19 +91,19 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
   describe('DefaultPool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(defaultPool, 3)
+      await testSetAddresses(defaultPool, 4)
     })
   })
 
   describe('StabilityPool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(stabilityPool, 8)
+      await testSetAddresses(stabilityPool, 9)
     })
   })
 
   describe('ActivePool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(activePool, 6)
+      await testSetAddresses(activePool, 7)
     })
   })
 

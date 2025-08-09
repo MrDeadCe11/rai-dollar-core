@@ -56,28 +56,35 @@ contract LUSDToken is CheckContract, ILUSDToken {
     
     // --- Addresses ---
     address public immutable troveManagerAddress;
+    address public immutable liquidationsAddress;
     address public immutable stabilityPoolAddress;
     address public immutable borrowerOperationsAddress;
     
     // --- Events ---
     event TroveManagerAddressChanged(address _troveManagerAddress);
+    event LiquidationsAddressChanged(address _liquidationsAddress);
     event StabilityPoolAddressChanged(address _newStabilityPoolAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
 
     constructor
     ( 
         address _troveManagerAddress,
+        address _liquidationsAddress,
         address _stabilityPoolAddress,
         address _borrowerOperationsAddress
     ) 
         public 
     {  
         checkContract(_troveManagerAddress);
+        checkContract(_liquidationsAddress);
         checkContract(_stabilityPoolAddress);
         checkContract(_borrowerOperationsAddress);
 
         troveManagerAddress = _troveManagerAddress;
         emit TroveManagerAddressChanged(_troveManagerAddress);
+
+        liquidationsAddress = _liquidationsAddress;
+        emit LiquidationsAddressChanged(_liquidationsAddress);
 
         stabilityPoolAddress = _stabilityPoolAddress;
         emit StabilityPoolAddressChanged(_stabilityPoolAddress);
@@ -278,7 +285,9 @@ contract LUSDToken is CheckContract, ILUSDToken {
 
     function _requireCallerIsTroveMorSP() internal view {
         require(
-            msg.sender == troveManagerAddress || msg.sender == stabilityPoolAddress,
+            msg.sender == troveManagerAddress ||
+            msg.sender == liquidationsAddress ||
+            msg.sender == stabilityPoolAddress,
             "LUSD: Caller is neither TroveManager nor StabilityPool");
     }
 

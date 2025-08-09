@@ -25,7 +25,7 @@ contract('StabilityPool', async accounts => {
     const mockActivePoolAddress = (await NonPayable.new()).address
     const dumbContractAddress = (await NonPayable.new()).address
     collateralToken = await CollateralToken.new("test", "test")
-    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
+    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -49,7 +49,7 @@ contract('ActivePool', async accounts => {
     mockBorrowerOperations = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
     collateralToken = await CollateralToken.new("test", "test")
-    await activePool.setAddresses(mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
+    await activePool.setAddresses(dumbContractAddress, mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -133,13 +133,14 @@ contract('DefaultPool', async accounts => {
   const [owner, alice] = accounts;
   beforeEach(async () => {
     defaultPool = await DefaultPool.new()
+    mockLiquidations = await NonPayable.new()
     mockTroveManager = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
     mockActivePool = await ActivePool.new()
     collateralToken = await CollateralToken.new("test", "test")
 
-    await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address, collateralToken.address)
-    await mockActivePool.setAddresses(dumbContractAddress, mockTroveManager.address, dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
+    await defaultPool.setAddresses(mockLiquidations.address, mockTroveManager.address, mockActivePool.address, collateralToken.address)
+    await mockActivePool.setAddresses(mockLiquidations.address, dumbContractAddress, mockTroveManager.address, dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded LUSD balance', async () => {

@@ -288,7 +288,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
         
       } catch (err) {
         assert.include(err.message, "revert")
-        assert.include(err.message, "Caller is not the TroveManager")
+        assert.include(err.message, "Caller is not TM or Liquidations")
       }
     })
 

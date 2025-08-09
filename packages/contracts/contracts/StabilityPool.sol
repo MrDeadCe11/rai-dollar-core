@@ -142,6 +142,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     IBorrowerOperations public borrowerOperations;
 
+    address public liquidations;
+
     ITroveManager public troveManager;
 
     ILUSDToken public lusdToken;
@@ -265,6 +267,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     function setAddresses(
         address _borrowerOperationsAddress,
+        address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
         address _lusdTokenAddress,
@@ -278,6 +281,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         onlyOwner
     {
         checkContract(_borrowerOperationsAddress);
+        checkContract(_liquidationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
         checkContract(_lusdTokenAddress);
@@ -287,6 +291,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         checkContract(_collateralToken);
 
         borrowerOperations = IBorrowerOperations(_borrowerOperationsAddress);
+        liquidations = _liquidationsAddress;
         troveManager = ITroveManager(_troveManagerAddress);
         activePool = IActivePool(_activePoolAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
@@ -532,7 +537,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     * Only called by liquidation functions in the TroveManager.
     */
     function offset(uint _debtToOffset, uint _nDebtToOffset, uint _collToAdd) external override {
-        _requireCallerIsTroveManager();
+        _requireCallerIsTroveManagerOrLiq();
         uint totalLUSD = totalLUSDDeposits; // cached to save an SLOAD
         if (totalLUSD == 0 || _debtToOffset == 0) { return; }
 
@@ -963,6 +968,12 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == address(troveManager), "StabilityPool: Caller is not TroveManager");
+    }
+
+    function _requireCallerIsTroveManagerOrLiq() internal view {
+        require(msg.sender == address(troveManager) || 
+                msg.sender == liquidations, 
+         "StabilityPool: Caller is not TroveManager or Liq");
     }
 
     function _requireNoUnderCollateralizedTroves() internal {

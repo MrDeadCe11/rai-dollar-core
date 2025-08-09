@@ -105,7 +105,7 @@ class BorrowerOperationsProxy extends Proxy {
   }
 
   async withdrawLUSD(...params) {
-    return this.forwardFunction(params, 'withdrawLUSD(uint256,uint256,address,address)')
+    return this.forwardFunction(params, 'withdrawLUSD(uint256,address,address)')
   }
 
   async repayLUSD(...params) {
@@ -212,10 +212,6 @@ class TroveManagerProxy extends Proxy {
     return this.proxyFunction('getPendingLUSDDebtReward', params)
   }
 
-  async liquidate(user) {
-    return this.proxyFunctionWithUser('liquidate', user)
-  }
-
   async getTCR(...params) {
     return this.proxyFunction('getTCR', params)
   }
@@ -230,10 +226,6 @@ class TroveManagerProxy extends Proxy {
 
   async getTroveOwnersCount() {
     return this.proxyFunction('getTroveOwnersCount', [])
-  }
-
-  async baseRate() {
-    return this.proxyFunction('baseRate', [])
   }
 
   async L_COLL() {
@@ -258,26 +250,6 @@ class TroveManagerProxy extends Proxy {
 
   async getActualDebtFromComposite(...params) {
     return this.proxyFunction('getActualDebtFromComposite', params)
-  }
-
-  async getRedemptionFeeWithDecay(...params) {
-    return this.proxyFunction('getRedemptionFeeWithDecay', params)
-  }
-
-  async getBorrowingRate() {
-    return this.proxyFunction('getBorrowingRate', [])
-  }
-
-  async getBorrowingRateWithDecay() {
-    return this.proxyFunction('getBorrowingRateWithDecay', [])
-  }
-
-  async getBorrowingFee(...params) {
-    return this.proxyFunction('getBorrowingFee', params)
-  }
-
-  async getBorrowingFeeWithDecay(...params) {
-    return this.proxyFunction('getBorrowingFeeWithDecay', params)
   }
 
   async getEntireDebtAndColl(...params) {

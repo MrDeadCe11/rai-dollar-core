@@ -1,5 +1,6 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
+const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
 
@@ -50,9 +51,11 @@ contract('TroveManager', async accounts => {
 
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
+    contracts.liquidations = await LiquidationsTester.new()
     contracts.troveManager = await TroveManagerTester.new()
     contracts.lusdToken = await LUSDTokenTester.new(
       contracts.troveManager.address,
+      contracts.liquidations.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )
@@ -61,6 +64,7 @@ contract('TroveManager', async accounts => {
     priceFeed = contracts.priceFeedTestnet
     lusdToken = contracts.lusdToken
     sortedTroves = contracts.sortedTroves
+    liquidations = contracts.liquidations
     troveManager = contracts.troveManager
     activePool = contracts.activePool
     stabilityPool = contracts.stabilityPool
@@ -102,7 +106,7 @@ contract('TroveManager', async accounts => {
     await priceFeed.setPrice(dec(50, 18))
     //assert.isTrue(await troveManager.checkRecoveryMode(await priceFeed.getPrice()))
     assert.isTrue(await th.checkRecoveryMode(contracts))
-    await troveManager.liquidate(A)
+    await liquidations.liquidate(A)
 
     console.log(`totalStakesSnapshot after L1: ${await troveManager.totalStakesSnapshot()}`)
     console.log(`totalCollateralSnapshot after L1: ${await troveManager.totalCollateralSnapshot()}`)
@@ -119,7 +123,7 @@ contract('TroveManager', async accounts => {
     // - Liquidate a tiny trove
     // - Adjust B's collateral by 1 wei
     for (let [idx, trove] of tinyTroves.entries()) {
-      await troveManager.liquidate(trove)
+      await liquidations.liquidate(trove)
       console.log(`B stake after L${idx + 2}: ${(await troveManager.Troves(B))[2]}`)
       console.log(`Snapshots ratio after L${idx + 2}: ${await getSnapshotsRatio()}`)
       await borrowerOperations.adjustTrove(0, 1, false, ZERO_ADDRESS, ZERO_ADDRESS, {from: B})  // A repays 1 wei

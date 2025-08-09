@@ -7,6 +7,7 @@ const dec = th.dec
 const toBN = th.toBN
 const getDifference = th.getDifference
 
+const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
 const RateControlTester = artifacts.require("RateControlTester")
 const LUSDToken = artifacts.require("LUSDToken")
@@ -55,10 +56,12 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
     beforeEach(async () => {
       contracts = await deploymentHelper.deployLiquityCore()
+      contracts.liquidations = await LiquidationsTester.new()
       contracts.troveManager = await TroveManagerTester.new()
       contracts.rateControl = await RateControlTester.new()
       contracts.lusdToken = await LUSDToken.new(
         contracts.troveManager.address,
+        contracts.liquidations.address,
         contracts.stabilityPool.address,
         contracts.borrowerOperations.address
       )
@@ -69,6 +72,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       stabilityPool = contracts.stabilityPool
       activePool = contracts.activePool
       sortedTroves = contracts.sortedTroves
+      liquidations = contracts.liquidations
       troveManager = contracts.troveManager
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
@@ -91,6 +95,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await deploymentHelper.connectLQTYContracts(LQTYContracts)
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+
+      troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
 
       // Check community issuance starts with 32 million LQTY
       communityLQTYSupply = toBN(await lqtyToken.balanceOf(communityIssuanceTester.address))
@@ -139,7 +145,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       const totalLQTYIssued_1 = await communityIssuanceTester.totalLQTYIssued()
       assert.isTrue(totalLQTYIssued_1.gt(toBN('0')))
       
-      await troveManager.liquidate(B)
+      await liquidations.liquidate(B)
       const blockTimestamp_2 = th.toBN(await th.getLatestBlockTimestamp(web3))
 
       assert.isFalse(await sortedTroves.contains(B))
@@ -183,7 +189,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.MINUTES_IN_ONE_WEEK, web3.currentProvider)
 
       // Liquidate d1. Triggers issuance.
-      await troveManager.liquidate(defaulter_1)
+      await liquidations.liquidate(defaulter_1)
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
       // Get G and communityIssuance before
@@ -418,10 +424,11 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Price Drops, defaulter1 liquidated. Stability Pool size drops by 50%
       await priceFeed.setPrice(dec(100, 18))
       assert.isFalse(await th.checkRecoveryMode(contracts))
-      tx = await troveManager.liquidate(defaulter_1)
+      tx = await liquidations.liquidate(defaulter_1)
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
-      const [,drip] = await th.getEmittedDripValues(tx)
+      //const [,drip] = await th.getEmittedDripValues(contracts,tx)
+      drip = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
       //const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var offsetDebt = toBN(await th.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
@@ -603,7 +610,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
 
       // Defaulter 1 liquidated. 20k LUSD fully offset with pool.
-      await troveManager.liquidate(defaulter_1, { from: owner });
+      await liquidations.liquidate(defaulter_1, { from: owner });
 
       // C, D each deposit 10k LUSD
       for (account of depositors_2) {
@@ -620,7 +627,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 2 liquidated. 10k LUSD offset
-      await troveManager.liquidate(defaulter_2, { from: owner });
+      await liquidations.liquidate(defaulter_2, { from: owner });
 
       // Erin, Flyn each deposit 100 LUSD
       for (account of depositors_3) {
@@ -638,7 +645,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 3 liquidated. 100 LUSD offset
-      await troveManager.liquidate(defaulter_3, { from: owner });
+      await liquidations.liquidate(defaulter_3, { from: owner });
 
       // Graham, Harriet each deposit 10k LUSD
       for (account of depositors_4) {
@@ -655,7 +662,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 4 liquidated. 100 LUSD offset
-      await troveManager.liquidate(defaulter_4, { from: owner });
+      await liquidations.liquidate(defaulter_4, { from: owner });
 
       // All depositors claim from SP
       for (depositor of depositors_4) {
@@ -858,7 +865,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
       P0 = await stabilityPool.P()
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_1))
       assert.isTrue(txL1.receipt.status)
 
@@ -882,7 +889,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Defaulter 2 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_2))
       assert.isTrue(txL2.receipt.status)
 
@@ -906,7 +913,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Defaulter 3 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      const txL3 = await liquidations.liquidate(defaulter_3, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_3))
       assert.isTrue(txL3.receipt.status)
 
@@ -927,7 +934,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Defaulter 4 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      const txL4 = await liquidations.liquidate(defaulter_4, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_4))
       assert.isTrue(txL4.receipt.status)
       const expP4 = await th.getNewPAfterLiquidation(contracts, txL4, P3, liqDeposits, lastLUSDError)
@@ -951,7 +958,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Defaulter 5 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL5 = await troveManager.liquidate(defaulter_5, { from: owner });
+      const txL5 = await liquidations.liquidate(defaulter_5, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_5))
       assert.isTrue(txL5.receipt.status)
       const expP5 = await th.getNewPAfterLiquidation(contracts, txL5, P4, liqDeposits, lastLUSDError)
@@ -971,7 +978,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Defaulter 6 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
-      const txL6 = await troveManager.liquidate(defaulter_6, { from: owner });
+      const txL6 = await liquidations.liquidate(defaulter_6, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_6))
       assert.isTrue(txL6.receipt.status)
 
@@ -1226,8 +1233,9 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       assert.equal(await stabilityPool.getTotalLUSDDeposits(), dec(100000, 18)) // total 100k
 
+      console.log("Status", (await troveManager.getTroveStatus(defaulter_1)).toString())
       // LIQUIDATION 1
-      await troveManager.liquidate(defaulter_1)
+      await liquidations.liquidate(defaulter_1)
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
       th.assertIsApproximatelyEqual(await stabilityPool.getTotalLUSDDeposits(), dec(50000, 18))  // 50k
@@ -1285,7 +1293,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // LIQUIDATION 2
-      await troveManager.liquidate(defaulter_2)
+      await liquidations.liquidate(defaulter_2)
       assert.isFalse(await sortedTroves.contains(defaulter_2))
 
       th.assertIsApproximatelyEqual(await stabilityPool.getTotalLUSDDeposits(), dec(60000, 18))
@@ -1361,7 +1369,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // LIQUIDATION 3
-      await troveManager.liquidate(defaulter_3)
+      await liquidations.liquidate(defaulter_3)
       assert.isFalse(await sortedTroves.contains(defaulter_3))
 
       th.assertIsApproximatelyEqual(await stabilityPool.getTotalLUSDDeposits(), dec(90000, 18))
@@ -1614,7 +1622,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       console.log("P0", P0.toString())
 
       //console.log(tx.logs)
-      const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
+      //const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
       var drip = toBN(await th.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
       console.log("drip", drip.toString())
 
@@ -1622,7 +1630,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
 
       // Defaulter 1 liquidated.  Value of P updated to  to 9999999, i.e. in decimal, ~1e-10
-      const txL1 = await troveManager.liquidate(defaulter_1, { from: owner });
+      const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_1))
       assert.isTrue(txL1.receipt.status)
       P1 = await stabilityPool.P()
@@ -1639,7 +1647,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 2 liquidated
-      const txL2 = await troveManager.liquidate(defaulter_2, { from: owner });
+      const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_2))
       assert.isTrue(txL2.receipt.status)
 
@@ -1657,7 +1665,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 3 liquidated
-      const txL3 = await troveManager.liquidate(defaulter_3, { from: owner });
+      const txL3 = await liquidations.liquidate(defaulter_3, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_3))
       assert.isTrue(txL3.receipt.status)
 
@@ -1672,7 +1680,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
 
       // Defaulter 4 liquidated
-      const txL4 = await troveManager.liquidate(defaulter_4, { from: owner });
+      const txL4 = await liquidations.liquidate(defaulter_4, { from: owner });
       assert.isFalse(await sortedTroves.contains(defaulter_4))
       assert.isTrue(txL4.receipt.status)
 

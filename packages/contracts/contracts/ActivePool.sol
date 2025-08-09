@@ -23,6 +23,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     string constant public NAME = "ActivePool";
     IERC20 public override collateralToken;
+    address public liquidationsAddress;
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public stabilityPoolAddress;
@@ -41,6 +42,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Contract setters ---
 
     function setAddresses(
+        address _liquidationsAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _stabilityPoolAddress,
@@ -51,6 +53,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         external
         onlyOwner
     {
+        checkContract(_liquidationsAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_stabilityPoolAddress);
@@ -58,7 +61,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         checkContract(_collateralTokenAddress);
         checkContract(_collSurplusPoolAddress);
 
-        
+        liquidationsAddress = _liquidationsAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         stabilityPoolAddress = _stabilityPoolAddress;
@@ -66,6 +69,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         collateralToken = IERC20(_collateralTokenAddress);
         collSurplusPoolAddress = _collSurplusPoolAddress;
 
+        emit LiquidationsAddressChanged(_liquidationsAddress);
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit StabilityPoolAddressChanged(_stabilityPoolAddress);
@@ -148,6 +152,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     function _requireCallerIsBOorTroveMorSP() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
+            msg.sender == liquidationsAddress ||
             msg.sender == troveManagerAddress ||
             msg.sender == stabilityPoolAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool");
@@ -165,6 +170,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     function _requireCallerIsBOorTroveM() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
+            msg.sender == liquidationsAddress ||
             msg.sender == troveManagerAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager");
     }
