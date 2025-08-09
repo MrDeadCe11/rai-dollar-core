@@ -1,7 +1,6 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
-const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 
 const { dec, toBN } = testHelpers.TestHelper
 const th = testHelpers.TestHelper
@@ -65,7 +64,6 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       contracts = await deploymentHelper.deployLiquityCore()
       const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
       contracts.troveManager = await TroveManagerTester.new()
-      contracts.liquidations = await LiquidationsTester.new()
       contracts = await deploymentHelper.deployLUSDToken(contracts)
 
       priceFeed = contracts.priceFeedTestnet
