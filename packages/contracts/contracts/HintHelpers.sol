@@ -13,6 +13,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     string constant public NAME = "HintHelpers";
 
     ISortedTroves public sortedTroves;
+    ISortedTroves public sortedShieldedTroves;
     ITroveManager public troveManager;
 
     // --- Events ---
@@ -25,6 +26,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
 
     function setAddresses(
         address _sortedTrovesAddress,
+        address _sortedShieldedTrovesAddress,
         address _troveManagerAddress,
         address _relayerAddress
     )
@@ -36,6 +38,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         checkContract(_relayerAddress);
 
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
+        sortedShieldedTroves = ISortedTroves(_sortedTrovesAddress);
         troveManager = ITroveManager(_troveManagerAddress);
         relayer = IRelayer(_relayerAddress);
 
@@ -65,7 +68,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
      * will leave it uncapped.
      */
 
-    function getRedemptionHints(
+    function getRedemptionHintsOld(
         uint _LUSDamount, 
         uint _price,
         uint _maxIterations
@@ -94,6 +97,9 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             _maxIterations = uint(-1);
         }
 
+        uint accRate = troveManager.accumulatedRate();
+        uint accShieldRate = troveManager.accumulatedShieldRate();
+
         while (currentTroveuser != address(0) && remainingLUSD > 0 && _maxIterations-- > 0) {
             // norm
             //uint netLUSDDebt = _getNetDebt(troveManager.getTroveDebt(currentTroveuser))
@@ -115,9 +121,9 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
 
                     uint compositeDebt = _getCompositeDebt(newDebt);
 
-                    uint256 nCompositeDebt = _normalizedDebt(compositeDebt, troveManager.accumulatedRate());
+                    uint256 nCompositeDebt = troveManager.shielded(currentTroveuser) ?
+                        _normalizedDebt(compositeDebt, accShieldRate) : _normalizedDebt(compositeDebt, accRate);
 
-                    //partialRedemptionHintNICR = LiquityMath._computeNominalCR(newColl, compositeDebt);
                     partialRedemptionHintNICR = LiquityMath._computeNominalCR(newColl, nCompositeDebt);
 
                     remainingLUSD = remainingLUSD.sub(maxRedeemableLUSD);
@@ -128,6 +134,110 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             }
 
             currentTroveuser = sortedTrovesCached.getPrev(currentTroveuser);
+        }
+
+        truncatedLUSDamount = _LUSDamount.sub(remainingLUSD);
+    }
+
+    function getRedemptionHints(
+        uint _LUSDamount,
+        uint _price,
+        uint _maxIterations
+    )
+        external
+        view
+        returns (
+            address firstRedemptionHint,
+            uint partialRedemptionHintNICR,
+            uint truncatedLUSDamount
+        )
+    {
+        uint par = relayer.par();
+        uint remainingLUSD = _LUSDamount;
+        if (_maxIterations == 0) { _maxIterations = type(uint).max; }
+
+        // --- seed: first redeemable in BASE (ICR ≥ MCR) ---
+        address curBase = sortedTroves.getLast();
+        while (curBase != address(0) && troveManager.getCurrentICR(curBase, _price) < MCR) {
+            curBase = sortedTroves.getPrev(curBase); // prev => larger ICR
+        }
+
+        // --- seed: first redeemable in SHIELDED (MCR ≤ ICR < HCR) ---
+        address curSh = sortedShieldedTroves.getLast();
+        while (curSh != address(0)) {
+            uint icrS = troveManager.getCurrentICR(curSh, _price);
+            if (icrS >= MCR) { if (icrS < HCR) { break; } else { curSh = address(0); break; } }
+            curSh = sortedShieldedTroves.getPrev(curSh);
+        }
+
+        // decide the very first hint (lower eligible ICR wins; tie → base)
+        {
+            uint icrB = curBase == address(0) ? type(uint).max : troveManager.getCurrentICR(curBase, _price);
+            uint icrS = curSh   == address(0) ? type(uint).max : troveManager.getCurrentICR(curSh,   _price);
+            if (icrB == type(uint).max && icrS == type(uint).max) {
+                // no redeemables at all
+                return (address(0), 0, 0);
+            }
+            firstRedemptionHint = (icrB <= icrS) ? curBase : curSh;
+        }
+
+        // accumulators for NICR math
+        uint accRate      = troveManager.accumulatedRate();
+        uint accShieldRate= troveManager.accumulatedShieldRate();
+
+        // --- merged walk to find partial NICR and truncated amount ---
+        while (remainingLUSD > 0 && _maxIterations-- > 0 && (curBase != address(0) || curSh != address(0))) {
+            // compute eligible ICRs for current heads
+            uint icrB = type(uint).max;
+            uint icrS = type(uint).max;
+
+            if (curBase != address(0)) {
+                uint b = troveManager.getCurrentICR(curBase, _price);
+                if (b >= MCR) icrB = b;
+            }
+            if (curSh != address(0)) {
+                uint s = troveManager.getCurrentICR(curSh, _price);
+                if (s >= MCR && s < HCR) icrS = s;
+            }
+            if (icrB == type(uint).max && icrS == type(uint).max) { break; }
+
+            bool pickBase = (icrB <= icrS);
+            address who = pickBase ? curBase : curSh;
+
+            // actual net debt (your helper already accounts for rewards in "actual" space)
+            uint netLUSDDebt = _getNetDebt(troveManager.getTroveActualDebt(who))
+                .add(troveManager.getPendingActualLUSDDebtReward(who));
+
+            if (netLUSDDebt > remainingLUSD) {
+                // this is the partial trove (if any)
+                if (netLUSDDebt > MIN_NET_DEBT) {
+                    uint maxRedeemableLUSD = LiquityMath._min(remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
+
+                    uint coll = troveManager.getTroveColl(who)
+                        .add(troveManager.getPendingCollateralReward(who));
+
+                    uint newColl = coll.sub(maxRedeemableLUSD.mul(par).div(_price));
+                    uint newDebt = netLUSDDebt.sub(maxRedeemableLUSD);
+                    uint compositeDebt = _getCompositeDebt(newDebt);
+
+                    // pick the right accumulator for this trove’s class
+                    bool isSh = troveManager.shielded(who);
+                    uint nCompositeDebt = isSh
+                        ? _normalizedDebt(compositeDebt, accShieldRate)
+                        : _normalizedDebt(compositeDebt, accRate);
+
+                    partialRedemptionHintNICR = LiquityMath._computeNominalCR(newColl, nCompositeDebt);
+
+                    remainingLUSD = remainingLUSD.sub(maxRedeemableLUSD);
+                }
+                break; // done: either we consumed all or we found partial and exit
+            } else {
+                // full redemption of this trove
+                remainingLUSD = remainingLUSD.sub(netLUSDDebt);
+                // advance only the chosen list
+                if (pickBase) curBase = sortedTroves.getPrev(who);
+                else          curSh   = sortedShieldedTroves.getPrev(who);
+            }
         }
 
         truncatedLUSDamount = _LUSDamount.sub(remainingLUSD);

@@ -169,7 +169,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     // --- Borrower Trove Operations ---
 
-    function openTrove(uint256 _collateralAmount, uint _LUSDAmount, address _upperHint, address _lowerHint) external override {
+    function openTrove(uint256 _collateralAmount, uint _LUSDAmount, address _upperHint, address _lowerHint, bool redemptionShield) external override {
         ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, lusdToken, collateralToken);
         LocalVariables_openTrove memory vars;
 
@@ -177,7 +177,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
         troveManager.drip();
         vars.par = relayer.getPar();
-        vars.accRate = troveManager.accumulatedRate();
+        vars.accRate = redemptionShield ? troveManager.accumulatedShieldRate() : troveManager.accumulatedRate();
+
         vars.price = priceFeed.fetchPrice();
         //bool isRecoveryMode = _checkRecoveryMode(vars.price, vars.accRate);
 

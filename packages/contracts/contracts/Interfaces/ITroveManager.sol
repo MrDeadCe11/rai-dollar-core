@@ -27,6 +27,7 @@ interface ITroveManager is ILiquityBase {
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
+    event SortedShieldedTrovesAddressChanged(address _sortedShieldedTrovesAddress);
     event LQTYTokenAddressChanged(address _lqtyTokenAddress);
     event LQTYStakingAddressChanged(address _lqtyStakingAddress);
     event RelayerAddressChanged(address _relayerAddress);
@@ -43,7 +44,7 @@ interface ITroveManager is ILiquityBase {
     event TroveSnapshotsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveIndexUpdated(address _borrower, uint _newIndex);
 
-    event AccInterestRateUpdated(uint256 rate);
+    event AccInterestRateUpdated(uint256 rate, uint256 shieldRate);
 
     // --- Functions ---
 
@@ -59,6 +60,7 @@ interface ITroveManager is ILiquityBase {
         address _priceFeedAddress,
         address _lusdTokenAddress,
         address _sortedTrovesAddress,
+        address _sortedShieldedTrovesAddress,
         address _lqtyTokenAddress,
         address _lqtyStakingAddress,
         address _relayerAddress,
@@ -72,6 +74,7 @@ interface ITroveManager is ILiquityBase {
     function lqtyStaking() external view returns (ILQTYStaking);
 
     function accumulatedRate() external view returns (uint);
+    function accumulatedShieldRate() external view returns (uint);
 
     function getTroveOwnersCount() external view returns (uint);
 

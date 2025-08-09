@@ -31,11 +31,13 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     address public collSurplusPoolAddress;
     uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;
+    uint256 internal LUSDShieldedDebt;
     // --- Events ---
 
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolLUSDDebtUpdated(uint _LUSDDebt);
+    event ActivePoolLUSDShieldedDebtUpdated(uint _LUSDShieldedDebt);
     event ActivePoolCollateralBalanceUpdated(uint _COLLATERAL);
     event CollateralSent(address _account, uint _amount);
 
@@ -81,9 +83,9 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Getters for public variables. Required by IPool interface ---
 
     /*
-    * Returns the ETH state variable.
+    * Returns the CT state variable.
     *
-    *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
+    *Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
     function getCollateral() external view override returns (uint) {
         return CT;
@@ -91,6 +93,10 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function getLUSDDebt() external view override returns (uint) {
         return LUSDDebt;
+    }
+
+    function getLUSDShieldedDebt() external view override returns (uint) {
+        return LUSDShieldedDebt;
     }
 
     // --- Pool functionality ---
@@ -144,6 +150,18 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function _isPool(address _pool) internal view returns (bool) {
         return _pool == stabilityPoolAddress || _pool == defaultPoolAddress || _pool == collSurplusPoolAddress;
+    }
+
+    function increaseLUSDShieldedDebt(uint _amount) external override {
+        _requireCallerIsBOorTroveM();
+        LUSDShieldedDebt  = LUSDShieldedDebt.add(_amount);
+        ActivePoolLUSDShieldedDebtUpdated(LUSDShieldedDebt);
+    }
+
+    function decreaseLUSDShieldedDebt(uint _amount) external override {
+        _requireCallerIsBOorTroveMorSP();
+        LUSDShieldedDebt = LUSDShieldedDebt.sub(_amount);
+        ActivePoolLUSDShieldedDebtUpdated(LUSDShieldedDebt);
     }
 
     function _isPool(address _pool) internal view returns (bool) {
