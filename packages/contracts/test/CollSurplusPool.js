@@ -44,7 +44,7 @@ contract('CollSurplusPool', async accounts => {
     borrowerOperations = contracts.borrowerOperations
     collateralToken = contracts.collateralToken
     // mint tokens
-    await th.mintCollateralTokens(contracts, accounts.slice(0, 10), dec(10, 24))
+    await th.mintCollateralTokensAndApproveActivePool(contracts, [A,B], dec(10, 24))
 
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)

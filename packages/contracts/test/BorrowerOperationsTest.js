@@ -88,7 +88,7 @@ contract('BorrowerOperations', async accounts => {
         const users = [alice, bob, carol, dennis, whale, A, B, C, D, E]
         await deploymentHelper.deployProxyScripts(contracts, LQTYContracts, owner, users)
       }
-      await th.mintCollateralTokens(contracts, [alice, bob, carol, dennis, whale, A, B, C, D, E], toBN(dec(1000, 18)))
+      await th.mintCollateralTokensAndApproveActivePool(contracts, [alice, bob, carol, dennis, whale, A, B, C, D, E], toBN(dec(1000, 18)))
       
       priceFeed = contracts.priceFeedTestnet
       lusdToken = contracts.lusdToken
