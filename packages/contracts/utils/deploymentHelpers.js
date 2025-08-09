@@ -458,16 +458,7 @@ class DeploymentHelper {
       LQTYContracts.lqtyToken.address,
       LQTYContracts.lqtyStaking.address,
       contracts.relayer.address,
-      contracts.collateralToken.address
     )
-
-    // set contracts in the Liquidations
-    await contracts.liquidations.setAddresses(
-      contracts.troveManager.address,
-      contracts.lusdToken.address,
-    )
-
-
 
     // set contracts in the Pools
     await contracts.stabilityPool.setAddresses(
@@ -478,8 +469,6 @@ class DeploymentHelper {
       contracts.lusdToken.address,
       contracts.sortedTroves.address,
       contracts.priceFeedTestnet.address,
-      LQTYContracts.communityIssuance.address,
-      contracts.collateralToken.address
       LQTYContracts.communityIssuance.address,
       contracts.collateralToken.address
     )
