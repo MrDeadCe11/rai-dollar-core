@@ -80,7 +80,7 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
       const kickbackRate_F2 = toBN(dec(80, 16)) // F2 kicks 80% back to depositor
       const kickbackRate_F3 = toBN(dec(1, 18)) // F2 kicks 100% back to depositor
 
-      await th.mintCollateralTokens(contracts, [owner,
+      await th.mintCollateralTokensAndApproveActivePool(contracts, [owner,
         whale,
         A, B, C, D, E, F, F1, F2, F3
       ], dec(100, 24))
@@ -88,7 +88,6 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
       await stabilityPool.registerFrontEnd(kickbackRate_F2, { from: F2 })
       await stabilityPool.registerFrontEnd(kickbackRate_F3, { from: F3 })
 
-      await th.mintCollateralTokens(contracts, accounts, toBN(dec(1000, 26)))
     })
  
   it("1. Liquidation succeeds after P reduced by a factor of 1e18", async () => {

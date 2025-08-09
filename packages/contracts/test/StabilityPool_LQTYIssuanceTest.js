@@ -77,6 +77,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
       collateralToken = contracts.collateralToken
+      
       await th.mintCollateralTokensAndApproveActivePool(contracts, [
         owner,
         whale,
