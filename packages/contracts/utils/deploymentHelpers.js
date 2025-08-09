@@ -509,6 +509,11 @@ class DeploymentHelper {
     await contracts.rateControl.setAddresses(
       contracts.relayer.address
     )
+
+    await contracts.aggregator.setAddresses(
+      contracts.troveManager.address,
+      contracts.lusdToken.address
+    )
   }
 
   static async connectLQTYContracts(LQTYContracts) {

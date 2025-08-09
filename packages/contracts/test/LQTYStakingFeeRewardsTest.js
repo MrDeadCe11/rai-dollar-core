@@ -79,7 +79,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     lqtyToken = LQTYContracts.lqtyToken
     lqtyStaking = LQTYContracts.lqtyStaking
 
-    await th.mintCollateralTokens(contracts, [owner, A, B, C, D, E, F, G, whale], web3.utils.toWei('15000', 'ether'))
+    await th.mintCollateralTokensAndApproveActivePool(contracts, [owner, A, B, C, D, E, F, G, whale], web3.utils.toWei('15000', 'ether'))
   })
 
   it('stake(): reverts if amount is zero', async () => {
