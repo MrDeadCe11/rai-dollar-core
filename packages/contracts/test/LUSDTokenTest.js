@@ -21,7 +21,7 @@ const PERMIT_TYPEHASH = keccak256(
 // Gets the EIP712 domain separator
 const getDomainSeparator = (name, contractAddress, chainId, version)  => {
   return keccak256(defaultAbiCoder.encode(['bytes32', 'bytes32', 'bytes32', 'uint256', 'address'], 
-  [ 
+  [
     keccak256(toUtf8Bytes('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')),
     keccak256(toUtf8Bytes(name)), 
     keccak256(toUtf8Bytes(version)),
@@ -334,32 +334,56 @@ contract('LUSDToken', async accounts => {
         value: 1,
       }
 
-      const buildPermitTx = async (deadline) => {
-        const nonce = (await lusdTokenTester.nonces(approve.owner)).toString()
+      const types = {
+        Permit: [
+          { name: 'owner',   type: 'address' },
+          { name: 'spender', type: 'address' },
+          { name: 'value',   type: 'uint256' },
+          { name: 'nonce',   type: 'uint256' },
+          { name: 'deadline',type: 'uint256' },
+        ],
+      };
 
-        // Get the EIP712 digest
-        const digest = getPermitDigest(
-          tokenName, lusdTokenTester.address,
-          chainId, tokenVersion,
-          approve.owner, approve.spender,
-          approve.value, nonce, deadline
-        )
+      // replace your buildPermitTx with this
+      const buildPermitTx = async (approve, deadline) => {
+        const name = await lusdTokenTester.name();
+        const version = await lusdTokenTester.version();
+        const chainId = (await ethers.provider.getNetwork()).chainId;
 
-        const { v, r, s } = sign(digest, alicePrivateKey)
+        const domain = {
+          name,
+          version,
+          chainId,
+          verifyingContract: lusdTokenTester.address,
+        };
+
+        const nonce = (await lusdTokenTester.nonces(approve.owner)).toString();
+
+        const message = {
+          owner:   approve.owner,
+          spender: approve.spender,
+          value:   ethers.BigNumber.from(approve.value.toString()),
+          nonce:   ethers.BigNumber.from(nonce),
+          deadline: ethers.BigNumber.from(deadline.toString()),
+        };
+
+        const wallet = new ethers.Wallet(alicePrivateKey, ethers.provider);
+        const sig = await wallet._signTypedData(domain, types, message);
+        const { v, r, s } = ethers.utils.splitSignature(sig);
 
         const tx = lusdTokenTester.permit(
           approve.owner, approve.spender, approve.value,
-          deadline, v, hexlify(r), hexlify(s)
-        )
+          deadline, v, r, s
+        );
 
-        return { v, r, s, tx }
-      }
-
+        return { v, r, s, tx };
+      };
+      
       it('permits and emits an Approval event (replay protected)', async () => {
         const deadline = 100000000000000
 
         // Approve it
-        const { v, r, s, tx } = await buildPermitTx(deadline)
+        const { v, r, s, tx } = await buildPermitTx(approve, deadline)
         const receipt = await tx
         const event = receipt.logs[0]
 
@@ -381,14 +405,14 @@ contract('LUSDToken', async accounts => {
       it('permits(): fails with expired deadline', async () => {
         const deadline = 1
 
-        const { v, r, s, tx } = await buildPermitTx(deadline)
+        const { v, r, s, tx } = await buildPermitTx(approve, deadline)
         await assertRevert(tx, 'LUSD: expired deadline')
       })
 
       it('permits(): fails with the wrong signature', async () => {
         const deadline = 100000000000000
 
-        const { v, r, s } = await buildPermitTx(deadline)
+        const { v, r, s } = await buildPermitTx(approve, deadline)
 
         const tx = lusdTokenTester.permit(
           carol, approve.spender, approve.value,
