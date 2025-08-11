@@ -43,6 +43,7 @@ interface ITroveManager is ILiquityBase {
     event LTermsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveSnapshotsUpdated(uint _L_COLL, uint _L_LUSDDebt);
     event TroveIndexUpdated(address _borrower, uint _newIndex);
+    event ShieldedTroveIndexUpdated(address _borrower, uint _newIndex);
 
     event AccInterestRateUpdated(uint256 rate, uint256 shieldRate);
 
@@ -78,7 +79,16 @@ interface ITroveManager is ILiquityBase {
 
     function getTroveOwnersCount() external view returns (uint);
 
+    function getShieldedTroveOwnersCount() external view returns (uint);
+
+    function shielded(address _borrower) external view returns (bool);
+
+    function shieldTrove(address _borrower) external;
+    function unShieldTrove(address _borrower) external;
+
     function getTroveFromTroveOwnersArray(uint _index) external view returns (address);
+
+    function getTroveFromShieldedTroveOwnersArray(uint _index) external view returns (address);
 
     function getNominalICR(address _borrower) external view returns (uint);
 
@@ -93,6 +103,8 @@ interface ITroveManager is ILiquityBase {
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,
         address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
         uint _partialRedemptionHintNICR,
         uint _maxIterations,
         uint _maxFee
@@ -102,7 +114,7 @@ interface ITroveManager is ILiquityBase {
 
     function updateTroveRewardSnapshots(address _borrower) external;
 
-    function addTroveOwnerToArray(address _borrower) external returns (uint index);
+    function addTroveOwnerToArray(address _borrower, bool _shielded) external returns (uint index);
 
     function applyPendingRewards(address _borrower) external;
 

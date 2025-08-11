@@ -48,6 +48,7 @@ contract('TroveManager', async accounts => {
   let priceFeed
   let lusdToken
   let sortedTroves
+  let sortedShieldedTroves
   let troveManager
   let activePool
   let stabilityPool
@@ -83,6 +84,7 @@ contract('TroveManager', async accounts => {
     priceFeed = contracts.priceFeedTestnet
     lusdToken = contracts.lusdToken
     sortedTroves = contracts.sortedTroves
+    sortedShieldedTroves = contracts.sortedShieldedTroves
     aggregator = contracts.aggregator
     troveManager = contracts.troveManager
     liquidations = contracts.liquidations
@@ -114,6 +116,7 @@ contract('TroveManager', async accounts => {
     troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
     liquidationsInterface = (await ethers.getContractAt("Liquidations", liquidations.address)).interface;
     collSurplusPoolInterface = (await ethers.getContractAt("CollSurplusPool", collSurplusPool.address)).interface;
+    borrowerOperationsInterface = (await ethers.getContractAt("BorrowerOperations", borrowerOperations.address)).interface;
 
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
@@ -248,9 +251,9 @@ contract('TroveManager', async accounts => {
     const activePool_RawCollateral_After= await collateralToken.balanceOf(activePool.address)
     const activePool_LUSDDebt_After = await activePool.getLUSDDebt()
 
-    console.log("activePool_Collateral_After", activePool_Collateral_After.toString())
-    console.log("A_collateral", A_collateral.toString())
-    console.log("B_collateral", B_collateral.toString())
+    //console.log("activePool_Collateral_After", activePool_Collateral_After.toString())
+    //console.log("A_collateral", A_collateral.toString())
+    //console.log("B_collateral", B_collateral.toString())
     // TODO Fix off by one
     //assert.equal(activePool_Collateral_After, A_collateral)
     assert.isAtMost(th.getDifference(activePool_Collateral_After, A_collateral), 1)
@@ -270,8 +273,7 @@ contract('TroveManager', async accounts => {
     const activePool_RawCollateral_Before = (await collateralToken.balanceOf(activePool.address)).toString()
     const activePool_LUSDDebt_Before = (await activePool.getLUSDDebt()).toString()
 
-    console.log("activePool_RawCollateral_Before", activePool_RawCollateral_Before.toString())
-    console.log("sum", A_collateral.add(B_collateral).toString())
+    //console.log("activePool_RawCollateral_Before", activePool_RawCollateral_Before.toString())
     assert.equal(activePool_Collateral_Before, A_collateral.add(B_collateral))
     assert.equal(activePool_RawCollateral_Before, A_collateral.add(B_collateral))
     th.assertIsApproximatelyEqual(activePool_LUSDDebt_Before, A_totalDebt.add(B_totalDebt))
@@ -690,9 +692,11 @@ contract('TroveManager', async accounts => {
     b_coll = (await troveManager.getEntireDebtAndColl(bob))[1]
     b_coll_pending = (await troveManager.getEntireDebtAndColl(bob))[3]
     b_exp = B_collateral.mul(L_COLL_expected_1).div(mv._1e18BN)
+    /*
     console.log("b_coll", b_coll.toString())
     console.log("b_exp", b_exp.toString())
     console.log("b_coll_pending", b_coll_pending.toString())
+    */
 
     // Bob now withdraws LUSD, bringing his ICR to 1.11
     const { increasedTotalDebt: B_increasedTotalDebt } = await withdrawLUSD({ ICR: toBN(dec(111, 16)), extraParams: { from: bob } })
@@ -754,7 +758,7 @@ contract('TroveManager', async accounts => {
     console.log("before liq")
     console.log("bob actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
-    console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())).toString())
+    console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
     console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
     // Liquidate
     await liquidations.liquidate(alice, { from: owner })
@@ -772,7 +776,7 @@ contract('TroveManager', async accounts => {
     console.log("after liq")
     console.log("bob actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(alice)).toString())
-    console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())).toString())
+    console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
     console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
   })
 
@@ -1811,8 +1815,6 @@ contract('TroveManager', async accounts => {
     bobDebtLiq = bobDebt.add((totalInterest.mul(bobDebt).div(entireDebt)))
     carolDebtLiq = carolDebt.add((totalInterest.mul(carolDebt).div(entireDebt)))
 
-    s = aliceDebtLiq.add(bobDebtLiq).add(carolDebtLiq)
-    console.log("s", s.toString())
     console.log("totalLiquidatedDebt", totalLiquidatedDebt.toString())
 
     assert.isAtMost(th.getDifference(aliceDebtLiq.add(bobDebtLiq).add(carolDebtLiq), totalLiquidatedDebt), 3)
@@ -2423,7 +2425,7 @@ contract('TroveManager', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_YEAR, web3.currentProvider)
       await troveManager.drip()
 
-      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
       supply = await contracts.lusdToken.totalSupply()
 
       whale_debt = await contracts.troveManager.getTroveActualDebt(whale)
@@ -2452,14 +2454,14 @@ contract('TroveManager', async accounts => {
     await openTrove({ ICR: toBN(dec(195, 16)), extraParams: { from: defaulter_3 } })
     await openTrove({ ICR: toBN(dec(192, 16)), extraParams: { from: defaulter_4 } })
 
-    debt_start = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    debt_start = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     supply_start = await contracts.lusdToken.totalSupply()
     assert.isTrue(debt_start.eq(supply_start))
     for (let i = 0; i < 100; i++) {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_YEAR, web3.currentProvider)
       await troveManager.drip()
 
-      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
       supply = await contracts.lusdToken.totalSupply()
 
       whale_debt = await contracts.troveManager.getTroveActualDebt(whale)
@@ -2535,7 +2537,7 @@ contract('TroveManager', async accounts => {
     await openTrove({ ICR: toBN(dec(200, 18)), extraParams: { from: dennis } })
 
     const TCR_Before = await th.getTCR(contracts)
-    const debtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate())
+    const debtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate(), await troveManager.accumulatedShieldRate())
 
     await openTrove({ ICR: toBN(dec(202, 16)), extraParams: { from: defaulter_1 } })
     await openTrove({ ICR: toBN(dec(190, 16)), extraParams: { from: defaulter_2 } })
@@ -2569,7 +2571,7 @@ contract('TroveManager', async accounts => {
     await priceFeed.setPrice(dec(200, 18))
 
     const TCR_After = await th.getTCR(contracts)
-    const debtAfter = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate())
+    const debtAfter = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate(), await troveManager.accumulatedShieldRate())
     const supplyAfter = await lusdToken.totalSupply()
 
     await troveManager.drip()
@@ -2600,7 +2602,7 @@ contract('TroveManager', async accounts => {
     await openTrove({ ICR: toBN(dec(200, 18)), extraParams: { from: dennis } })
 
     const TCR_Before = await th.getTCR(contracts)
-    const debtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate())
+    const debtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate(), await troveManager.accumulatedShieldRate())
 
     await openTrove({ ICR: toBN(dec(202, 16)), extraParams: { from: defaulter_1 } })
     await openTrove({ ICR: toBN(dec(190, 16)), extraParams: { from: defaulter_2 } })
@@ -2635,7 +2637,7 @@ contract('TroveManager', async accounts => {
     await troveManager.drip()
 
     const TCR_After = await th.getTCR(contracts)
-    const debtAfter = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate())
+    const debtAfter = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate(), await troveManager.accumulatedShieldRate())
     const supplyAfter = await lusdToken.totalSupply()
 
     // console.log("debt", debtAfter.toString())
@@ -2704,7 +2706,7 @@ contract('TroveManager', async accounts => {
     //assert.isTrue((await lusdToken.totalSupply()).sub(trove_debt_sum).lte(toBN('2')))
 
 
-    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     const supply = await contracts.lusdToken.totalSupply()
     // console.log("debt", debt.toString())
     // console.log("supply", supply.toString())
@@ -2754,13 +2756,13 @@ contract('TroveManager', async accounts => {
       await priceFeed.setPrice(dec(200, 18))
       //await contracts.troveManager.drip()
       supply = await contracts.lusdToken.totalSupply()
-      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+      debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
 
       // allow at most divergence of 1 per trove
       assert.isTrue(supply.sub(debt).lte(toBN('1')))
     }
     supply = await contracts.lusdToken.totalSupply()
-    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
   })
 
   it("liquidate(): a pure redistribution reduces the TCR only as a result of compensation", async () => {
@@ -2787,7 +2789,7 @@ contract('TroveManager', async accounts => {
     const TCR_0 = await th.getTCR(contracts)
 
     const entireSystemCollBefore = await troveManager.getEntireSystemColl()
-    const entireSystemDebtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate())
+    const entireSystemDebtBefore = await troveManager.getEntireSystemDebt(await troveManager.accumulatedRate(), await troveManager.accumulatedShieldRate())
 
     const expectedTCR_0 = entireSystemCollBefore.mul(price).div(entireSystemDebtBefore)
 
@@ -4888,6 +4890,12 @@ contract('TroveManager', async accounts => {
       dennis
     )
 
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      dennis,
+      dennis
+    )
+
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
@@ -4898,6 +4906,8 @@ contract('TroveManager', async accounts => {
       firstRedemptionHint,
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       {
@@ -4946,12 +4956,12 @@ contract('TroveManager', async accounts => {
     const dennis_LUSDBalance_After = (await lusdToken.balanceOf(dennis)).toString()
     assert.equal(dennis_LUSDBalance_After, dennis_LUSDBalance_Before.sub(redemptionAmount))
 
-    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     supply = await contracts.lusdToken.totalSupply()
     // console.log("debt", debt.toString())
     // console.log("supply", supply.toString())
     // console.log("supply - debt", supply.sub(debt).toString())
-    assert.isTrue(supply.gt(debt))
+    assert.isTrue(supply.eq(debt))
   })
 
   it('redeemCollateral(): with invalid first hint, zero address', async () => {
@@ -4986,6 +4996,11 @@ contract('TroveManager', async accounts => {
       dennis,
       dennis
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      dennis,
+      dennis
+    )
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -4997,6 +5012,8 @@ contract('TroveManager', async accounts => {
       ZERO_ADDRESS, // invalid first hint
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       {
@@ -5066,6 +5083,11 @@ contract('TroveManager', async accounts => {
       dennis,
       dennis
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      dennis,
+      dennis
+    )
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -5077,6 +5099,8 @@ contract('TroveManager', async accounts => {
       erin, // invalid first hint, it doesn't have a trove
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       {
@@ -5153,6 +5177,11 @@ contract('TroveManager', async accounts => {
       dennis,
       dennis
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      dennis,
+      dennis
+    )
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -5164,6 +5193,8 @@ contract('TroveManager', async accounts => {
       erin, // invalid trove, below MCR
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       {
@@ -5224,7 +5255,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // Flyn redeems collateral
-    await troveManager.redeemCollateral(redemptionAmount, alice, alice, alice, 0, 0, th._100pct, { from: flyn })
+    await troveManager.redeemCollateral(redemptionAmount, alice, alice, alice, alice, alice, 0, 0, th._100pct, { from: flyn })
 
     // Check Flyn's redemption has reduced his balance from 100 to (100-60) = 40 LUSD
     const flynBalance = await lusdToken.balanceOf(flyn)
@@ -5281,7 +5312,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // Flyn redeems collateral with only two iterations
-    await troveManager.redeemCollateral(attemptedRedemptionAmount, alice, alice, alice, 0, 2, th._100pct, { from: flyn })
+    await troveManager.redeemCollateral(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, th._100pct, { from: flyn })
 
     // Check Flyn's redemption has reduced his balance from 100 to (100-40) = 60 LUSD
     const flynBalance = (await lusdToken.balanceOf(flyn)).toString()
@@ -5405,8 +5436,13 @@ contract('TroveManager', async accounts => {
       dennis,
       dennis
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      dennis,
+      dennis
+    )
 
-    const frontRunRedepmtion = toBN(dec(1, 18))
+    const frontRunRedemption = toBN(dec(1, 18))
     // Oops, another transaction gets in the way
     {
       const {
@@ -5419,16 +5455,23 @@ contract('TroveManager', async accounts => {
         dennis,
         dennis
       )
+      const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        dennis,
+        dennis
+      )
 
       // skip bootstrapping phase
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
       // Alice redeems 1 LUSD from Carol's Trove
       await troveManager.redeemCollateral(
-        frontRunRedepmtion,
+        frontRunRedemption,
         firstRedemptionHint,
         upperPartialRedemptionHint,
         lowerPartialRedemptionHint,
+        upperShieldedPartialRedemptionHint,
+        lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: alice }
@@ -5441,6 +5484,8 @@ contract('TroveManager', async accounts => {
       firstRedemptionHint,
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       {
@@ -5464,13 +5509,13 @@ contract('TroveManager', async accounts => {
     const receivedCollateral = dennis_CollateralBalance_After.sub(dennis_CollateralBalance_Before)
 
     // Expect only 17 worth of Collateral drawn
-    const expectedTotalCollateralDrawn = fullfilledRedemptionAmount.sub(frontRunRedepmtion).div(toBN(200)) // redempted LUSD converted to Collateral, at Collateral:USD price 200
+    const expectedTotalCollateralDrawn = fullfilledRedemptionAmount.sub(frontRunRedemption).div(toBN(200)) // redempted LUSD converted to Collateral, at Collateral:USD price 200
     const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(CollateralFee)
 
     th.assertIsApproximatelyEqual(expectedReceivedCollateral, receivedCollateral)
 
     const dennis_LUSDBalance_After = (await lusdToken.balanceOf(dennis)).toString()
-    th.assertIsApproximatelyEqual(dennis_LUSDBalance_After, dennis_LUSDBalance_Before.sub(fullfilledRedemptionAmount.sub(frontRunRedepmtion)))
+    th.assertIsApproximatelyEqual(dennis_LUSDBalance_After, dennis_LUSDBalance_Before.sub(fullfilledRedemptionAmount.sub(frontRunRedemption)))
   })
 
   // active debt cannot be zero, as there's a positive min debt enforced, and at least a trove must exist
@@ -5499,6 +5544,8 @@ contract('TroveManager', async accounts => {
     const redemptionTx = await troveManager.redeemCollateral(
       amount,
       alice,
+      '0x0000000000000000000000000000000000000000',
+      '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
       nicrHint.partialRedemptionHintNICR.toString(),
@@ -5551,6 +5598,8 @@ contract('TroveManager', async accounts => {
       alice,
       '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
+      '0x0000000000000000000000000000000000000000',
+      '0x0000000000000000000000000000000000000000',
       0,
       0,
       th._100pct,
@@ -5598,6 +5647,8 @@ contract('TroveManager', async accounts => {
       redemptionAmount,
       carol, // try to trick redeemCollateral by passing a hint that doesn't exactly point to the
       // last Trove with ICR == 110% (which would be Alice's)
+      '0x0000000000000000000000000000000000000000',
+      '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
       '0x0000000000000000000000000000000000000000',
       0,
@@ -5655,7 +5706,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // Erin attempts to redeem with _amount = 0
-    const redemptionTxPromise = troveManager.redeemCollateral(0, erin, erin, erin, 0, 0, th._100pct, { from: erin })
+    const redemptionTxPromise = troveManager.redeemCollateral(0, erin, erin, erin, erin, erin, 0, 0, th._100pct, { from: erin })
     await assertRevert(redemptionTxPromise, "TroveManager: Amount must be greater than zero")
   })
 
@@ -5979,12 +6030,19 @@ contract('TroveManager', async accounts => {
       erin,
       erin
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      erin,
+      erin
+    )
 
     await troveManager.redeemCollateral(
       amount,
       firstRedemptionHint,
       upperPartialRedemptionHint,
       lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
       { from: erin })
@@ -6052,12 +6110,19 @@ contract('TroveManager', async accounts => {
         erin,
         erin
       )
+      const { 0: upperShieldedPartialRedemptionHint_1, 1: lowerShieldedPartialRedemptionHint_1 } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        erin,
+        erin
+      )
 
       const redemptionTx = await troveManager.redeemCollateral(
         dec(1000, 18),
         firstRedemptionHint,
         upperPartialRedemptionHint_1,
         lowerPartialRedemptionHint_1,
+        upperShieldedPartialRedemptionHint_1,
+        lowerShieldedPartialRedemptionHint_1,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: erin })
@@ -6080,11 +6145,18 @@ contract('TroveManager', async accounts => {
         erin,
         erin
       )
+      const { 0: upperShieldedPartialRedemptionHint_2, 1: lowerShieldedPartialRedemptionHint_2 } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        erin,
+        erin
+      )
 
       const redemptionTx = await troveManager.redeemCollateral(
         '401000000000000000000', firstRedemptionHint,
         upperPartialRedemptionHint_2,
         lowerPartialRedemptionHint_2,
+        upperShieldedPartialRedemptionHint_2,
+        lowerShieldedPartialRedemptionHint_2,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: erin })
@@ -6106,11 +6178,18 @@ contract('TroveManager', async accounts => {
         erin,
         erin
       )
+      const { 0: upperShieldedPartialRedemptionHint_3, 1: lowerShieldedPartialRedemptionHint_3 } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        erin,
+        erin
+      )
 
       const redemptionTx = await troveManager.redeemCollateral(
         '239482309000000000000000000', firstRedemptionHint,
         upperPartialRedemptionHint_3,
         lowerPartialRedemptionHint_3,
+        upperShieldedPartialRedemptionHint_3,
+        lowerShieldedPartialRedemptionHint_3,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: erin })
@@ -6134,11 +6213,18 @@ contract('TroveManager', async accounts => {
         erin,
         erin
       )
+      const { 0: upperShieldedPartialRedemptionHint_4, 1: lowerShieldedPartialRedemptionHint_4 } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        erin,
+        erin
+      )
 
       const redemptionTx = await troveManager.redeemCollateral(
         maxBytes32, firstRedemptionHint,
         upperPartialRedemptionHint_4,
         lowerPartialRedemptionHint_4,
+        upperShieldedPartialRedemptionHint_4,
+        lowerShieldedPartialRedemptionHint_4,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: erin })
@@ -6190,6 +6276,11 @@ contract('TroveManager', async accounts => {
       erin,
       erin
     )
+    const { 0: upperShieldedPartialRedemptionHint_1, 1: lowerShieldedPartialRedemptionHint_1 } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      erin,
+      erin
+    )
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -6199,6 +6290,8 @@ contract('TroveManager', async accounts => {
       firstRedemptionHint,
       upperPartialRedemptionHint_1,
       lowerPartialRedemptionHint_1,
+      upperShieldedPartialRedemptionHint_1,
+      lowerShieldedPartialRedemptionHint_1,
       partialRedemptionHintNICR,
       0, th._100pct,
       { from: erin })
@@ -6223,12 +6316,19 @@ contract('TroveManager', async accounts => {
       flyn,
       flyn
     )
+    const { 0: upperShieldedPartialRedemptionHint_2, 1: lowerShieldedPartialRedemptionHint_2 } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      flyn,
+      flyn
+    )
 
     const redemption_2 = await troveManager.redeemCollateral(
       _373_LUSD,
       firstRedemptionHint,
       upperPartialRedemptionHint_2,
       lowerPartialRedemptionHint_2,
+      upperShieldedPartialRedemptionHint_2,
+      lowerShieldedPartialRedemptionHint_2,
       partialRedemptionHintNICR,
       0, th._100pct,
       { from: flyn })
@@ -6252,12 +6352,19 @@ contract('TroveManager', async accounts => {
       graham,
       graham
     )
+    const { 0: upperShieldedPartialRedemptionHint_3, 1: lowerShieldedPartialRedemptionHint_3 } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      graham,
+      graham
+    )
 
     const redemption_3 = await troveManager.redeemCollateral(
       _950_LUSD,
       firstRedemptionHint,
       upperPartialRedemptionHint_3,
       lowerPartialRedemptionHint_3,
+      upperShieldedPartialRedemptionHint_3,
+      lowerShieldedPartialRedemptionHint_3,
       partialRedemptionHintNICR,
       0, th._100pct,
       { from: graham })
@@ -6291,6 +6398,11 @@ contract('TroveManager', async accounts => {
       bob,
       bob
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      bob,
+      bob
+    )
 
     // Bob tries to redeem his illegally obtained LUSD
     try {
@@ -6299,6 +6411,8 @@ contract('TroveManager', async accounts => {
         firstRedemptionHint,
         upperPartialRedemptionHint,
         lowerPartialRedemptionHint,
+        upperShieldedPartialRedemptionHint,
+        lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: bob })
@@ -6307,7 +6421,7 @@ contract('TroveManager', async accounts => {
     }
 
     //assert.isFalse(redemptionTx.receipt.status);
-    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     supply = await contracts.lusdToken.totalSupply()
     // console.log("debt", debt.toString())
     // console.log("supply", supply.toString())
@@ -6336,6 +6450,11 @@ contract('TroveManager', async accounts => {
       bob,
       bob
     )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      bob,
+      bob
+    )
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -6347,13 +6466,15 @@ contract('TroveManager', async accounts => {
         firstRedemptionHint,
         upperPartialRedemptionHint,
         lowerPartialRedemptionHint,
+        upperShieldedPartialRedemptionHint,
+        lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
         0, th._100pct,
         { from: bob })
     } catch (error) {
       assert.include(error.message, "VM Exception while processing transaction")
     }
-    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     const supply = await contracts.lusdToken.totalSupply()
     // console.log("debt", debt.toString())
     // console.log("supply", supply.toString())
@@ -6962,6 +7083,8 @@ contract('TroveManager', async accounts => {
         firstRedemptionHint,
         ZERO_ADDRESS,
         alice,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
         partialRedemptionHintNICR,
         0, th._100pct,
         {
@@ -6985,6 +7108,8 @@ contract('TroveManager', async accounts => {
         firstRedemptionHint,
         ZERO_ADDRESS,
         alice,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
         partialRedemptionHintNICR,
         0, th._100pct,
         {
@@ -6994,6 +7119,68 @@ contract('TroveManager', async accounts => {
       ),
       'TroveManager: Fee would eat up all returned collateral'
     )
+  })
+  it("redeemCollateral(): shielded trove is not redeemed against", async () => {
+    await rateControl.setCoBias(0)
+    const collateralAmount = dec(1000, 'ether')
+    await collateralToken.approve(activePool.address, collateralAmount, { from: A })
+    await collateralToken.approve(activePool.address, collateralAmount, { from: B })
+    await collateralToken.approve(activePool.address, collateralAmount, { from: C })
+    tx_a = await borrowerOperations.openTrove(collateralAmount, await getOpenTroveLUSDAmount( dec(10000, 18)), A, A, { from: A })
+    tx_b = await borrowerOperations.openTrove(collateralAmount, await getOpenTroveLUSDAmount( dec(20000, 18)), B, B, { from: B })
+    tx_c = await borrowerOperations.openShieldedTrove(collateralAmount, await getOpenTroveLUSDAmount( dec(30000, 18)), C, C, { from: C })
+
+    nCompDebt_A = toBN(th.getRawEventArgByName(tx_a, borrowerOperationsInterface, borrowerOperations.address, "TroveUpdated", "_debt"))
+    nCompDebt_B = toBN(th.getRawEventArgByName(tx_b, borrowerOperationsInterface, borrowerOperations.address, "TroveUpdated", "_debt"))
+    nCompDebt_C = toBN(th.getRawEventArgByName(tx_c, borrowerOperationsInterface, borrowerOperations.address, "TroveUpdated", "_debt"))
+
+    const A_debt = await troveManager.getTroveDebt(A)
+    const B_debt = await troveManager.getTroveDebt(B)
+    const C_debt = await troveManager.getTroveDebt(C)
+
+    activeDebt = await activePool.getLUSDDebt()
+    activeShieldedDebt = await activePool.getLUSDShieldedDebt()
+    console.log("activeDebt", activeDebt.toString())
+
+    assert.isTrue(activeDebt.eq(A_debt.add(B_debt)))
+    assert.isTrue(activeShieldedDebt.eq(C_debt))
+
+    const price = await priceFeed.getPrice();
+
+    // shielded trove is above HCR
+    assert.isTrue((await troveManager.getCurrentICR(C, price)).gt((await troveManager.HCR())))
+
+    // A and C send all their tokens to B
+    await lusdToken.transfer(B, await lusdToken.balanceOf(A), {from: A})
+    await lusdToken.transfer(B, await lusdToken.balanceOf(C), {from: C})
+    
+    await aggregator.setBaseRate(0) 
+
+    // skip bootstrapping phase
+    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+
+    // Before redemption
+
+    // LUSD redemption is 55000 US
+    const LUSDRedemption = dec(55000, 18)
+
+    const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, LUSDRedemption, th._100pct)
+
+    // Check A, B closed and C remains active
+    assert.isFalse(await sortedTroves.contains(A))
+    assert.isFalse(await sortedTroves.contains(B))
+    assert.isTrue(await sortedShieldedTroves.contains(C))
+
+    //const expectedDebt_A = toBN(dec(4600, 18))//.mul(par).div(toBN(dec(1, 18)))
+    // A's remaining debt = 29800 + 19800 + 9800 + 200 - 55000 = 4600
+    const expectedDebt_A = toBN('0')
+    const A_final_debt = await troveManager.getTroveDebt(A)
+    console.log("A_final_debt", A_final_debt.toString())
+    assert.isTrue(A_final_debt.eq(expectedDebt_A))
+
+    // C lost no debt
+    const C_final_debt = await troveManager.getTroveDebt(C)
+    assert.isTrue(C_final_debt.eq(C_debt))
   })
 
   it("getPendingLUSDDebtReward(): Returns 0 if there is no pending LUSDDebt reward", async () => {

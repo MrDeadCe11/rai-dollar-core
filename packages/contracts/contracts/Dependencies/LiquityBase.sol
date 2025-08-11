@@ -21,15 +21,16 @@ contract LiquityBase is BaseMath, ILiquityBase {
     uint constant public _100pct = 1000000000000000000; // 1e18 == 100%
 
     // Minimum collateral ratio for unshielded individual troves
-    uint constant public MCR = 1100000000000000000; // 110%
+    uint constant public MCR = 110 * 10**16; // 110%
 
     // Critical system collateral ratio. If the system's total collateral ratio (TCR) falls below the CCR, Recovery Mode is triggered.
-    uint constant public CCR = 1500000000000000000; // 150%
+    uint constant public CCR = 150 * 10**16; // 150%
 
     // Minimum collateral ratio for shieled troves
     // Shielded troves are still liquidated at MCR, but troves under HCR can be redeemed against
-    uint constant public SHIELDED_MULTIPLIER = 17 * 10**17; //1.7
-    uint constant public HCR = SHIELDED_MULTIPLIER * MCR / DECIMAL_PRECISION; // 1.7 * MCR
+    //uint constant public SHIELDED_MULTIPLIER = 12 * 10**17; //1.2
+    //uint constant public HCR = SHIELDED_MULTIPLIER * MCR / DECIMAL_PRECISION; // 1.7 * MCR
+    uint constant public HCR = 130 * 10**16; //130%
 
     // Amount of LUSD to be locked in gas pool on opening troves
     uint constant public LUSD_GAS_COMPENSATION = 200e18;
@@ -101,11 +102,9 @@ contract LiquityBase is BaseMath, ILiquityBase {
         normDebt = debt.mul(RATE_PRECISION).div(rate);
 
         // Round up if rounding caused an underestimation
-        /*
         if (normDebt.mul(rate).div(RATE_PRECISION) < debt) {
             normDebt += 1;
         }
-        */
     }
 
     // Returns the actual debt from normalized debt
@@ -139,8 +138,8 @@ contract LiquityBase is BaseMath, ILiquityBase {
         return TCR;
     }
 
-    function _checkRecoveryMode(uint _price, uint _accRate) internal view returns (bool) {
-        uint TCR = _getTCR(_price, _accRate);
+    function _checkRecoveryMode(uint _price, uint _accRate, uint _accShieldRate) internal view returns (bool) {
+        uint TCR = _getTCR(_price, _accRate, _accShieldRate);
 
         return TCR < CCR;
     }

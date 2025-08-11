@@ -24,6 +24,7 @@ interface IBorrowerOperations is ILiquityBase {
     event RelayerAddressChanged(address _relayerAddress);
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
+    event ShieldedTroveCreated(address indexed _borrower, uint arrayIndex);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
     event LUSDBorrowingFeePaid(address indexed _borrower, uint _LUSDFee);
 
@@ -39,12 +40,21 @@ interface IBorrowerOperations is ILiquityBase {
         address _collSurplusPoolAddress,
         address _priceFeedAddress,
         address _sortedTrovesAddress,
+        address _sortedShieldedTrovesAddress,
         address _lusdTokenAddress,
         address _lqtyStakingAddress,
         address _relayerAddress
     ) external;
+
     function collateralToken() external view returns (IERC20);
-    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool redemptionShield) external;
+
+    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
+
+    function openShieldedTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
+
+    function shieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
+
+    function unShieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
 

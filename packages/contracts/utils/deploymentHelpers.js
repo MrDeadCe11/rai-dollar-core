@@ -101,6 +101,7 @@ class DeploymentHelper {
     const priceFeedTestnet = await PriceFeedTestnet.new()
     const aggregator = await Aggregator.new()
     const sortedTroves = await SortedTroves.new()
+    const sortedShieldedTroves = await SortedTroves.new()
     const troveManager = await TroveManager.new()
     const liquidations = await Liquidations.new()
     const activePool = await ActivePool.new()
@@ -129,6 +130,7 @@ class DeploymentHelper {
     DefaultPool.setAsDeployed(defaultPool)
     PriceFeedTestnet.setAsDeployed(priceFeedTestnet)
     SortedTroves.setAsDeployed(sortedTroves)
+    SortedTroves.setAsDeployed(sortedShieldedTroves)
     Aggregator.setAsDeployed(aggregator)
     TroveManager.setAsDeployed(troveManager)
     Liquidations.setAsDeployed(liquidations)
@@ -149,6 +151,7 @@ class DeploymentHelper {
       priceFeedTestnet,
       lusdToken,
       sortedTroves,
+      sortedShieldedTroves,
       aggregator,
       troveManager,
       liquidations,
@@ -175,6 +178,7 @@ class DeploymentHelper {
     // Contract without testers (yet)
     testerContracts.priceFeedTestnet = await PriceFeedTestnet.new()
     testerContracts.sortedTroves = await SortedTroves.new()
+    testerContracts.sortedShieldedTroves = await SortedTroves.new()
     // Actual tester contracts
     testerContracts.aggregator = await AggregatorTester.new()
     testerContracts.communityIssuance = await CommunityIssuanceTester.new()
@@ -267,6 +271,7 @@ class DeploymentHelper {
   static async deployLiquityCoreTruffle() {
     const priceFeedTestnet = await PriceFeedTestnet.new()
     const sortedTroves = await SortedTroves.new()
+    const sortedShieldedTroves = await SortedTroves.new()
     const aggregator = await Aggregator.new()
     const troveManager = await TroveManager.new()
     const liquidations = await Liquidations.new()
@@ -289,6 +294,7 @@ class DeploymentHelper {
       priceFeedTestnet,
       lusdToken,
       sortedTroves,
+      sortedShieldedTroves,
       aggregator,
       troveManager,
       liquidations,
@@ -373,6 +379,7 @@ class DeploymentHelper {
     contracts.stabilityPool = new StabilityPoolProxy(owner, proxies, stabilityPoolScript.address, contracts.stabilityPool)
 
     contracts.sortedTroves = new SortedTrovesProxy(owner, proxies, contracts.sortedTroves)
+    contracts.sortedShieldedTroves = new SortedTrovesProxy(owner, proxies, contracts.sortedShieldedTroves)
 
     const lusdTokenScript = await TokenScript.new(contracts.lusdToken.address)
     contracts.lusdToken = new TokenProxy(owner, proxies, lusdTokenScript.address, contracts.lusdToken)
@@ -387,8 +394,15 @@ class DeploymentHelper {
   // Connect contracts to their dependencies
   static async connectCoreContracts(contracts, LQTYContracts) {
 
-    // set TroveManager addr in SortedTroves
+    // set TroveManager addr in sortedTroves
     await contracts.sortedTroves.setParams(
+      maxBytes32,
+      contracts.troveManager.address,
+      contracts.borrowerOperations.address
+    )
+
+    // set TroveManager addr in sortedShieldedTroves
+    await contracts.sortedShieldedTroves.setParams(
       maxBytes32,
       contracts.troveManager.address,
       contracts.borrowerOperations.address
@@ -397,6 +411,7 @@ class DeploymentHelper {
     // set contract addresses in the FunctionCaller 
     await contracts.functionCaller.setTroveManagerAddress(contracts.troveManager.address)
     await contracts.functionCaller.setSortedTrovesAddress(contracts.sortedTroves.address)
+    await contracts.functionCaller.setSortedShieldedTrovesAddress(contracts.sortedShieldedTroves.address)
 
     // set contracts in BorrowerOperations 
     await contracts.borrowerOperations.setAddresses(
@@ -408,6 +423,7 @@ class DeploymentHelper {
       contracts.collSurplusPool.address,
       contracts.priceFeedTestnet.address,
       contracts.sortedTroves.address,
+      contracts.sortedShieldedTroves.address,
       contracts.lusdToken.address,
       LQTYContracts.lqtyStaking.address,
       contracts.relayer.address,
@@ -436,6 +452,7 @@ class DeploymentHelper {
       contracts.priceFeedTestnet.address,
       contracts.lusdToken.address,
       contracts.sortedTroves.address,
+      contracts.sortedShieldedTroves.address,
       LQTYContracts.lqtyToken.address,
       LQTYContracts.lqtyStaking.address,
       contracts.relayer.address,
@@ -490,6 +507,7 @@ class DeploymentHelper {
     // set contracts in HintHelpers
     await contracts.hintHelpers.setAddresses(
       contracts.sortedTroves.address,
+      contracts.sortedShieldedTroves.address,
       contracts.troveManager.address,
       contracts.relayer.address
     )

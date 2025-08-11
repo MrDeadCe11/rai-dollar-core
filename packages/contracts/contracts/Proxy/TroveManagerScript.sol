@@ -21,6 +21,8 @@ contract TroveManagerScript is CheckContract {
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,
         address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
         uint _partialRedemptionHintNICR,
         uint _maxIterations,
         uint _maxFee
@@ -30,6 +32,8 @@ contract TroveManagerScript is CheckContract {
             _firstRedemptionHint,
             _upperPartialRedemptionHint,
             _lowerPartialRedemptionHint,
+            _upperShieldedPartialRedemptionHint,
+            _lowerShieldedPartialRedemptionHint,
             _partialRedemptionHintNICR,
             _maxIterations,
             _maxFee

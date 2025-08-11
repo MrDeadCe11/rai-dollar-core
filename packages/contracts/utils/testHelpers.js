@@ -1554,21 +1554,32 @@ class TestHelper {
     const firstRedemptionHint = redemptionhint[0]
     const partialRedemptionNewICR = redemptionhint[1]
     //console.log("partialRedemptionNewICR", partialRedemptionNewICR.toString())
+    await contracts.hintHelpers.getApproxHint(partialRedemptionNewICR, 50, this.latestRandomSeed, false)
 
     const {
       hintAddress: approxPartialRedemptionHint,
+      seed
+    } = await contracts.hintHelpers.getApproxHint(partialRedemptionNewICR, 50, this.latestRandomSeed, false)
+    const {
+      hintAddress: approxShieldedPartialRedemptionHint,
       latestRandomSeed
-    } = await contracts.hintHelpers.getApproxHint(partialRedemptionNewICR, 50, this.latestRandomSeed)
+    } = await contracts.hintHelpers.getApproxHint(partialRedemptionNewICR, 50, this.latestRandomSeed, true)
     this.latestRandomSeed = latestRandomSeed
 
     const exactPartialRedemptionHint = (await contracts.sortedTroves.findInsertPosition(partialRedemptionNewICR,
       approxPartialRedemptionHint,
       approxPartialRedemptionHint))
 
+    const exactShieldedPartialRedemptionHint = (await contracts.sortedShieldedTroves.findInsertPosition(partialRedemptionNewICR,
+      approxShieldedPartialRedemptionHint,
+      approxShieldedPartialRedemptionHint))
+
     const tx = await contracts.troveManager.redeemCollateral(LUSDAmount,
       firstRedemptionHint,
       exactPartialRedemptionHint[0],
       exactPartialRedemptionHint[1],
+      exactShieldedPartialRedemptionHint[0],
+      exactShieldedPartialRedemptionHint[1],
       partialRedemptionNewICR,
       0, maxFee,
       { from: redeemer, gasPrice: gasPrice_toUse},
