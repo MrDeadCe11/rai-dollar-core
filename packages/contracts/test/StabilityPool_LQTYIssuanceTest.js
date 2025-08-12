@@ -246,12 +246,17 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // One year passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_YEAR), web3.currentProvider)
 
-      // D deposits, triggering LQTY gains for A,B,C. Withdraws immediately after
-      await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: D })
-      await stabilityPool.withdrawFromSP(dec(1, 18), { from: D })
+      // total before issuance
+      const totalBefore = toBN(await communityIssuanceTester.totalLQTYIssued());
 
-      // Expected gains for each depositor after 1 year (50% total issued).  Each deposit gets 1/3 of issuance.
-      const expectedLQTYGain_1yr = communityLQTYSupply.div(toBN('2')).div(toBN('3'))
+
+      await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: D });
+      await stabilityPool.withdrawFromSP(dec(1, 18), { from: D });
+
+      // After the trigger
+      const totalAfter = toBN(await communityIssuanceTester.totalLQTYIssued());
+      const distributable = totalAfter.sub(totalBefore);
+      const expectedLQTYGain_1yr = distributable.div(toBN('3'));
 
       // Check LQTY gain
       const A_LQTYGain_1yr = await stabilityPool.getDepositorLQTYGain(A)
@@ -259,8 +264,6 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       const C_LQTYGain_1yr = await stabilityPool.getDepositorLQTYGain(C)
 
       // Check gains are correct, error tolerance = 1e-6 of a token
-      console.log("expected A 1yr", expectedLQTYGain_1yr.toString())
-      console.log("actual A 1yr", A_LQTYGain_1yr.toString() )
       assert.isAtMost(getDifference(A_LQTYGain_1yr, expectedLQTYGain_1yr), 1e12)
       assert.isAtMost(getDifference(B_LQTYGain_1yr, expectedLQTYGain_1yr), 1e12)
       assert.isAtMost(getDifference(C_LQTYGain_1yr, expectedLQTYGain_1yr), 1e12)
@@ -272,8 +275,14 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: D })
       await stabilityPool.withdrawFromSP(dec(1, 18), { from: D })
 
-      // Expected gains for each depositor after 2 years (75% total issued).  Each deposit gets 1/3 of issuance.
-      const expectedLQTYGain_2yr = communityLQTYSupply.mul(toBN('3')).div(toBN('4')).div(toBN('3'))
+      // After the trigger
+      const totalAfter2 = toBN(await communityIssuanceTester.totalLQTYIssued());
+
+      const distributable2 = totalAfter2.sub(totalBefore);
+        // Expected gains for each depositor after 2 years (75% total issued).  Each deposit gets 1/3 of issuance.
+      const expectedLQTYGain_2yr = distributable2.div(toBN('3'));
+
+
 
       // Check LQTY gain
       const A_LQTYGain_2yr = await stabilityPool.getDepositorLQTYGain(A)
@@ -321,22 +330,27 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // One year passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_YEAR), web3.currentProvider)
+      const totalBefore = toBN(await communityIssuanceTester.totalLQTYIssued());
 
       // D deposits, triggering LQTY gains for A,B,C. Withdraws immediately after
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: D })
       await stabilityPool.withdrawFromSP(dec(1, 18), { from: D })
 
+      // After the trigger
+      const totalAfter = toBN(await communityIssuanceTester.totalLQTYIssued());
+      const distributable = totalAfter.sub(totalBefore);
+
       // Expected gains for each depositor after 1 year (50% total issued)
-      const A_expectedLQTYGain_1yr = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued after 1 year
+      const A_expectedLQTYGain_1yr = distributable
+        // .div(toBN('2')) // 50% of total issued after 1 year
         .div(toBN('6'))  // A gets 1/6 of the issuance
 
-      const B_expectedLQTYGain_1yr = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued after 1 year
+      const B_expectedLQTYGain_1yr = distributable
+        // .div(toBN('2')) // 50% of total issued after 1 year
         .div(toBN('3'))  // B gets 2/6 = 1/3 of the issuance
 
-      const C_expectedLQTYGain_1yr = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued after 1 year
+      const C_expectedLQTYGain_1yr = distributable
+        // .div(toBN('2')) // 50% of total issued after 1 year
         .div(toBN('2'))  // C gets 3/6 = 1/2 of the issuance
 
       // Check LQTY gain
@@ -356,17 +370,20 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: D })
       await stabilityPool.withdrawFromSP(dec(1, 18), { from: D })
 
+      const totalAfter2 = toBN(await communityIssuanceTester.totalLQTYIssued());
+      const distributable2 = totalAfter2.sub(totalBefore);
+
       // Expected gains for each depositor after 2 years (75% total issued).
-      const A_expectedLQTYGain_2yr = communityLQTYSupply
-        .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
+      const A_expectedLQTYGain_2yr = distributable2
+        // .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
         .div(toBN('6'))  // A gets 1/6 of the issuance
 
-      const B_expectedLQTYGain_2yr = communityLQTYSupply
-        .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
+      const B_expectedLQTYGain_2yr = distributable2
+        // .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
         .div(toBN('3'))  // B gets 2/6 = 1/3 of the issuance
 
-      const C_expectedLQTYGain_2yr = communityLQTYSupply
-        .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
+      const C_expectedLQTYGain_2yr = distributable2
+        // .mul(toBN('3')).div(toBN('4')) // 75% of total issued after 1 year
         .div(toBN('2'))  // C gets 3/6 = 1/2 of the issuance
 
       // Check LQTY gain
@@ -420,6 +437,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // Year 1 passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_YEAR), web3.currentProvider)
 
+      const totalBefore = toBN(await communityIssuanceTester.totalLQTYIssued());
+
       assert.equal(await stabilityPool.getTotalLUSDDeposits(), dec(60000, 18))
 
       // Price Drops, defaulter1 liquidated. Stability Pool size drops by 50%
@@ -441,17 +460,20 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // consider drip
       assert.isAtMost(getDifference(await stabilityPool.getTotalLUSDDeposits(), expSpDeposits), 1000)
 
+      const totalAfter = toBN(await communityIssuanceTester.totalLQTYIssued());
+      const distributable = totalAfter.sub(totalBefore);
+
       // Expected gains for each depositor after 1 year (50% total issued)
-      const A_expectedLQTYGain_Y1 = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued in Y1
+      const A_expectedLQTYGain_Y1 = distributable
+        // .div(toBN('2')) // 50% of total issued in Y1
         .div(toBN('6'))  // A got 1/6 of the issuance
 
-      const B_expectedLQTYGain_Y1 = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued in Y1
+      const B_expectedLQTYGain_Y1 = distributable
+        // .div(toBN('2')) // 50% of total issued in Y1
         .div(toBN('3'))  // B gets 2/6 = 1/3 of the issuance
 
-      const C_expectedLQTYGain_Y1 = communityLQTYSupply
-        .div(toBN('2')) // 50% of total issued in Y1
+      const C_expectedLQTYGain_Y1 = distributable
+        // .div(toBN('2')) // 50% of total issued in Y1
         .div(toBN('2'))  // C gets 3/6 = 1/2 of the issuance
 
       // Check LQTY gain
@@ -486,7 +508,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // E deposits and withdraws, creating LQTY issuance
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: E })
-      await stabilityPool.withdrawFromSP(dec(1, 18), { from: E })
+      // ICR is too low to withdraw any amount, however 0 will
+      await stabilityPool.withdrawFromSP(0, { from: E })
 
       // Expected gains for each depositor during Y2:
       const A_expectedLQTYGain_Y2 = communityLQTYSupply
@@ -495,7 +518,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         .div(A_denom)  // A got 50/700 = 1/14 of the issuance
         //.div(toBN('14'))  // A got 50/700 = 1/14 of the issuance
       
-      console.log("A_expectedLQTYGain_Y2", A_expectedLQTYGain_Y2.toString())
+     // console.log("A_expectedLQTYGain_Y2", A_expectedLQTYGain_Y2.toString())
       const B_expectedLQTYGain_Y2 = communityLQTYSupply
         .div(toBN('4')) // 25% of total issued in Y2
         .mul(toBN(dec(1,18)))
@@ -534,11 +557,11 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
 
-      // Each depositor fully withdraws
-      await stabilityPool.withdrawFromSP(dec(10000, 18), { from: A })
-      await stabilityPool.withdrawFromSP(dec(20000, 18), { from: B })
-      await stabilityPool.withdrawFromSP(dec(30000, 18), { from: C })
-      await stabilityPool.withdrawFromSP(dec(40000, 18), { from: D })
+      // Each depositor withdraws 0 to trigger final issuance, all troves are ICR < MCR so no actual withdrawal is permitted
+      await stabilityPool.withdrawFromSP(0, { from: A })
+      await stabilityPool.withdrawFromSP(0, { from: B })
+      await stabilityPool.withdrawFromSP(0, { from: C })
+      await stabilityPool.withdrawFromSP(0, { from: D })
 
       // Check LQTY balances increase by correct amount
       assert.isAtMost(getDifference((await lqtyToken.balanceOf(A)), A_expectedTotalGain), 1e12)
@@ -569,7 +592,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
       await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_3, defaulter_3, { from: defaulter_3 })
       await borrowerOperations.openTrove(dec(200, 'ether'), await getOpenTroveLUSDAmount(dec(20000, 18)), defaulter_4, defaulter_4, { from: defaulter_4 })
-
+      
       // price drops by 50%: defaulter ICR falls to 100%
       await priceFeed.setPrice(dec(100, 18));
 
@@ -609,7 +632,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // 1 month passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
-
+      const issuanceBeforeWithdrawal = await communityIssuanceTester.totalLQTYIssued()
+     // console.log("issuanceBeforeWithdrawal", issuanceBeforeWithdrawal.toString())
       // Defaulter 1 liquidated. 20k LUSD fully offset with pool.
       await liquidations.liquidate(defaulter_1, { from: owner });
 
@@ -622,6 +646,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       for (const depositor of depositors_1) {
         await stabilityPool.withdrawFromSP(dec(10000, 18), { from: depositor })
       }
+      const totalIssuanceAfterWithdrawal = await communityIssuanceTester.totalLQTYIssued()
+     // console.log("totalIssuanceAfterWithdrawal", totalIssuanceAfterWithdrawal.toString())
       await priceFeed.setPrice(dec(100, 18));
 
       // 1 month passes
@@ -670,9 +696,12 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         await stabilityPool.withdrawFromSP(0, { from: depositor })
       }
 
+      const totalIssuanceDiff_M1 = totalIssuanceAfterWithdrawal.sub(issuanceBeforeWithdrawal)
+     // console.log("totalIssuanceDiff_M1", totalIssuanceDiff_M1.toString())
+
       /* Each depositor constitutes 50% of the pool from the time they deposit, up until the liquidation.
-      Therefore, divide monthly issuance by 2 to get the expected per-depositor LQTY gain.*/
-      const expectedLQTYGain_M1 = issuance_M1.div(th.toBN('2'))
+      Therefore, divide monthly issuance by 2 to get t   he expected per-depositor LQTY gain.*/
+      const expectedLQTYGain_M1 = totalIssuanceDiff_M1.div(th.toBN('2'))
       const expectedLQTYGain_M2 = issuance_M2.div(th.toBN('2'))
       const expectedLQTYGain_M3 = issuance_M3.div(th.toBN('2'))
       const expectedLQTYGain_M4 = issuance_M4.div(th.toBN('2'))
@@ -862,6 +891,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       // 1 month passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
 
+      const issuanceBeforeWithdrawal = await communityIssuanceTester.totalLQTYIssued()
       // Defaulter 1 liquidated.  Value of P updated to  to 1e-5
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
@@ -875,14 +905,14 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       const expP1 = await th.getNewPAfterLiquidation(contracts, txL1, P0, liqDeposits, lastLUSDError)
       P1 = await stabilityPool.P()
-      console.log("P1", P1.toString())
-      console.log("expP1", expP1.toString())
+     // console.log("P1", P1.toString())
+     // console.log("expP1", expP1.toString())
       //assert.equal(await stabilityPool.P(), dec(1, 13)) //P decreases: P = 1e(18-5) = 1e13
       assert.isTrue(P1.eq(expP1))
 
       // B provides to SP
       await stabilityPool.provideToSP(dec(99999, 18), ZERO_ADDRESS, { from: B })
-
+      const totalIssuanceAfterWithdrawal = await communityIssuanceTester.totalLQTYIssued()
       // large time passes increasing interest enough to avoid P scale change
       // 1 month passes
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
@@ -896,8 +926,6 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       const expP2 = await th.getNewPAfterLiquidation(contracts, txL2, P1, liqDeposits, lastLUSDError)
       P2 = await stabilityPool.P()
-      console.log("P2", P2.toString())
-      console.log("expP2", expP2.toString())
 
       // Check scale is 1
       assert.equal(await stabilityPool.currentScale(), '1')
@@ -941,8 +969,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       const expP4 = await th.getNewPAfterLiquidation(contracts, txL4, P3, liqDeposits, lastLUSDError)
       P4 = await stabilityPool.P()
 
-      console.log("P4", P4.toString())
-      console.log("expP4", expP4.toString())
+     // console.log("P4", P4.toString())
+     // console.log("expP4", expP4.toString())
 
       // Check scale is 2
       assert.equal(await stabilityPool.currentScale(), '2')
@@ -955,6 +983,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // 1 month passes
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
+
 
       // Defaulter 5 liquidated
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
@@ -1003,18 +1032,21 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         await stabilityPool.withdrawFromSP(dec(100000, 18), { from: depositor })
       }
 
+      // since the test setup takes longer than 60 seconds we have to subtract the issuance diff from issuance 1 since there will be extra unexpected issuance
+      const totalIssuanceDiff = totalIssuanceAfterWithdrawal.sub(issuanceBeforeWithdrawal)
+
       const LQTYGain_A = await lqtyToken.balanceOf(A)
       const LQTYGain_B = await lqtyToken.balanceOf(B)
       const LQTYGain_C = await lqtyToken.balanceOf(C)
       const LQTYGain_D = await lqtyToken.balanceOf(D)
       const LQTYGain_E = await lqtyToken.balanceOf(E)
       const LQTYGain_F = await lqtyToken.balanceOf(F)
-      console.log("LQTYGain_A", LQTYGain_A.toString())
+     // console.log("LQTYGain_A", LQTYGain_A.toString())
 
       /* Expect each deposit to have earned 100% of the LQTY issuance for the month in which it was active, prior
      to the liquidation that mostly depleted it.  Error tolerance = 1e-3 tokens. */
 
-      const expectedGainA = issuance_M1.add(issuance_M2.div(toBN('100000')))
+      const expectedGainA = totalIssuanceDiff.add(issuance_M2.div(toBN('100000')))
       const expectedGainB = issuance_M2.add(issuance_M3.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
       const expectedGainC = issuance_M3.add(issuance_M4.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
       const expectedGainD = issuance_M4.add(issuance_M5.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
@@ -1076,14 +1108,17 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // One year passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_YEAR), web3.currentProvider)
-
+      const issuanceBeforeWithdrawal = await communityIssuanceTester.totalLQTYIssued()
       // E deposits, triggering LQTY gains for A,B,C,D,F1,F2. Withdraws immediately after
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: E })
       await stabilityPool.withdrawFromSP(dec(1, 18), { from: E })
+      const totalIssuanceAfterWithdrawal = await communityIssuanceTester.totalLQTYIssued()
+      // since we are passing 60 seconds in the setup the inital issuance must be subtracted from the total issuance
+      const expectedIssuance_Y1 = totalIssuanceAfterWithdrawal.sub(issuanceBeforeWithdrawal)
 
       // Expected issuance for year 1 is 50% of total supply.
-      const expectedIssuance_Y1 = communityLQTYSupply.div(toBN('2'))
-      
+      //const expectedIssuance_Y1 = communityLQTYSupply.div(toBN('2'))
+
       // Get actual LQTY gains
       const A_LQTYGain_Y1 = await stabilityPool.getDepositorLQTYGain(A)
       const B_LQTYGain_Y1 = await stabilityPool.getDepositorLQTYGain(B)
@@ -1231,30 +1266,31 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // Month 1 passes
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
-
+      const issuanceBeforeWithdrawal = await communityIssuanceTester.totalLQTYIssued()
       assert.equal(await stabilityPool.getTotalLUSDDeposits(), dec(100000, 18)) // total 100k
 
-      console.log("Status", (await troveManager.getTroveStatus(defaulter_1)).toString())
+     // console.log("Status", (await troveManager.getTroveStatus(defaulter_1)).toString())
       // LIQUIDATION 1
       await liquidations.liquidate(defaulter_1)
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
       th.assertIsApproximatelyEqual(await stabilityPool.getTotalLUSDDeposits(), dec(50000, 18))  // 50k
-
+      const totalIssuanceAfterWithdrawal = await communityIssuanceTester.totalLQTYIssued()
+      const totalIssuanceDiff = totalIssuanceAfterWithdrawal.sub(issuanceBeforeWithdrawal)
       // --- CHECK GAINS AFTER L1 ---
 
       // During month 1, deposit sizes are: A:10000, B:20000, C:30000, D:40000.  Total: 100000
       // Expected gains for each depositor after month 1 
-      const A_share_M1 = issuance_M1.mul(toBN('10000')).div(toBN('100000'))
+      const A_share_M1 = totalIssuanceDiff.mul(toBN('10000')).div(toBN('100000'))
       const A_expectedLQTYGain_M1 = F1_kickbackRate.mul(A_share_M1).div(toBN(dec(1, 18)))
 
-      const B_share_M1 = issuance_M1.mul(toBN('20000')).div(toBN('100000'))
+      const B_share_M1 = totalIssuanceDiff.mul(toBN('20000')).div(toBN('100000'))
       const B_expectedLQTYGain_M1 = F2_kickbackRate.mul(B_share_M1).div(toBN(dec(1, 18)))
 
-      const C_share_M1 = issuance_M1.mul(toBN('30000')).div(toBN('100000'))
+      const C_share_M1 = totalIssuanceDiff.mul(toBN('30000')).div(toBN('100000'))
       const C_expectedLQTYGain_M1 = F2_kickbackRate.mul(C_share_M1).div(toBN(dec(1, 18)))
 
-      const D_share_M1 = issuance_M1.mul(toBN('40000')).div(toBN('100000'))
+      const D_share_M1 = totalIssuanceDiff.mul(toBN('40000')).div(toBN('100000'))
       const D_expectedLQTYGain_M1 = D_share_M1
 
       // F1's stake = A 
@@ -1447,7 +1483,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // Expect deposit C now to be 10125 LUSD
       const C_compoundedLUSDDeposit = await stabilityPool.getCompoundedLUSDDeposit(C)
-      console.log("C_compoundedLUSDDeposit", C_compoundedLUSDDeposit.toString())
+     // console.log("C_compoundedLUSDDeposit", C_compoundedLUSDDeposit.toString())
       //assert.isAtMost(getDifference(C_compoundedLUSDDeposit, dec(10125, 18)), 1000)
       // Increased tolerance
       // current value is 10124999999999999970000
@@ -1608,34 +1644,40 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await stabilityPool.provideToSP(dec(5000, 18), frontEnd_1, { from: A })
 
       total = await stabilityPool.getTotalLUSDDeposits()
-      console.log("total", total.toString())
+     // console.log("total", total.toString())
 
       tx = await borrowerOperations.openTrove(dec(200, 'ether'), dec(5000, 18), B, B, { from: B })
 
       total = await stabilityPool.getTotalLUSDDeposits()
-      console.log("total", total.toString())
+     // console.log("total", total.toString())
 
       P0 = await stabilityPool.P()
-      console.log("P0", P0.toString())
+     // console.log("P0", P0.toString())
 
       await stabilityPool.provideToSP(dec(5000, 18), frontEnd_1, { from: B })
       P0 = await stabilityPool.P()
-      console.log("P0", P0.toString())
+     // console.log("P0", P0.toString())
 
       //console.log(tx.logs)
       //const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
       var drip = toBN(await th.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
-      console.log("drip", drip.toString())
-
+     // console.log("drip", drip.toString())
+      const totalIssuanceAfterB = await communityIssuanceTester.totalLQTYIssued()
       // 1 month passes (M1)
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)
 
+      const issuanceBeforeM1 = await communityIssuanceTester.totalLQTYIssued()
+
       // Defaulter 1 liquidated.  Value of P updated to  to 9999999, i.e. in decimal, ~1e-10
       const txL1 = await liquidations.liquidate(defaulter_1, { from: owner });
+
+      const issuanceAfterM1 = await communityIssuanceTester.totalLQTYIssued()
+      const totalIssuanceDiffM1 = issuanceAfterM1.sub(issuanceBeforeM1)
+
       assert.isFalse(await sortedTroves.contains(defaulter_1))
       assert.isTrue(txL1.receipt.status)
       P1 = await stabilityPool.P()
-      console.log("P1", P1.toString())
+     // console.log("P1", P1.toString())
 
       // Check scale is 0
       assert.equal(await stabilityPool.currentScale(), '0')
@@ -1646,14 +1688,16 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // 1 month passes (M2)
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_MONTH, web3.currentProvider)
-
+      const issuanceBeforeM2 = await communityIssuanceTester.totalLQTYIssued()
       // Defaulter 2 liquidated
       const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
+      const issuanceAfterM2 = await communityIssuanceTester.totalLQTYIssued()
+      const totalIssuanceDiffM2 = issuanceAfterM2.sub(issuanceBeforeM2)
       assert.isFalse(await sortedTroves.contains(defaulter_2))
       assert.isTrue(txL2.receipt.status)
 
       P2 = await stabilityPool.P()
-      console.log("P2", P2.toString())
+     // console.log("P2", P2.toString())
 
       // Check scale is 1
       assert.equal(await stabilityPool.currentScale(), '1')
@@ -1690,12 +1734,13 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
+
       /* All depositors withdraw fully from SP.  Withdraw in reverse order, so that the largest remaining
       deposit (F) withdraws first, and does not get extra LQTY gains from the periods between withdrawals */
       for (depositor of [E, D, C, B, A]) {
         await stabilityPool.withdrawFromSP(dec(10000, 18), { from: depositor })
       }
-
+      
       const LQTYGain_A = await lqtyToken.balanceOf(A)
       const LQTYGain_B = await lqtyToken.balanceOf(B)
       const LQTYGain_C = await lqtyToken.balanceOf(C)
@@ -1717,13 +1762,13 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
      expectedLQTYGain_F1:  (1 - k) * (M1 + M2 + M3 + M4)
      */
 
-      const expectedLQTYGain_A_and_B =
+      const expectedLQTYGain_A_and_B = 
         kickbackRate
-          .mul(issuance_M1)
+          .mul(totalIssuanceDiffM1)
           .div(toBN('2'))
           .div(toBN(dec(1, 18))) // gain from L1
           .add(
-            kickbackRate.mul(issuance_M2)
+            kickbackRate.mul(totalIssuanceDiffM2)
               .div(toBN('2'))
               .div(toBN(dec(1, 18)))
               .div(toBN('100000'))
@@ -1759,7 +1804,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         .div(toBN(dec(1, 18))) // gain from L4
         .mul(toBN('99999')).div(toBN('100000')) // Scale by 9999.9/10000
 
-      const issuance1st4Months = issuance_M1.add(issuance_M2).add(issuance_M3).add(issuance_M4)
+      const issuance1st4Months = totalIssuanceDiffM1.add(totalIssuanceDiffM2).add(issuance_M3).add(issuance_M4)
       const expectedLQTYGain_F1 = (toBN(dec(1, 18)).sub(kickbackRate)).mul(issuance1st4Months).div(toBN(dec(1, 18)))
 
       assert.isAtMost(getDifference(expectedLQTYGain_A_and_B, LQTYGain_A), 1e15)

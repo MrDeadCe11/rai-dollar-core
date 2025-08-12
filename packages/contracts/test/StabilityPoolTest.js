@@ -2644,8 +2644,6 @@ contract('StabilityPool', async accounts => {
 
       for (depositor of [A, B, C, D]) {
         const snapshot = await stabilityPool.depositSnapshots(depositor)
-        console.log(depositor)
-        console.log(snapshot)
 
         const ZERO = toBN('0')
         // Check S,P, G snapshots are non-zero
