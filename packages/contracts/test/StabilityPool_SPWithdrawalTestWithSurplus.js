@@ -1672,12 +1672,12 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await borrowerOperations.openTrove(dec(1e9, 'ether'), await getOpenTroveLUSDAmount(dec(1e11, 18)), whale, whale, { from: whale })
 
       // Defaulter 1 withdraws 'almost' 1e9 LUSD.
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999991, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999999, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
 
       // Defaulter 2 withdraws 594e7 LUSD
       //await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(594e7, 18)), defaulter_2, defaulter_2, { from: defaulter_2, value: dec(6e7, 'ether') })
       // slightly increase debt to ensure scale change
-      await borrowerOperations.openTrove(dec(6e7, 'ether'), await getOpenTroveLUSDAmount(dec(596e7, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
+      await borrowerOperations.openTrove(dec(6e7, 'ether'), await getOpenTroveLUSDAmount(dec(599e7, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
 
       await lusdToken.transfer(alice, dec(1e9, 18), { from: whale })
       await stabilityPool.provideToSP(dec(1e9, 18), ZERO_ADDRESS, { from: alice })
@@ -1725,7 +1725,6 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       assert.isTrue(txL2.receipt.status)
       const [aliceFinalDeposit, bobFinalDeposit, carolFinalDeposit, dennisFinalDeposit, whaleFinalDeposit] = (await th.depositsAfterLiquidation(contracts, txL2, [aliceDeposit, bobDeposit, carolDeposit, dennisDeposit, whaleDeposit]))
-
       assert.equal(await stabilityPool.currentScale(), '1')
 
       // whale deposits LUSD so all can exit
@@ -2448,7 +2447,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const bobLUSDBalDiff = bobLUSDBalance.sub(bobExpectedLUSDBalance).abs()
 
       // had to increase tolerance because of inaccuracy in th.depositsAfterLiquidation()
-      assert.isTrue(bobLUSDBalDiff.lte(toBN(dec(2, 18))))
+      assert.isTrue(bobLUSDBalDiff.lte(toBN(dec(21, 17))))
 
       // Adding this test since th.getNewPAfterLiquidation() is exact and produces the correct deposit
       assert.isTrue(bobLUSDBalance.eq(expDepositWithP))

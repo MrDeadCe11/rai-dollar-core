@@ -23,7 +23,7 @@ import "./Dependencies/IERC20.sol";
  * LUSD in the Stability Pool:  that is, the offset debt evaporates, and an equal amount of LUSD tokens in the Stability Pool is burned.
  *
  * Thus, a liquidation causes each depositor to receive a LUSD loss, in proportion to their deposit as a share of total deposits.
- * They also receive an ERC20 gain, as the ERC20 collateral of the liquidated trove is distributed among Stability depositors,
+ * They also receive an Collateral gain, as the ERC20 collateral of the liquidated trove is distributed among Stability depositors,
  * in the same proportion.
  *
  * When a liquidation occurs, it depletes every deposit by the same fraction: for example, a liquidation that depletes 40%
@@ -35,25 +35,25 @@ import "./Dependencies/IERC20.sol";
  *
  * --- IMPLEMENTATION ---
  *
- * We use a highly scalable method of tracking deposits and ERC20 gains that has O(1) complexity.
+ * We use a highly scalable method of tracking deposits and collateral gains that has O(1) complexity.
  *
- * When a liquidation occurs, rather than updating each depositor's deposit and ERC20 gain, we simply update two state variables:
+ * When a liquidation occurs, rather than updating each depositor's deposit and collateral gain, we simply update two state variables:
  * a product P, and a sum S.
  *
  * A mathematical manipulation allows us to factor out the initial deposit, and accurately track all depositors' compounded deposits
- * and accumulated ERC20 gains over time, as liquidations occur, using just these two variables P and S. When depositors join the
+ * and accumulated collateral gains over time, as liquidations occur, using just these two variables P and S. When depositors join the
  * Stability Pool, they get a snapshot of the latest P and S: P_t and S_t, respectively.
  *
- * The formula for a depositor's accumulated ERC20 gain is derived here:
+ * The formula for a depositor's accumulated collateral gain is derived here:
  * https://github.com/liquity/dev/blob/main/papers/Scalable_Reward_Distribution_with_Compounding_Stakes.pdf
  *
  * For a given deposit d_t, the ratio P/P_t tells us the factor by which a deposit has decreased since it joined the Stability Pool,
- * and the term d_t * (S - S_t)/P_t gives us the deposit's total accumulated ERC20 gain.
+ * and the term d_t * (S - S_t)/P_t gives us the deposit's total accumulated collateral gain.
  *
- * Each liquidation updates the product P and sum S. After a series of liquidations, a compounded deposit and corresponding ERC20 gain
+ * Each liquidation updates the product P and sum S. After a series of liquidations, a compounded deposit and corresponding collateral gain
  * can be calculated using the initial deposit, the depositor’s snapshots of P and S, and the latest values of P and S.
  *
- * Any time a depositor updates their deposit (withdrawal, top-up) their accumulated ERC20 gain is paid out, their new deposit is recorded
+ * Any time a depositor updates their deposit (withdrawal, top-up) their accumulated collateral gain is paid out, their new deposit is recorded
  * (based on their latest compounded deposit and modified by the withdrawal/top-up), and they receive new snapshots of the latest P and S.
  * Essentially, they make a fresh deposit that overwrites the old one.
  *
@@ -82,13 +82,13 @@ import "./Dependencies/IERC20.sol";
  * as 0, since it is now less than 1e-9'th of its initial value (e.g. a deposit of 1 billion LUSD has depleted to < 1 LUSD).
  *
  *
- *  --- TRACKING DEPOSITOR'S ERC20 GAIN OVER SCALE CHANGES ---
+ *  --- TRACKING DEPOSITOR'S COLLATERAL GAIN OVER SCALE CHANGES ---
  *
  * The latest value of S is stored upon each scale change.
  *
- * This allows us to calculate a deposit's accumulated ERC20 gain.
+ * This allows us to calculate a deposit's accumulated collateral gain.
  *
- * We calculate the depositor's accumulated ERC20 gain for the scale at which they made the deposit, using the ERC20 gain formula:
+ * We calculate the depositor's accumulated collateral gain for the scale at which they made the deposit, using the collateral gain formula:
  * e_1 = d_t * (S - S_t) / P_t
  *
  * and also for scale after, taking care to divide the latter by a factor of 1e9:
@@ -108,7 +108,7 @@ import "./Dependencies/IERC20.sol";
  *  |---+---------|-------------|-----...
  *         i            i+1
  *
- * The sum of (e_1 + e_2) captures the depositor's total accumulated ERC20 gain, handling the case where their
+ * The sum of (e_1 + e_2) captures the depositor's total accumulated collateral gain, handling the case where their
  * deposit spanned one scale change. We only care about gains across one scale change, since the compounded
  * deposit is defined as being 0 once it has spanned more than one scale change.
  *
@@ -330,7 +330,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     *
     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
     * - Tags the deposit with the provided front end tag param, if it's a new deposit
-    * - Sends depositor's accumulated gains (LQTY, ERC20) to depositor
+    * - Sends depositor's accumulated gains (LQTY, collateral) to depositor
     * - Sends the tagged front end's accumulated LQTY gains to the tagged front end
     * - Increases deposit and tagged front end's stake, and takes new snapshots for each.
     */
@@ -377,7 +377,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     *
     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
     * - Removes the deposit's front end tag if it is a full withdrawal
-    * - Sends all depositor's accumulated gains (LQTY, ERC20) to depositor
+    * - Sends all depositor's accumulated gains (LQTY, collateral) to depositor
     * - Sends the tagged front end's accumulated LQTY gains to the tagged front end
     * - Decreases deposit and tagged front end's stake, and takes new snapshots for each.
     *

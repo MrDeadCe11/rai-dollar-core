@@ -1206,16 +1206,16 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [,drip2] = await th.getEmittedDripValues(contracts,tx2)
       var [liquidatedDebt2] = await th.getEmittedLiquidationValues(tx2)
-      console.log("drip2", drip2.toString())
-      console.log("liquidatedDebt2", liquidatedDebt2.toString())
+    // console.log("drip2", drip2.toString())
+    // console.log("liquidatedDebt2", liquidatedDebt2.toString())
       const expP_2 = await th.getNewPAfterLiquidation(contracts, tx2, P1, liq2Deposits, lastLUSDError2)
 
       //Check scale and sum
       const scale_2 = (await stabilityPool.currentScale()).toString()
       const P_2 = await stabilityPool.P()
 
-      console.log("P_2", P_2.toString())
-      console.log("expP_2", expP_2.toString())
+    // console.log("P_2", P_2.toString())
+    // console.log("expP_2", expP_2.toString())
 
       assert.equal(scale_2, '0')
       assert.isAtMost(th.getDifference(P_2, dec(5, 13)), 10)
@@ -1551,9 +1551,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await borrowerOperations.openTrove(dec(10000, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), ZERO_ADDRESS, ZERO_ADDRESS, { from: bob })
 
       // Defaulter 1 withdraws 'almost' 1e9 LUSD:  999999991 LUSD
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999991, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999999, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
       // Defaulter 2 withdraws 9900 LUSD
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(995e6, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999999, 18)), defaulter_2, defaulter_2, { from: defaulter_2 })
 
       spDeposit = toBN(dec(1e9, 18))
       await lusdToken.transfer(alice, spDeposit, { from: whale })
@@ -1576,45 +1576,30 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const [aliceGain1, aliceDeposit1] = (await th.depositorValuesAfterLiquidation(contracts, tx1, [spDeposit]))
 
 
-      //assert.equal((await stabilityPool.P()).toString(), dec(9, 9))
+      //assert.equal((await stabili tyPool.P()).toString(), dec(9, 9))
 
       // whale deposits LUSD so Alice can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
 
       // Increasing the price for a moment to avoid pending liquidations to block withdrawal
       await priceFeed.setPrice(dec(200, 18))
-      const txA = await stabilityPool.withdrawFromSP(dec(10000, 18), { from: alice })
-
-const MIN = toBN('1000000000000000000'); // MIN_LUSD_IN_SP
-
-const Tcur = toBN((await stabilityPool.getTotalLUSDDeposits()).toString());
-const whaleDep = toBN((await stabilityPool.getCompoundedLUSDDeposit(whale)).toString());
-
-const maxSafe = Tcur.sub(MIN);
-const toWithdraw = maxSafe.gt(toBN('0')) ? Math.min(maxSafe, whaleDep) : toBN('0');
-console.log('toWithdraw', toWithdraw.toString())  
-      await stabilityPool.withdrawFromSP(toWithdraw, { from: whale })
-
+      const txA = await stabilityPool.withdrawFromSP(dec(100000, 18), { from: alice })
       await priceFeed.setPrice(dec(100, 18))
 
       // Grab the ETH gain from the emitted event in the tx log
       const alice_ETHWithdrawn = await th.getEventArgByName(txA, 'CollateralGainWithdrawn', '_collateral').toString()
-      // const alice_LUSDWithdrawn = await th.getEventArgByName(txA, 'Offsetted', 'debtToOffset').toString()
-      // await lusdToken.transfer(bob, spDeposit, { from: whale })
-      // await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: bob })
+      await lusdToken.transfer(bob, spDeposit, { from: whale })
+      await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: bob })
 
       // Defaulter 2 liquidated.  9900 LUSD liquidated. P altered by a factor of 1-(9900/10000) = 0.01.  Scale changed.
       liqDeposits = await stabilityPool.getTotalLUSDDeposits()
       lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
 
       tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
-      const ppp = await stabilityPool.P()
-      console.log(ppp.toString())
       const expP2 = await th.getNewPAfterLiquidation(contracts, tx2, P1, liqDeposits, lastLUSDError)
       const P2 = await stabilityPool.P()
       assert.equal(await stabilityPool.currentScale(), '1')
-      console.log('P2', P2.toString())
-      console.log('expP2', expP2.toString())
+
       assert.isTrue(expP2.eq(P2.div(toBN(dec(1,9)))))
 
       // include 1 LUSD whaledeposit for depositorValuesAfterLiquidation()
@@ -1787,8 +1772,8 @@ console.log('toWithdraw', toWithdraw.toString())
       const expP1 = await th.getNewPAfterLiquidation(contracts, txL1, P0, liqDeposits, lastLUSDError)
       const P1 = await stabilityPool.P()
 
-      console.log("P1", P1.toString())
-      console.log("expP1", expP1.toString()) 
+    // console.log("P1", P1.toString())
+    // console.log("expP1", expP1.toString()) 
       assert.isTrue(P1.eq(expP1))        
 
       assert.equal(await stabilityPool.currentScale(), '0')
@@ -2221,8 +2206,8 @@ console.log('toWithdraw', toWithdraw.toString())
       // Check compounded deposits
       const E_deposit = await stabilityPool.getCompoundedLUSDDeposit(E)
       const F_deposit = await stabilityPool.getCompoundedLUSDDeposit(F)
-      console.log(`E_deposit: ${E_deposit.toString()}`)
-      console.log(`F_deposit: ${F_deposit.toString()}`)
+    // console.log(`E_deposit: ${E_deposit.toString()}`)
+    // console.log(`F_deposit: ${F_deposit.toString()}`)
       // V1
       assert.equal(E_deposit.toString(), '499975001134028698')
       assert.equal(F_deposit.toString(), '499975001134028698')
