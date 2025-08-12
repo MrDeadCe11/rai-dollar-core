@@ -12,8 +12,11 @@ interface IBorrowerOperations is ILiquityBase {
     // --- Events ---
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
+    event RewardsAddressChanged(address _newRewardsAddress);
     event ActivePoolAddressChanged(address _activePoolAddress);
+    event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
+    event DefaultShieldedPoolAddressChanged(address _defaultShieldedPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
@@ -22,6 +25,7 @@ interface IBorrowerOperations is ILiquityBase {
     event LUSDTokenAddressChanged(address _lusdTokenAddress);
     event LQTYStakingAddressChanged(address _lqtyStakingAddress);
     event RelayerAddressChanged(address _relayerAddress);
+    event CollateralTokenAddressChanged(address _collateralTokenAddress);
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
     event ShieldedTroveCreated(address indexed _borrower, uint arrayIndex);
@@ -30,11 +34,14 @@ interface IBorrowerOperations is ILiquityBase {
 
     // --- Functions ---
 
+    /*
     function setAddresses(
-        address _collateralTokenAddress,
         address _troveManagerAddress,
+        address _rewardsAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _defaultPoolAddress,
+        address _defaultShieldedPoolAddress,
         address _stabilityPoolAddress,
         address _gasPoolAddress,
         address _collSurplusPoolAddress,
@@ -43,8 +50,12 @@ interface IBorrowerOperations is ILiquityBase {
         address _sortedShieldedTrovesAddress,
         address _lusdTokenAddress,
         address _lqtyStakingAddress,
-        address _relayerAddress
+        address _relayerAddress,
+        address _collateralTokenAddress
     ) external;
+    */
+
+   function setAddresses(address[] memory addresses) external;
 
     function collateralToken() external view returns (IERC20);
 

@@ -49,6 +49,8 @@ contract LiquityBase is BaseMath, ILiquityBase {
 
     IDefaultPool public defaultPool;
 
+    IDefaultPool public defaultShieldedPool;
+
     IPriceFeed public override priceFeed;
 
     IRelayer public relayer; 

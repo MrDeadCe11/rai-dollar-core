@@ -4,6 +4,7 @@ pragma solidity 0.6.11;
 
 import "./Interfaces/IBorrowerOperations.sol";
 import "./Interfaces/ITroveManager.sol";
+import "./Interfaces/IRewards.sol";
 import "./Interfaces/ILUSDToken.sol";
 import "./Interfaces/ICollSurplusPool.sol";
 import "./Interfaces/ISortedTroves.sol";
@@ -20,6 +21,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // --- Connected contract declarations ---
 
     ITroveManager public troveManager;
+
+    IRewards public rewards;
 
     address stabilityPoolAddress;
 
@@ -80,6 +83,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     struct ContractsCache {
         ITroveManager troveManager;
+        IRewards rewards;
         IActivePool activePool;
         ILUSDToken lusdToken;
         IERC20 collateralToken;
@@ -111,19 +115,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // --- Dependency setters ---
 
     function setAddresses(
-        address _troveManagerAddress,
-        address _activePoolAddress,
-        address _defaultPoolAddress,
-        address _stabilityPoolAddress,
-        address _gasPoolAddress,
-        address _collSurplusPoolAddress,
-        address _priceFeedAddress,
-        address _sortedTrovesAddress,
-        address _sortedShieldedTrovesAddress,
-        address _lusdTokenAddress,
-        address _lqtyStakingAddress,
-        address _relayerAddress,
-        address _collateralTokenAddress
+        address[] memory addresses
     )
         external
         override
@@ -132,47 +124,41 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         // This makes impossible to open a trove with zero withdrawn LUSD
         assert(MIN_NET_DEBT > 0);
 
-        checkContract(_collateralTokenAddress);
-        checkContract(_troveManagerAddress);
-        checkContract(_activePoolAddress);
-        checkContract(_defaultPoolAddress);
-        checkContract(_stabilityPoolAddress);
-        checkContract(_gasPoolAddress);
-        checkContract(_collSurplusPoolAddress);
-        checkContract(_priceFeedAddress);
-        checkContract(_sortedTrovesAddress);
-        checkContract(_sortedShieldedTrovesAddress);
-        checkContract(_lusdTokenAddress);
-        checkContract(_lqtyStakingAddress);
-        checkContract(_relayerAddress);
+        for (uint i = 0; i < addresses.length; i++) {
+            checkContract(addresses[i]);
+        }
 
-        collateralToken = IERC20(_collateralTokenAddress);
-        troveManager = ITroveManager(_troveManagerAddress);
-        activePool = IActivePool(_activePoolAddress);
-        defaultPool = IDefaultPool(_defaultPoolAddress);
-        stabilityPoolAddress = _stabilityPoolAddress;
-        gasPoolAddress = _gasPoolAddress;
-        collSurplusPool = ICollSurplusPool(_collSurplusPoolAddress);
-        priceFeed = IPriceFeed(_priceFeedAddress);
-        sortedTroves = ISortedTroves(_sortedTrovesAddress);
-        sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
-        lusdToken = ILUSDToken(_lusdTokenAddress);
-        lqtyStakingAddress = _lqtyStakingAddress;
-        lqtyStaking = ILQTYStaking(_lqtyStakingAddress);
-        relayer = IRelayer(_relayerAddress);
+        troveManager = ITroveManager(addresses[0]);
+        rewards = IRewards(addresses[1]);
+        activePool = IActivePool(addresses[2]);
+        activeShieldedPool = IActivePool(addresses[3]);
+        defaultPool = IDefaultPool(addresses[4]);
+        defaultShieldedPool = IDefaultPool(addresses[5]);
+        stabilityPoolAddress = addresses[6];
+        gasPoolAddress = addresses[7];
+        collSurplusPool = ICollSurplusPool(addresses[8]);
+        priceFeed = IPriceFeed(addresses[9]);
+        sortedTroves = ISortedTroves(addresses[10]);
+        sortedShieldedTroves = ISortedTroves(addresses[11]);
+        lusdToken = ILUSDToken(addresses[12]);
+        relayer = IRelayer(addresses[13]);
+        collateralToken = IERC20(addresses[14]);
 
-        emit TroveManagerAddressChanged(_troveManagerAddress);
-        emit ActivePoolAddressChanged(_activePoolAddress);
-        emit DefaultPoolAddressChanged(_defaultPoolAddress);
-        emit StabilityPoolAddressChanged(_stabilityPoolAddress);
-        emit GasPoolAddressChanged(_gasPoolAddress);
-        emit CollSurplusPoolAddressChanged(_collSurplusPoolAddress);
-        emit PriceFeedAddressChanged(_priceFeedAddress);
-        emit SortedTrovesAddressChanged(_sortedTrovesAddress);
-        emit SortedShieldedTrovesAddressChanged(_sortedShieldedTrovesAddress);
-        emit LUSDTokenAddressChanged(_lusdTokenAddress);
-        emit LQTYStakingAddressChanged(_lqtyStakingAddress);
-        emit RelayerAddressChanged(_relayerAddress);
+        emit TroveManagerAddressChanged(addresses[0]);
+        emit RewardsAddressChanged(addresses[1]);
+        emit ActivePoolAddressChanged(addresses[2]);
+        emit ActiveShieldedPoolAddressChanged(addresses[3]);
+        emit DefaultPoolAddressChanged(addresses[4]);
+        emit DefaultShieldedPoolAddressChanged(addresses[5]);
+        emit StabilityPoolAddressChanged(addresses[6]);
+        emit GasPoolAddressChanged(addresses[7]);
+        emit CollSurplusPoolAddressChanged(addresses[8]);
+        emit PriceFeedAddressChanged(addresses[9]);
+        emit SortedTrovesAddressChanged(addresses[10]);
+        emit SortedShieldedTrovesAddressChanged(addresses[11]);
+        emit LUSDTokenAddressChanged(addresses[12]);
+        emit RelayerAddressChanged(addresses[13]);
+        emit CollateralTokenAddressChanged(addresses[14]);
 
         _renounceOwnership();
     }
@@ -187,7 +173,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     function _openTrove(uint256 _collateralAmount, uint _LUSDAmount, address _upperHint, address _lowerHint, bool redemptionShield) internal {
-        ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, lusdToken, collateralToken);
+        ContractsCache memory contractsCache = ContractsCache(troveManager, rewards, activePool, lusdToken, collateralToken);
         LocalVariables_openTrove memory vars;
 
         _requireSufficientCollateralBalance(collateralToken, msg.sender, _collateralAmount);
@@ -224,8 +210,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         contractsCache.troveManager.increaseTroveColl(msg.sender, _collateralAmount);
         contractsCache.troveManager.increaseTroveDebt(msg.sender, nCompositeDebt); //norm debt
 
-        contractsCache.troveManager.updateTroveRewardSnapshots(msg.sender);
-        vars.stake = contractsCache.troveManager.updateStakeAndTotalStakes(msg.sender);
+        contractsCache.rewards.updateTroveRewardSnapshots(msg.sender);
+        vars.stake = contractsCache.rewards.updateStakeAndTotalStakes(msg.sender);
 
         if (redemptionShield) {
             sortedShieldedTroves.insert(msg.sender, vars.NICR, _upperHint, _lowerHint);
@@ -303,17 +289,17 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     * If both are positive, it will revert.
     */
     function _adjustTrove(address _borrower, uint _collateralToAdd, uint _collWithdrawal, uint _LUSDChange, bool _isDebtIncrease, bool _toggleShield, address _upperHint, address _lowerHint) internal {
-        ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, lusdToken, collateralToken);
+        ContractsCache memory contractsCache = ContractsCache(troveManager, rewards, activePool, lusdToken, collateralToken);
         LocalVariables_adjustTrove memory vars;
 
         // TODO add drip() here. It will break tests
 
         // final shield status after adjust
-        bool redemptionShield = troveManager.shielded(_borrower) != _toggleShield;
+        vars.shielded = troveManager.shielded(_borrower) != _toggleShield;
 
         // switch shielded status in troveManager    
         if (_toggleShield) {
-            if (redemptionShield) {
+            if (vars.shielded) {
             contractsCache.troveManager.shieldTrove(msg.sender, _upperHint, _lowerHint);
             } else {
             contractsCache.troveManager.unShieldTrove(msg.sender, _upperHint, _lowerHint);
@@ -324,7 +310,6 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
         vars.price = priceFeed.fetchPrice();
-        vars.shielded = redemptionShield;
         //bool isRecoveryMode = _checkRecoveryMode(vars.price, vars.accRate);
 
         if (_isDebtIncrease) {
@@ -339,7 +324,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         // Confirm the operation is either a borrower adjusting their own trove, or a pure Collateral transfer from the Stability Pool to a trove
         assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && _collateralToAdd > 0 && _LUSDChange == 0));
 
-        contractsCache.troveManager.applyPendingRewards(_borrower);
+        contractsCache.rewards.applyPendingRewards(_borrower);
 
         // Get the collChange based on whether or not Collateral was sent in the transaction
         (vars.collChange, vars.isCollIncrease) = _getCollChange(_collateralToAdd, _collWithdrawal);
@@ -358,7 +343,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
                                                 vars.netDebtChange, _isDebtIncrease, vars.price, vars.par);
         assert(_collWithdrawal <= vars.coll); 
         // Check the adjustment satisfies all conditions for the current system mode
-        _requireValidAdjustment(_collWithdrawal, _isDebtIncrease, vars, redemptionShield);
+        _requireValidAdjustment(_collWithdrawal, _isDebtIncrease, vars, vars.shielded);
             
         // When the adjustment is a debt repayment, check it's a valid amount and that the caller has enough LUSD
         if (!_isDebtIncrease && _LUSDChange > 0) {
@@ -372,7 +357,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         (vars.newColl, vars.newDebt) = _updateTroveFromAdjustment(contractsCache.troveManager, _borrower, vars.collChange,
                                                                   vars.isCollIncrease, nNetDebtChange, _isDebtIncrease);
 
-        vars.stake = contractsCache.troveManager.updateStakeAndTotalStakes(_borrower);
+        vars.stake = contractsCache.rewards.updateStakeAndTotalStakes(_borrower);
 
         // Re-insert trove in to the sorted list
         uint newNICR = _getNewNominalICRFromTroveChange(vars.coll, vars.debt, vars.collChange, vars.isCollIncrease,
@@ -402,6 +387,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     function closeTrove() external override {
         ITroveManager troveManagerCached = troveManager;
+        IRewards rewardsCached = rewards;
         IActivePool activePoolCached = activePool;
         ILUSDToken lusdTokenCached = lusdToken;
 
@@ -413,7 +399,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         bool shielded = troveManagerCached.shielded(msg.sender);
         uint accRate = shielded ? troveManagerCached.accumulatedShieldRate() : troveManagerCached.accumulatedRate();
 
-        troveManagerCached.applyPendingRewards(msg.sender);
+        rewardsCached.applyPendingRewards(msg.sender);
 
         uint coll = troveManagerCached.getTroveColl(msg.sender);
         uint debt = troveManagerCached.getTroveDebt(msg.sender);
@@ -421,7 +407,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
         _requireSufficientLUSDBalance(lusdTokenCached, msg.sender, actualDebt.sub(LUSD_GAS_COMPENSATION));
 
-        troveManagerCached.removeStake(msg.sender);
+        rewardsCached.removeStake(msg.sender);
         troveManagerCached.closeTrove(msg.sender);
 
         emit TroveUpdated(msg.sender, 0, 0, 0, BorrowerOperation.closeTrove);

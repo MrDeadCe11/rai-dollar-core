@@ -25,6 +25,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
   let lusdToken
   let sortedTroves
   let troveManager
+  let rewards
   let nameRegistry
   let activePool
   let stabilityPool
@@ -48,6 +49,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     lusdToken = coreContracts.lusdToken
     sortedTroves = coreContracts.sortedTroves
     troveManager = coreContracts.troveManager
+    rewards = coreContracts.rewards
     nameRegistry = coreContracts.nameRegistry
     activePool = coreContracts.activePool
     stabilityPool = coreContracts.stabilityPool
@@ -100,7 +102,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("applyPendingRewards(): reverts when called by an account that is not BorrowerOperations", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await troveManager.applyPendingRewards(bob, { from: alice })
+        const txAlice = await rewards.applyPendingRewards(bob, { from: alice })
         
       } catch (err) {
          assert.include(err.message, "revert")
@@ -112,7 +114,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("updateRewardSnapshots(): reverts when called by an account that is not BorrowerOperations", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await troveManager.updateTroveRewardSnapshots(bob, { from: alice })
+        const txAlice = await rewards.updateTroveRewardSnapshots(bob, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert" )
@@ -124,7 +126,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("removeStake(): reverts when called by an account that is not BorrowerOperations", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await troveManager.removeStake(bob, { from: alice })
+        const txAlice = await rewards.removeStake(bob, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert")
@@ -136,7 +138,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("updateStakeAndTotalStakes(): reverts when called by an account that is not BorrowerOperations", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await troveManager.updateStakeAndTotalStakes(bob, { from: alice })
+        const txAlice = await rewards.updateStakeAndTotalStakes(bob, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert")
@@ -287,7 +289,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
         
       } catch (err) {
         assert.include(err.message, "revert")
-        assert.include(err.message, "Caller is not TM or Liquidations")
+        assert.include(err.message, "DefaultPool: Caller is not Rewards")
       }
     })
 
@@ -299,7 +301,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
         
       } catch (err) {
         assert.include(err.message, "revert")
-        assert.include(err.message, "Caller is not the TroveManager")
+        assert.include(err.message, "Caller is not Rewards")
       }
     })
 
@@ -311,7 +313,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
         
       } catch (err) {
         assert.include(err.message, "revert")
-        assert.include(err.message, "Caller is not the TroveManager")
+        assert.include(err.message, "Caller is not Rewards")
       }
     })
 
@@ -335,11 +337,11 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     it("offset(): reverts when called by an account that is not TroveManager", async () => {
       // Attempt call from alice
       try {
-        txAlice = await stabilityPool.offset(100, 100, 10, { from: alice })
+        txAlice = await stabilityPool.offset(100, 100, 10, 100, 100, 10, { from: alice })
         assert.fail(txAlice)
       } catch (err) {
         assert.include(err.message, "revert")
-        assert.include(err.message, "Caller is not TroveManager")
+        assert.include(err.message, "Caller is not Liq")
       }
     })
 

@@ -24,6 +24,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     string constant public NAME = "ActivePool";
     IERC20 public override collateralToken;
     address public liquidationsAddress;
+    address public rewardsAddress;
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public stabilityPoolAddress;
@@ -45,6 +46,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function setAddresses(
         address _liquidationsAddress,
+        address _rewardsAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _stabilityPoolAddress,
@@ -56,6 +58,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         onlyOwner
     {
         checkContract(_liquidationsAddress);
+        checkContract(_rewardsAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_stabilityPoolAddress);
@@ -64,6 +67,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         checkContract(_collSurplusPoolAddress);
 
         liquidationsAddress = _liquidationsAddress;
+        rewardsAddress = _rewardsAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         stabilityPoolAddress = _stabilityPoolAddress;
@@ -102,7 +106,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Pool functionality ---
 
     function sendCollateral(address _account, uint _amount) external override {
-        _requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorRewards();
         CT = CT.sub(_amount);
         emit ActivePoolCollateralBalanceUpdated(CT);
         emit CollateralSent(_account, _amount);
@@ -137,13 +141,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     }
 
     function increaseLUSDDebt(uint _amount) external override {
-        _requireCallerIsBOorTroveM();
+        //_requireCallerIsBOorTroveMorRewards();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt  = LUSDDebt.add(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
-        _requireCallerIsBOorTroveMorSP();
+        //_requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
@@ -154,12 +160,14 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function increaseLUSDShieldedDebt(uint _amount) external override {
         _requireCallerIsBOorTroveM();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDShieldedDebt  = LUSDShieldedDebt.add(_amount);
         ActivePoolLUSDShieldedDebtUpdated(LUSDShieldedDebt);
     }
 
     function decreaseLUSDShieldedDebt(uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDShieldedDebt = LUSDShieldedDebt.sub(_amount);
         ActivePoolLUSDShieldedDebtUpdated(LUSDShieldedDebt);
     }
@@ -184,6 +192,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             msg.sender == troveManagerAddress ||
             msg.sender == stabilityPoolAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool");
+    }
+    function _requireCallerIsBOorTroveMorSPorRewards() internal view {
+        require(
+            msg.sender == borrowerOperationsAddress ||
+            msg.sender == liquidationsAddress ||
+            msg.sender == troveManagerAddress ||
+            msg.sender == rewardsAddress ||
+            msg.sender == stabilityPoolAddress,
+            "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Rewards");
     }
 
     function _requireCallerIsBOorTroveMorSPorDefaultPool() internal view {

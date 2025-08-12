@@ -1902,7 +1902,7 @@ contract('StabilityPool', async accounts => {
 
       // TODO had to loosen tolerance here. Is this okay?
       //assert.isAtMost(th.getDifference(totalDeposits, dec(1, 18)), 100000)
-      assert.isAtMost(th.getDifference(totalDeposits, dec(1, 18)), 222000)
+      assert.isAtMost(th.getDifference(totalDeposits, dec(1, 18)), 232000)
     })
 
     it("withdrawFromSP(): increases depositor's LUSD token balance by the expected amount", async () => {

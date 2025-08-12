@@ -15,19 +15,20 @@ interface ILiquidations is ILiquityBase {
     
     // --- Events ---
 
-    event AggregatorAddressChanged(address _newAggregatorAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
+    event RewardsAddressChanged(address _newRewardsAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
     event ActivePoolAddressChanged(address _activePoolAddress);
+    event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
+    event DefaultShieldedPoolAddressChanged(address _defaultShieldedPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
-    event LQTYTokenAddressChanged(address _lqtyTokenAddress);
-    event LQTYStakingAddressChanged(address _lqtyStakingAddress);
+    event SortedShieldedTrovesAddressChanged(address _sortedShieldedTrovesAddress);
     event RelayerAddressChanged(address _relayerAddress);
 
     event Liquidation(uint _liquidatedDebt, uint _liquidatedColl, uint _collGasCompensation, uint _LUSDGasCompensation);
@@ -48,24 +49,24 @@ interface ILiquidations is ILiquityBase {
 
     function setAddresses(
         address _troveManagerAddress,
+        address _rewardsAddress,
         address _borrowerOperationsAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _defaultPoolAddress,
+        address _defaultShieldedPoolAddress,
         address _stabilityPoolAddress,
         address _gasPoolAddress,
         address _collSurplusPoolAddress,
         address _priceFeedAddress,
         address _lusdTokenAddress,
         address _sortedTrovesAddress,
-        address _lqtyTokenAddress,
-        address _lqtyStakingAddress,
+        address _sortedShieldedTrovesAddress,
         address _relayerAddress
     ) external;
 
     function stabilityPool() external view returns (IStabilityPool);
     function lusdToken() external view returns (ILUSDToken);
-    function lqtyToken() external view returns (ILQTYToken);
-    function lqtyStaking() external view returns (ILQTYStaking);
 
     function liquidate(address _borrower) external;
 

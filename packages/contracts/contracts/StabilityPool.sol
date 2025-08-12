@@ -150,6 +150,8 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     // Needed to check if there are pending liquidations
     ISortedTroves public sortedTroves;
+    // Needed to check if there are pending liquidations
+    ISortedTroves public sortedShieldedTroves;
 
     ICommunityIssuance public communityIssuance;
 
@@ -270,8 +272,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _lusdTokenAddress,
         address _sortedTrovesAddress,
+        address _sortedShieldedTrovesAddress,
         address _priceFeedAddress,
         address _communityIssuanceAddress,
         address _collateralToken
@@ -286,6 +290,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         checkContract(_activePoolAddress);
         checkContract(_lusdTokenAddress);
         checkContract(_sortedTrovesAddress);
+        checkContract(_sortedShieldedTrovesAddress);
         checkContract(_priceFeedAddress);
         checkContract(_communityIssuanceAddress);
         checkContract(_collateralToken);
@@ -294,8 +299,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         liquidations = _liquidationsAddress;
         troveManager = ITroveManager(_troveManagerAddress);
         activePool = IActivePool(_activePoolAddress);
+        activeShieldedPool = IActivePool(_activeShieldedPoolAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
+        sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
         priceFeed = IPriceFeed(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
         collateralToken = IERC20(_collateralToken);
@@ -304,10 +311,13 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         collateralToken.approve(address(activePool), type(uint256).max);
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
+        emit LiquidationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
+        emit ActiveShieldedPoolAddressChanged(_activeShieldedPoolAddress);
         emit LUSDTokenAddressChanged(_lusdTokenAddress);
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
+        emit SortedShieldedTrovesAddressChanged(_sortedShieldedTrovesAddress);
         emit PriceFeedAddressChanged(_priceFeedAddress);
         emit CommunityIssuanceAddressChanged(_communityIssuanceAddress);
 
@@ -536,21 +546,27 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     * and transfers the Trove's ERC20 collateral from ActivePool to StabilityPool.
     * Only called by liquidation functions in the TroveManager.
     */
-    function offset(uint _debtToOffset, uint _nDebtToOffset, uint _collToAdd) external override {
-        _requireCallerIsTroveManagerOrLiq();
+    function offset(uint _baseDebtToOffset, uint _baseNDebtToOffset, uint _baseCollToAdd,
+                    uint _shieldedDebtToOffset, uint _shieldedNDebtToOffset, uint _shieldedCollToAdd) external override {
+        _requireCallerIsLiq();
         uint totalLUSD = totalLUSDDeposits; // cached to save an SLOAD
-        if (totalLUSD == 0 || _debtToOffset == 0) { return; }
+        if (totalLUSD == 0 || (_baseDebtToOffset == 0 && _shieldedDebtToOffset == 0)) { return; }
 
         _triggerLQTYIssuance(communityIssuance);
 
+        uint totalDebtToOffset = _baseDebtToOffset.add(_shieldedDebtToOffset);
+        uint totalCollToAdd = _baseCollToAdd.add(_shieldedCollToAdd);
+
         (uint collateralGainPerUnitStaked,
-            uint LUSDLossPerUnitStaked) = _computeRewardsPerUnitStaked(_collToAdd, _debtToOffset, totalLUSD);
+            uint LUSDLossPerUnitStaked) = _computeRewardsPerUnitStaked(totalCollToAdd, totalDebtToOffset, totalLUSD);
 
         _updateRewardSumAndProduct(collateralGainPerUnitStaked, LUSDLossPerUnitStaked);  // updates S and P
 
-        _moveOffsetCollAndDebt(_collToAdd, _debtToOffset, _nDebtToOffset);
+        _moveOffsetCollAndDebt(totalDebtToOffset, _baseCollToAdd,  _baseNDebtToOffset, 
+                              _shieldedCollToAdd, _shieldedNDebtToOffset);
 
-        emit Offset(_collToAdd, _debtToOffset, totalLUSD, LUSDLossPerUnitStaked, collateralGainPerUnitStaked);
+        emit Offset(_baseCollToAdd.add(_shieldedCollToAdd), totalDebtToOffset,
+                    totalLUSD, LUSDLossPerUnitStaked, collateralGainPerUnitStaked);
 
     }
 
@@ -655,17 +671,22 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         emit P_Updated(newP);
     }
 
-    function _moveOffsetCollAndDebt(uint _collToAdd, uint _debtToOffset, uint _nDebtToOffset) internal {
+    function _moveOffsetCollAndDebt(uint _totalDebtToOffset, uint _baseCollToAdd, uint _baseNDebtToOffset,
+                                    uint _shieldedCollToAdd, uint _shieldedNDebtToOffset) internal {
         IActivePool activePoolCached = activePool;
+        IActivePool activeShieldedPoolCached = activeShieldedPool;
 
         // Cancel the liquidated LUSD debt with the LUSD in the stability pool
-        activePoolCached.decreaseLUSDDebt(_nDebtToOffset);
-        _decreaseLUSD(_debtToOffset);
+        activePoolCached.decreaseLUSDDebt(_baseNDebtToOffset);
+        activeShieldedPoolCached.decreaseLUSDDebt(_shieldedNDebtToOffset);
+
+        _decreaseLUSD(_totalDebtToOffset);
 
         // Burn the debt that was successfully offset
-        lusdToken.burn(address(this), _debtToOffset);
+        lusdToken.burn(address(this), _totalDebtToOffset);
 
-        activePoolCached.sendCollateral(address(this), _collToAdd);
+        activePoolCached.sendCollateral(address(this), _baseCollToAdd);
+        activeShieldedPoolCached.sendCollateral(address(this), _shieldedCollToAdd);
     }
 
     function _decreaseLUSD(uint _amount) internal {
@@ -962,18 +983,17 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     // --- 'require' functions ---
 
-    function _requireCallerIsActivePool() internal view {
-        require( msg.sender == address(activePool), "StabilityPool: Caller is not ActivePool");
+    function _requireCallerIsAnActivePool() internal view {
+        require( msg.sender == address(activePool) || msg.sender == address(activeShieldedPool) ,
+                "StabilityPool: Caller is not ActivePool");
     }
 
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == address(troveManager), "StabilityPool: Caller is not TroveManager");
     }
 
-    function _requireCallerIsTroveManagerOrLiq() internal view {
-        require(msg.sender == address(troveManager) || 
-                msg.sender == liquidations, 
-         "StabilityPool: Caller is not TroveManager or Liq");
+    function _requireCallerIsLiq() internal view {
+        require(msg.sender == liquidations, "StabilityPool: Caller is not Liq");
     }
 
     function _requireNoUnderCollateralizedTroves() internal {
@@ -1019,7 +1039,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     }
 
     function processCollateralIncrease(uint _amount) external override {
-        _requireCallerIsActivePool();
+        _requireCallerIsAnActivePool();
         CT = CT.add(_amount);
         emit StabilityPoolCollateralBalanceUpdated(CT);
     }

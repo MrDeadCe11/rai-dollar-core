@@ -43,6 +43,7 @@ contract('BorrowerOperations', async accounts => {
   let lusdToken
   let sortedTroves
   let troveManager
+  let rewards
   let activePool
   let stabilityPool
   let defaultPool
@@ -96,6 +97,7 @@ contract('BorrowerOperations', async accounts => {
       aggregator = contracts.aggregator
       liquidations = contracts.liquidations
       troveManager = contracts.troveManager
+      rewards = contracts.rewards
       activePool = contracts.activePool
       stabilityPool = contracts.stabilityPool
       defaultPool = contracts.defaultPool
@@ -202,7 +204,7 @@ contract('BorrowerOperations', async accounts => {
 
       const alice_Trove_Before = await troveManager.Troves(alice)
       const alice_Stake_Before = alice_Trove_Before[2]
-      const totalStakes_Before = (await troveManager.totalStakes())
+      const totalStakes_Before = (await rewards.totalStakes())
 
       assert.isTrue(totalStakes_Before.eq(alice_Stake_Before))
       // alice approve coll transfer
@@ -213,7 +215,7 @@ contract('BorrowerOperations', async accounts => {
       // Check stake and total stakes get updated
       const alice_Trove_After = await troveManager.Troves(alice)
       const alice_Stake_After = alice_Trove_After[2]
-      const totalStakes_After = (await troveManager.totalStakes())
+      const totalStakes_After = (await rewards.totalStakes())
 
       assert.isTrue(alice_Stake_After.eq(alice_Stake_Before.add(toBN(dec(2, 'ether')))))
       assert.isTrue(totalStakes_After.eq(totalStakes_Before.add(toBN(dec(2, 'ether')))))
@@ -236,16 +238,16 @@ contract('BorrowerOperations', async accounts => {
 
       assert.isFalse(await sortedTroves.contains(carol))
 
-      const L_COLL = await troveManager.L_COLL()
-      const L_LUSDDebt = await troveManager.L_LUSDDebt()
+      const L_COLL = await rewards.L_Coll()
+      const L_LUSDDebt = await rewards.L_LUSDDebt()
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
-      const alice_rewardSnapshot_Before = await troveManager.rewardSnapshots(alice)
+      const alice_rewardSnapshot_Before = await rewards.rewardSnapshots(alice)
       
       const alice_CollateralrewardSnapshot_Before = alice_rewardSnapshot_Before[0]
       const alice_LUSDDebtRewardSnapshot_Before = alice_rewardSnapshot_Before[1]
 
-      const bob_rewardSnapshot_Before = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot_Before = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot_Before = bob_rewardSnapshot_Before[0]
       const bob_LUSDDebtRewardSnapshot_Before = bob_rewardSnapshot_Before[1]
 
@@ -254,10 +256,10 @@ contract('BorrowerOperations', async accounts => {
       assert.equal(bob_CollateralrewardSnapshot_Before, 0)
       assert.equal(bob_LUSDDebtRewardSnapshot_Before, 0)
 
-      const alicePendingCollateralReward = await troveManager.getPendingCollateralReward(alice)
-      const bobPendingCollateralReward = await troveManager.getPendingCollateralReward(bob)
-      const alicePendingLUSDDebtReward = await troveManager.getPendingLUSDDebtReward(alice)
-      const bobPendingLUSDDebtReward = await troveManager.getPendingLUSDDebtReward(bob)
+      const alicePendingCollateralReward = await rewards.getPendingCollateralReward(alice)
+      const bobPendingCollateralReward = await rewards.getPendingCollateralReward(bob)
+      const alicePendingLUSDDebtReward = await rewards.getPendingLUSDDebtReward(alice)
+      const bobPendingLUSDDebtReward = await rewards.getPendingLUSDDebtReward(bob)
       for (reward of [alicePendingCollateralReward, bobPendingCollateralReward, alicePendingLUSDDebtReward, bobPendingLUSDDebtReward]) {
         assert.isTrue(reward.gt(toBN('0')))
       }
@@ -288,11 +290,11 @@ contract('BorrowerOperations', async accounts => {
 
       /* Check that both Alice and Bob's snapshots of the rewards-per-unit-staked metrics should be updated
        to the latest values of L_COLL and L_LUSDDebt */
-      const alice_rewardSnapshot_After = await troveManager.rewardSnapshots(alice)
+      const alice_rewardSnapshot_After = await rewards.rewardSnapshots(alice)
       const alice_CollateralrewardSnapshot_After = alice_rewardSnapshot_After[0]
       const alice_LUSDDebtRewardSnapshot_After = alice_rewardSnapshot_After[1]
 
-      const bob_rewardSnapshot_After = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot_After = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot_After = bob_rewardSnapshot_After[0]
       const bob_LUSDDebtRewardSnapshot_After = bob_rewardSnapshot_After[1]
 
@@ -543,7 +545,7 @@ contract('BorrowerOperations', async accounts => {
 
       const alice_Trove_Before = await troveManager.Troves(alice)
       const alice_Stake_Before = alice_Trove_Before[2]
-      const totalStakes_Before = (await troveManager.totalStakes())
+      const totalStakes_Before = (await rewards.totalStakes())
 
       assert.isTrue(alice_Stake_Before.eq(aliceColl))
       assert.isTrue(totalStakes_Before.eq(aliceColl))
@@ -554,7 +556,7 @@ contract('BorrowerOperations', async accounts => {
       // Check stake and total stakes get updated
       const alice_Trove_After = await troveManager.Troves(alice)
       const alice_Stake_After = alice_Trove_After[2]
-      const totalStakes_After = (await troveManager.totalStakes())
+      const totalStakes_After = (await rewards.totalStakes())
 
       assert.isTrue(alice_Stake_After.eq(alice_Stake_Before.sub(toBN(dec(1, 'ether')))))
       assert.isTrue(totalStakes_After.eq(totalStakes_Before.sub(toBN(dec(1, 'ether')))))
@@ -592,15 +594,15 @@ contract('BorrowerOperations', async accounts => {
       // close Carol's Trove, liquidating her 1 ether and 180LUSD.
       await liquidations.liquidate(carol, { from: owner });
 
-      const L_COLL = await troveManager.L_COLL()
-      const L_LUSDDebt = await troveManager.L_LUSDDebt()
+      const L_COLL = await rewards.L_Coll()
+      const L_LUSDDebt = await rewards.L_LUSDDebt()
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
-      const alice_rewardSnapshot_Before = await troveManager.rewardSnapshots(alice)
+      const alice_rewardSnapshot_Before = await rewards.rewardSnapshots(alice)
       const alice_CollateralrewardSnapshot_Before = alice_rewardSnapshot_Before[0]
       const alice_LUSDDebtRewardSnapshot_Before = alice_rewardSnapshot_Before[1]
 
-      const bob_rewardSnapshot_Before = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot_Before = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot_Before = bob_rewardSnapshot_Before[0]
       const bob_LUSDDebtRewardSnapshot_Before = bob_rewardSnapshot_Before[1]
 
@@ -610,10 +612,10 @@ contract('BorrowerOperations', async accounts => {
       assert.equal(bob_LUSDDebtRewardSnapshot_Before, 0)
 
       // Check A and B have pending rewards
-      const pendingCollReward_A = await troveManager.getPendingCollateralReward(alice)
-      const pendingDebtReward_A = await troveManager.getPendingLUSDDebtReward(alice)
-      const pendingCollReward_B = await troveManager.getPendingCollateralReward(bob)
-      const pendingDebtReward_B = await troveManager.getPendingLUSDDebtReward(bob)
+      const pendingCollReward_A = await rewards.getPendingCollateralReward(alice)
+      const pendingDebtReward_A = await rewards.getPendingLUSDDebtReward(alice)
+      const pendingCollReward_B = await rewards.getPendingCollateralReward(bob)
+      const pendingDebtReward_B = await rewards.getPendingLUSDDebtReward(bob)
       for (reward of [pendingCollReward_A, pendingDebtReward_A, pendingCollReward_B, pendingDebtReward_B]) {
         assert.isTrue(reward.gt(toBN('0')))
       }
@@ -639,11 +641,11 @@ contract('BorrowerOperations', async accounts => {
 
       /* After top up, both Alice and Bob's snapshots of the rewards-per-unit-staked metrics should be updated
        to the latest values of L_COLL and L_LUSDDebt */
-      const alice_rewardSnapshot_After = await troveManager.rewardSnapshots(alice)
+      const alice_rewardSnapshot_After = await rewards.rewardSnapshots(alice)
       const alice_CollateralrewardSnapshot_After = alice_rewardSnapshot_After[0]
       const alice_LUSDDebtRewardSnapshot_After = alice_rewardSnapshot_After[1]
 
-      const bob_rewardSnapshot_After = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot_After = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot_After = bob_rewardSnapshot_After[0]
       const bob_LUSDDebtRewardSnapshot_After = bob_rewardSnapshot_After[1]
 
@@ -2241,7 +2243,7 @@ contract('BorrowerOperations', async accounts => {
       await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: alice } })
 
       const stakeBefore = await troveManager.getTroveStake(alice)
-      const totalStakesBefore = await troveManager.totalStakes();
+      const totalStakesBefore = await rewards.totalStakes();
       assert.isTrue(stakeBefore.gt(toBN('0')))
       assert.isTrue(totalStakesBefore.gt(toBN('0')))
 
@@ -2250,7 +2252,7 @@ contract('BorrowerOperations', async accounts => {
       await borrowerOperations.adjustTrove(dec(1, 'ether'), 0, dec(50, 18), true, alice, alice, { from: alice })
 
       const stakeAfter = await troveManager.getTroveStake(alice)
-      const totalStakesAfter = await troveManager.totalStakes();
+      const totalStakesAfter = await rewards.totalStakes();
 
       assert.isTrue(stakeAfter.eq(stakeBefore.add(toBN(dec(1, 18)))))
       assert.isTrue(totalStakesAfter.eq(totalStakesBefore.add(toBN(dec(1, 18)))))
@@ -2262,7 +2264,7 @@ contract('BorrowerOperations', async accounts => {
       await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: alice } })
 
       const stakeBefore = await troveManager.getTroveStake(alice)
-      const totalStakesBefore = await troveManager.totalStakes();
+      const totalStakesBefore = await rewards.totalStakes();
       assert.isTrue(stakeBefore.gt(toBN('0')))
       assert.isTrue(totalStakesBefore.gt(toBN('0')))
 
@@ -2270,7 +2272,7 @@ contract('BorrowerOperations', async accounts => {
       await borrowerOperations.adjustTrove(0, dec(500, 'finney'), dec(50, 18), false, alice, alice, { from: alice })
 
       const stakeAfter = await troveManager.getTroveStake(alice)
-      const totalStakesAfter = await troveManager.totalStakes();
+      const totalStakesAfter = await rewards.totalStakes();
 
       assert.isTrue(stakeAfter.eq(stakeBefore.sub(toBN(dec(5, 17)))))
       assert.isTrue(totalStakesAfter.eq(totalStakesBefore.sub(toBN(dec(5, 17)))))
@@ -2595,8 +2597,8 @@ contract('BorrowerOperations', async accounts => {
       await priceFeed.setPrice(dec(100, 18))
 
       // Get Alice's pending reward snapshots 
-      const L_COLL_A_Snapshot = (await troveManager.rewardSnapshots(alice))[0]
-      const L_LUSDDebt_A_Snapshot = (await troveManager.rewardSnapshots(alice))[1]
+      const L_COLL_A_Snapshot = (await rewards.rewardSnapshots(alice))[0]
+      const L_LUSDDebt_A_Snapshot = (await rewards.rewardSnapshots(alice))[1]
       assert.isTrue(L_COLL_A_Snapshot.gt(toBN('0')))
       assert.isTrue(L_LUSDDebt_A_Snapshot.gt(toBN('0')))
 
@@ -2605,8 +2607,8 @@ contract('BorrowerOperations', async accounts => {
       assert.isFalse(await sortedTroves.contains(carol))
 
       // Get Alice's pending reward snapshots after Carol's liquidation. Check above 0
-      const L_COLL_Snapshot_A_AfterLiquidation = (await troveManager.rewardSnapshots(alice))[0]
-      const L_LUSDDebt_Snapshot_A_AfterLiquidation = (await troveManager.rewardSnapshots(alice))[1]
+      const L_COLL_Snapshot_A_AfterLiquidation = (await rewards.rewardSnapshots(alice))[0]
+      const L_LUSDDebt_Snapshot_A_AfterLiquidation = (await rewards.rewardSnapshots(alice))[1]
 
       assert.isTrue(L_COLL_Snapshot_A_AfterLiquidation.gt(toBN('0')))
       assert.isTrue(L_LUSDDebt_Snapshot_A_AfterLiquidation.gt(toBN('0')))
@@ -2620,8 +2622,8 @@ contract('BorrowerOperations', async accounts => {
       await borrowerOperations.closeTrove({ from: alice })
 
       // Check Alice's pending reward snapshots are zero
-      const L_COLL_Snapshot_A_afterAliceCloses = (await troveManager.rewardSnapshots(alice))[0]
-      const L_LUSDDebt_Snapshot_A_afterAliceCloses = (await troveManager.rewardSnapshots(alice))[1]
+      const L_COLL_Snapshot_A_afterAliceCloses = (await rewards.rewardSnapshots(alice))[0]
+      const L_LUSDDebt_Snapshot_A_afterAliceCloses = (await rewards.rewardSnapshots(alice))[1]
 
       assert.equal(L_COLL_Snapshot_A_afterAliceCloses, '0')
       assert.equal(L_LUSDDebt_Snapshot_A_afterAliceCloses, '0')
@@ -2719,7 +2721,7 @@ contract('BorrowerOperations', async accounts => {
       assert.isTrue(bobStakeBefore.gt('0'))
       assert.isTrue(dennisStakeBefore.gt('0'))
 
-      const totalStakesBefore = await troveManager.totalStakes()
+      const totalStakesBefore = await rewards.totalStakes()
 
       assert.isTrue(totalStakesBefore.eq(aliceStakeBefore.add(bobStakeBefore).add(dennisStakeBefore)))
 
@@ -2731,7 +2733,7 @@ contract('BorrowerOperations', async accounts => {
 
       // Check stake and total stakes get updated
       const aliceStakeAfter = await getTroveStake(alice)
-      const totalStakesAfter = await troveManager.totalStakes()
+      const totalStakesAfter = await rewards.totalStakes()
 
       assert.equal(aliceStakeAfter, 0)
       assert.isTrue(totalStakesAfter.eq(totalStakesBefore.sub(aliceStakeBefore)))
@@ -2820,11 +2822,11 @@ contract('BorrowerOperations', async accounts => {
       await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: carol } })
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
-      const alice_rewardSnapshot_Before = await troveManager.rewardSnapshots(alice)
+      const alice_rewardSnapshot_Before = await rewards.rewardSnapshots(alice)
       const alice_CollateralrewardSnapshot_Before = alice_rewardSnapshot_Before[0]
       const alice_LUSDDebtRewardSnapshot_Before = alice_rewardSnapshot_Before[1]
 
-      const bob_rewardSnapshot_Before = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot_Before = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot_Before = bob_rewardSnapshot_Before[0]
       const bob_LUSDDebtRewardSnapshot_Before = bob_rewardSnapshot_Before[1]
 
@@ -2840,8 +2842,8 @@ contract('BorrowerOperations', async accounts => {
       assert.isAtMost(th.getDifference(defaultPool_Collateral, liquidatedColl_C), 100)
       assert.isAtMost(th.getDifference(defaultPool_LUSDDebt, liquidatedDebt_C), 100)
 
-      const pendingCollReward_A = await troveManager.getPendingCollateralReward(alice)
-      const pendingDebtReward_A = await troveManager.getPendingLUSDDebtReward(alice)
+      const pendingCollReward_A = await rewards.getPendingCollateralReward(alice)
+      const pendingDebtReward_A = await rewards.getPendingLUSDDebtReward(alice)
       assert.isTrue(pendingCollReward_A.gt('0'))
       assert.isTrue(pendingDebtReward_A.gt('0'))
 
@@ -3576,7 +3578,7 @@ contract('BorrowerOperations', async accounts => {
 
     it("openTrove(): creates a stake and adds it to total stakes", async () => {
       const aliceStakeBefore = await getTroveStake(alice)
-      const totalStakesBefore = await troveManager.totalStakes()
+      const totalStakesBefore = await rewards.totalStakes()
 
       assert.equal(aliceStakeBefore, '0')
       assert.equal(totalStakesBefore, '0')
@@ -3587,7 +3589,7 @@ contract('BorrowerOperations', async accounts => {
       assert.isTrue(aliceCollAfter.gt(toBN('0')))
       assert.isTrue(aliceStakeAfter.eq(aliceCollAfter))
 
-      const totalStakesAfter = await troveManager.totalStakes()
+      const totalStakesAfter = await rewards.totalStakes()
 
       assert.isTrue(totalStakesAfter.eq(aliceStakeAfter))
     })
@@ -3642,8 +3644,8 @@ contract('BorrowerOperations', async accounts => {
       /* with total stakes = 10 ether, after liquidation, L_COLL should equal 1/10 ether per-ether-staked,
        and L_LUSD should equal 18 LUSD per-ether-staked. */
 
-      const L_COLL = await troveManager.L_COLL()
-      const L_LUSD = await troveManager.L_LUSDDebt()
+      const L_COLL = await rewards.L_Coll()
+      const L_LUSD = await rewards.L_LUSDDebt()
 
       assert.isTrue(L_COLL.gt(toBN('0')))
       assert.isTrue(L_LUSD.gt(toBN('0')))
@@ -3654,7 +3656,7 @@ contract('BorrowerOperations', async accounts => {
       tcr = await troveManager.getTCR(await priceFeed.getPrice())
 
       // Check Bob's snapshots of L_COLL and L_LUSD equal the respective current values
-      const bob_rewardSnapshot = await troveManager.rewardSnapshots(bob)
+      const bob_rewardSnapshot = await rewards.rewardSnapshots(bob)
       const bob_CollateralrewardSnapshot = bob_rewardSnapshot[0]
       const bob_LUSDDebtRewardSnapshot = bob_rewardSnapshot[1]
 

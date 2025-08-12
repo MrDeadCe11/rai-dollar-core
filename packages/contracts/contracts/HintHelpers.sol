@@ -3,6 +3,7 @@
 pragma solidity 0.6.11;
 
 import "./Interfaces/ITroveManager.sol";
+import "./Interfaces/IRewards.sol";
 import "./Interfaces/ISortedTroves.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
@@ -15,12 +16,14 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     ISortedTroves public sortedTroves;
     ISortedTroves public sortedShieldedTroves;
     ITroveManager public troveManager;
+    IRewards public rewards;
 
     // --- Events ---
 
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event SortedShieldedTrovesAddressChanged(address _sortedShieldedTrovesAddress);
     event TroveManagerAddressChanged(address _troveManagerAddress);
+    event RewardsAddressChanged(address _rewardsAddress);
     event RelayerAddressChanged(address _relayerAddress);
 
     struct HintLocals {
@@ -40,6 +43,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         address _sortedTrovesAddress,
         address _sortedShieldedTrovesAddress,
         address _troveManagerAddress,
+        address _rewardsAddress,
         address _relayerAddress
     )
         external
@@ -48,16 +52,19 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         checkContract(_sortedTrovesAddress);
         checkContract(_sortedShieldedTrovesAddress);
         checkContract(_troveManagerAddress);
+        checkContract(_rewardsAddress);
         checkContract(_relayerAddress);
 
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
         troveManager = ITroveManager(_troveManagerAddress);
+        rewards = IRewards(_rewardsAddress);
         relayer = IRelayer(_relayerAddress);
 
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit SortedShieldedTrovesAddressChanged(_sortedShieldedTrovesAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
+        emit RewardsAddressChanged(_rewardsAddress);
         emit RelayerAddressChanged(_relayerAddress);
 
         _renounceOwnership();
@@ -129,7 +136,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     uint maxRedeemableLUSD = LiquityMath._min(remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
 
                     uint ETH = troveManager.getTroveColl(currentTroveuser)
-                        .add(troveManager.getPendingCollateralReward(currentTroveuser));
+                        .add(rewards.getPendingCollateralReward(currentTroveuser));
 
                     uint newColl = ETH.sub(maxRedeemableLUSD.mul(par).div(_price));
                     uint newDebt = netLUSDDebt.sub(maxRedeemableLUSD);
@@ -231,7 +238,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     uint maxRedeemableLUSD = LiquityMath._min(vars.remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
 
                     uint coll = troveManager.getTroveColl(who)
-                        .add(troveManager.getPendingCollateralReward(who));
+                        .add(rewards.getPendingCollateralReward(who));
 
                     uint newColl = coll.sub(maxRedeemableLUSD.mul(vars.par).div(_price));
                     uint newDebt = netLUSDDebt.sub(maxRedeemableLUSD);
