@@ -1699,7 +1699,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const txB = await stabilityPool.withdrawFromSP(dec(1e9, 18), { from: bob })
       const txC = await stabilityPool.withdrawFromSP(dec(2e9, 18), { from: carol })
       const txD = await stabilityPool.withdrawFromSP(dec(3e9, 18), { from: dennis })
-      .toString()
+
       // V1 comment
       /* Expect depositors to withdraw 1% of their initial deposit, and an ETH gain 
       in proportion to their initial deposit:
