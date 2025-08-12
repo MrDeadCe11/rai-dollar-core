@@ -679,7 +679,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         return stake;
     }
     function redistributeDebtAndColl(uint _debt, uint _coll) external override {
-        // requirecallerisliq
+        _requireCallerIsLiquidations();
         _redistributeDebtAndColl(activePool, defaultPool, _debt, _coll);
     }
     // norm debt

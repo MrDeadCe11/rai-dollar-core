@@ -230,8 +230,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
   })
 
   describe('ActivePool', async accounts => {
-    // sendETH
-    it("sendETH(): reverts when called by an account that is not BO nor TroveM nor SP", async () => {
+    it("sendCollateral(): reverts when called by an account that is not BO nor TroveM nor SP", async () => {
       // Attempt call from alice
       try {
         const txAlice = await activePool.sendCollateral(alice, 100, { from: alice })

@@ -189,7 +189,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyStaking.stake(dec(100, 18), {from: A})
 
     // Check LUSD fee per unit staked is zero
-    const F_LUSD_Before = await lqtyStaking.F_Collateral()
+    const F_LUSD_Before = await lqtyStaking.F_LUSD()
     assert.equal(F_LUSD_Before, '0')
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)

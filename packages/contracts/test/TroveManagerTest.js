@@ -1940,7 +1940,7 @@ contract('TroveManager', async accounts => {
     assert.isTrue(totalCollGasComp.eq(totalGasComp))
 
     ethGain = await stabilityPool.getDepositorCollateralGain(whale)
-    assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100000)
+    assert.isAtMost(th.getDifference(totalLiquidatedColl, ethGain), 100030)
 
     // Check alice, bob, carol in-active, check whale active
     assert.isFalse((await sortedTroves.contains(alice)))

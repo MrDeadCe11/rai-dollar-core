@@ -1284,7 +1284,6 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     //Carol  withdraws 1 ETH from her trove
     const C_withdrawnColl = toBN(dec(1, 'ether'))
-    await collateralToken.approve(activePool.address, C_withdrawnColl, { from: carol })
     await borrowerOperations.withdrawColl(C_withdrawnColl, carol, carol, { from: carol })
 
     const B_collAfterL1 = B_coll.add(B_pendingRewardsAfterL1).add(B_addedColl)

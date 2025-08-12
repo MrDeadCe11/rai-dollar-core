@@ -35,7 +35,7 @@ contract('TroveManager', async accounts => {
   let collSurplusPool
   let defaultPool
   let borrowerOperations
-  let hintHelpers
+  let liquidations
   let collateralToken
 
   let contracts

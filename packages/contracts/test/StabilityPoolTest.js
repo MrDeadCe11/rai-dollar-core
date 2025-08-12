@@ -3261,7 +3261,7 @@ contract('StabilityPool', async accounts => {
       //"BorrowerOps: An operation that would result in ICR < MCR is not permitted")
       const aliceTrove_After = await troveManager.Troves(alice)
       const aliceTrove_Collateral_After = aliceTrove_After[1]
-      assert.isTrue(aliceTrove_Collateral_After.gt(aliceTrove_Collateral_Before.gt))
+      assert.isTrue(aliceTrove_Collateral_After.gt(aliceTrove_Collateral_Before))
     })
 
     it("withdrawCollateralGainToTrove(): Subsequent deposit and withdrawal attempt from same account, with no intermediate liquidations, withdraws zero Collateral", async () => {

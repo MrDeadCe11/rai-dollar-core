@@ -11,9 +11,9 @@ interface IActivePool is IPool {
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolLUSDDebtUpdated(uint _LUSDDebt);
-    event ActivePoolETHBalanceUpdated(uint _ETH);
+    event ActivePoolCollateralBalanceUpdated(uint _collateral);
 
     // --- Functions ---
     function collateralToken() external view returns (IERC20);
-    function sendETH(address _account, uint _amount) external;
+    function sendCollateral(address _account, uint _amount) external;
 }

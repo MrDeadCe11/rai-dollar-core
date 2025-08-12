@@ -18,6 +18,7 @@ contract('Pool Manager: Sum-Product rounding errors', async accounts => {
   let priceFeed
   let lusdToken
   let stabilityPool
+  let liquidations
   let troveManager
   let borrowerOperations
 
@@ -29,7 +30,8 @@ contract('Pool Manager: Sum-Product rounding errors', async accounts => {
     stabilityPool = contracts.stabilityPool
     troveManager = contracts.troveManager
     borrowerOperations = contracts.borrowerOperations
-
+    liquidations = contracts.liquidations
+    
     const contractAddresses = getAddresses(contracts)
     await connectContracts(contracts, contractAddresses)
   })

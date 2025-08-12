@@ -48,6 +48,7 @@ contract('SortedTroves', async accounts => {
   let troveManager
   let borrowerOperations
   let lusdToken
+  let liquidations
   let collateralToken
 
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
@@ -75,6 +76,7 @@ contract('SortedTroves', async accounts => {
       borrowerOperations = contracts.borrowerOperations
       lusdToken = contracts.lusdToken
       collateralToken = contracts.collateralToken
+      liquidations = contracts.liquidations
       await th.mintCollateralTokensAndApproveActivePool(contracts, [
         owner,
         alice, bob, carol, dennis, erin, flyn, graham, harriet, ida,

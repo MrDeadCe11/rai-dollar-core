@@ -81,6 +81,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function sendCollateralToActivePool(uint _amount) external override {
         _requireCallerIsTMorLiquidations();
+        if (_amount > 0) {
         IActivePool activePool = IActivePool(activePoolAddress);
         CT = CT.sub(_amount);
         emit DefaultPoolCollateralBalanceUpdated(CT);
@@ -90,6 +91,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         collateralToken.transfer(activePoolAddress, _amount);
         // process collateral increase
         activePool.processCollateralIncrease(_amount);
+        }
     }
 
     function addCollateral(address _account, uint _amount) external override {
@@ -138,7 +140,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         require(
             msg.sender == troveManagerAddress ||
             msg.sender == activePoolAddress,
-            "DefaultPool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
+            "DefaultPool: Caller is neither TM nor ActivePool");
     }
 
 }

@@ -10,7 +10,4 @@ contract ActivePoolTester is ActivePool {
         LUSDDebt  = LUSDDebt.add(_amount);
     }
 
-    function unprotectedPayable() external payable {
-        CT = CT.add(msg.value);
-    }
 }

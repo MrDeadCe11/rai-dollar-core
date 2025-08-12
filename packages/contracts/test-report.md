@@ -638,7 +638,7 @@ issuance fraction after: 949066037374286
     ✓ sendETH(): decreases the recorded ETH balance by the correct amount
 
   Contract: DefaultPool
-    ✓ getCollateral(): gets the recorded LUSD balance
+    ✓ getCollateral(): gets the recorded Collateral balance
     ✓ getLUSDDebt(): gets the recorded LUSD balance
     ✓ increaseLUSD(): increases the recorded LUSD balance by the correct amount
     ✓ decreaseLUSD(): decreases the recorded LUSD balance by the correct amount (57ms)

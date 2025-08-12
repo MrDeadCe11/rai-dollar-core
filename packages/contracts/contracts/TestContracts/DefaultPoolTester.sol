@@ -10,7 +10,4 @@ contract DefaultPoolTester is DefaultPool {
         LUSDDebt  = LUSDDebt.add(_amount);
     }
 
-    function unprotectedPayable() external payable {
-        CT = CT.add(msg.value);
-    }
 }

@@ -102,7 +102,10 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         emit CollateralSent(_account, _amount);
         
         // transfer collateral to account
-        collateralToken.transfer(_account, _amount);
+        require(
+            collateralToken.transfer(_account, _amount),
+            "ActivePool: Collateral transfer failed"
+        );
         
         // process collateral increase if address is a pool
         if (_isPool(_account)) {
@@ -120,20 +123,23 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         _requireCallerIsBOorTroveMorSPorDefaultPool();
         CT = CT.add(_amount);
 
-        collateralToken.transferFrom(_account, address(this), _amount);
+        require(
+            collateralToken.transferFrom(_account, address(this), _amount),
+            "ActivePool: Collateral transfer failed"
+        );
         emit ActivePoolCollateralBalanceUpdated(CT);
     }
 
     function increaseLUSDDebt(uint _amount) external override {
         _requireCallerIsBOorTroveM();
         LUSDDebt  = LUSDDebt.add(_amount);
-        ActivePoolLUSDDebtUpdated(LUSDDebt);
+        emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
         LUSDDebt = LUSDDebt.sub(_amount);
-        ActivePoolLUSDDebtUpdated(LUSDDebt);
+        emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function _isPool(address _pool) internal view returns (bool) {
@@ -180,6 +186,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // receive() external payable {
     //     _requireCallerIsBorrowerOperationsOrDefaultPool();
     //     ETH = ETH.add(msg.value);
-    //     emit ActivePoolETHBalanceUpdated(ETH);
+    //     emit ActivePoolCollateralBalanceUpdated(ETH);
     // }
 }

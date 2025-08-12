@@ -51,7 +51,7 @@ contract('BorrowerWrappers', async accounts => {
   let activePool
   let stabilityPool
   let defaultPool
-  let cdefaulter_1ollSurplusPool
+  let collSurplusPool
   let borrowerOperations
   let borrowerWrappers
   let lqtyTokenOriginal
@@ -260,15 +260,7 @@ contract('BorrowerWrappers', async accounts => {
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price);
 
-    console.log("Status", (await troveManager.getTroveStatus(defaulter_1)).toString())
-    console.log("Trove", (await troveManager.Troves(defaulter_1))[3].toString())
 
-    console.log("troveManager.address", contracts.troveManager.address)
-    console.log("liquidations.troveManager.address", (await contracts.liquidations.troveManager()))
-    //console.log("bo.troveManager.address", (await contracts.borrowerOperations.troveManager()))
-
-    s = await liquidations.getTroveStatus(defaulter_1);
-    console.log("troveStatus in liquidations", s.toString())
     // Defaulter trove closed
     const liquidationTX_1 = await liquidations.liquidate(defaulter_1, { from: owner })
     //const liquidationTX_1 = await liquidations.liquidate(defaulter_1)
@@ -312,8 +304,8 @@ contract('BorrowerWrappers', async accounts => {
    
     const totalDepositsWithDrip = totalDeposits.add(spLUSDGain)
 
-    const compoundedLUSDDeposit_A_1 = await stabilityPool.getCompoundedLUSDDeposit.skip(alice)
-    const compoundedLUSDDeposit_whale_1 = await stabilityPool.getCompoundedLUSDDeposit.skip(whale)
+    const compoundedLUSDDeposit_A_1 = await stabilityPool.getCompoundedLUSDDeposit(alice)
+    const compoundedLUSDDeposit_whale_1 = await stabilityPool.getCompoundedLUSDDeposit(whale)
     //console.log("aliceDepositWithDrip", aliceDepositWithDrip.toString())
     //console.log("compoundedLUSDDeposit_A_1", compoundedLUSDDeposit_A_1.toString())
 
@@ -340,7 +332,7 @@ contract('BorrowerWrappers', async accounts => {
     const totalDepositsWithDripLiq = totalDepositsWithDrip.add(spLUSDGainLiq)
 
     console.log("totalDepositsWithDripLiq", totalDepositsWithDripLiq.toString())
-    const totalDepositsBeforeClaim = (await stabilityPool.getCompoundedLUSDDeposit.skip(alice)).add(await stabilityPool.getCompoundedLUSDDeposit.skip(whale)) 
+    const totalDepositsBeforeClaim = (await stabilityPool.getCompoundedLUSDDeposit(alice)).add(await stabilityPool.getCompoundedLUSDDeposit(whale)) 
     console.log("totalLUSDDeposits", totalDepositsBeforeClaim.toString())
 
 
@@ -348,7 +340,7 @@ contract('BorrowerWrappers', async accounts => {
     const expectedLUSDLoss_A = liquidatedDebt_1.mul(aliceDepositWithDripLiq).div(totalDepositsWithDripLiq)
 
     const expectedCompoundedLUSDDeposit_A = aliceFinalDeposit
-    const compoundedLUSDDeposit_A = await stabilityPool.getCompoundedLUSDDeposit.skip(alice)
+    const compoundedLUSDDeposit_A = await stabilityPool.getCompoundedLUSDDeposit(alice)
 
     // collateral * 150 / 2500 * 0.995
     //const expectedETHGain_A = collateral.mul(aliceDeposit).div(totalDeposits).mul(toBN(dec(995, 15))).div(mv._1e18BN)
@@ -686,7 +678,7 @@ contract('BorrowerWrappers', async accounts => {
     const lqtyBalanceAfter = await lqtyToken.balanceOf(alice)
     const ICRAfter = await troveManager.getCurrentICR(alice, price)
     const depositAfter = (await stabilityPool.deposits(alice))[0]
-    const compoundDepositAfter = await stabilityPool.getCompoundedLUSDDeposit.skip(alice)
+    const compoundDepositAfter = await stabilityPool.getCompoundedLUSDDeposit(alice)
     const stakeAfter = await lqtyStaking.stakes(alice)
 
     // check proxy balances remain the same

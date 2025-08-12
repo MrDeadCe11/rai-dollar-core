@@ -36,6 +36,7 @@ contract('StabilityPool - Small Liquidation', async accounts => {
   let lqtyToken
   let communityIssuanceTester
   let collateralToken
+  let liquidations
 
   let communityLQTYSupply
   let issuance_M1

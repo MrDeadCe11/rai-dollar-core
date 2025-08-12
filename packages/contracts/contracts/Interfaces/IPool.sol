@@ -7,7 +7,7 @@ interface IPool {
     
     // --- Events ---
     
-    event ETHBalanceUpdated(uint _newBalance);
+    event CollateralBalanceUpdated(uint _newBalance);
     event LUSDBalanceUpdated(uint _newBalance);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
     event DefaultPoolAddressChanged(address _newDefaultPoolAddress);
@@ -20,8 +20,8 @@ interface IPool {
 
     function getLUSDDebt() external view returns (uint);
 
-    function addCollateral(address _account, uint _amount) external;
-    
+    function addCollateral(address _account, uint256 _amount) external;
+
     function increaseLUSDDebt(uint _amount) external;
 
     function decreaseLUSDDebt(uint _amount) external;

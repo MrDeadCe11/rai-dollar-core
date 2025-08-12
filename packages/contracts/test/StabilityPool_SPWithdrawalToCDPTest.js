@@ -1,4 +1,4 @@
-const { copySync } = require("fs-extra")
+
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
@@ -46,6 +46,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
   let activePool
   let stabilityPool
   let defaultPool
+  let liquidations
   let borrowerOperations
   let collateralToken
 
