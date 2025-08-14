@@ -144,6 +144,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     struct SingleRedemptionValues {
         uint LUSDLot;
         uint collateralLot;
+        uint fee;
+        uint256 newDebt;
+        uint256 newColl;
         bool cancelledPartial;
     }
 
@@ -265,7 +268,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint _maxLUSDamount,
         uint _price,
         uint _par,
-        RedemptionHints memory hints
+        RedemptionHints memory hints,
+        uint _maxFeePercentage
     )
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
@@ -276,49 +280,56 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
 
+        // subtract fee from collateralLot so fee remains in trove
+        singleRedemption.fee = aggregator.getRedemptionFee(singleRedemption.collateralLot);
+
+        _requireUserAcceptsFee(singleRedemption.fee, singleRedemption.collateralLot, _maxFeePercentage);
+
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.fee);
+
         uint normDebt = _normalizedDebt(singleRedemption.LUSDLot);
         if (normDebt.mul(accumulatedRate).div(RATE_PRECISION) < _actualDebt(singleRedemption.LUSDLot)) {
             normDebt += 1;
         }
 
         // Decrease the debt and collateral of the current Trove according to the LUSD lot and corresponding collateral to send
-        uint newDebt = (Troves[_borrower].debt).sub(normDebt);
-        uint newColl = (Troves[_borrower].coll).sub(singleRedemption.collateralLot);
+        singleRedemption.newDebt = (Troves[_borrower].debt).sub(normDebt);
+        singleRedemption.newColl = (Troves[_borrower].coll).sub(singleRedemption.collateralLot);
 
         // Change from eq to lte
         // since sub of normalized debt above could make 1 wei less
         // and actualDebt can also round down
         //if (_actualDebt(newDebt).sub(1) <= LUSD_GAS_COMPENSATION) {
-        if (_actualDebt(newDebt) <= LUSD_GAS_COMPENSATION) {
+        if (_actualDebt(singleRedemption.newDebt) <= LUSD_GAS_COMPENSATION) {
             // No debt left in the Trove (except for the liquidation reserve), therefore the trove gets closed
             _removeStake(_borrower);
             _closeTrove(_borrower, Status.closedByRedemption);
-            _redeemCloseTrove(_contractsCache, _borrower, LUSD_GAS_COMPENSATION, newColl);
+            _redeemCloseTrove(_contractsCache, _borrower, LUSD_GAS_COMPENSATION, singleRedemption.newColl);
             emit TroveUpdated(_borrower, 0, 0, 0, TroveManagerOperation.redeemCollateral);
 
         } else {
-            uint newNICR = LiquityMath._computeNominalCR(newColl, newDebt);
+            uint newNICR = LiquityMath._computeNominalCR(singleRedemption.newColl, singleRedemption.newDebt);
             /*
             * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
             * certainly result in running out of gas. 
             *
             * If the resultant net debt of the partial is less than the minimum, net debt we bail.
             */
-            if (newNICR != hints.partialNICR || _getNetDebt(_actualDebt(newDebt)) < MIN_NET_DEBT) {
-                //emit PartialNicr(_borrower, newNICR, _actualDebt(newDebt));
+            if (newNICR != hints.partialNICR || _getNetDebt(_actualDebt(singleRedemption.newDebt)) < MIN_NET_DEBT) {
+                //emit PartialNicr(_borrower, newNICR, _actualDebt(singleRedemption.newDebt));
                 singleRedemption.cancelledPartial = true;
                 return singleRedemption;
             }
 
             _contractsCache.sortedTroves.reInsert(_borrower, newNICR, hints.upperHint, hints.lowerHint);
 
-            Troves[_borrower].debt = newDebt;
-            Troves[_borrower].coll = newColl;
+            Troves[_borrower].debt = singleRedemption.newDebt;
+            Troves[_borrower].coll = singleRedemption.newColl;
             _updateStakeAndTotalStakes(_borrower);
 
             emit TroveUpdated(
                 _borrower,
-                newDebt, newColl,
+                singleRedemption.newDebt, singleRedemption.newColl,
                 Troves[_borrower].stake,
                 TroveManagerOperation.redeemCollateral
             );
@@ -446,8 +457,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             address nextUserToCheck = contractsCache.sortedTroves.getPrev(currentBorrower);
 
             _applyPendingRewards(contractsCache.activePool, contractsCache.defaultPool, currentBorrower);
-
-
+            
             hints = RedemptionHints(_upperPartialRedemptionHint,
                                     _lowerPartialRedemptionHint,
                                     _partialRedemptionHintNICR);
@@ -458,13 +468,15 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 totals.remainingLUSD,
                 totals.price,
                 totals.par,
-                hints
+                hints,
+                _maxFeePercentage
             );
 
             if (singleRedemption.cancelledPartial) break; // Partial redemption was cancelled (out-of-date hint, or new net debt < minimum), therefore we could not redeem from the last Trove
 
             totals.totalLUSDToRedeem  = totals.totalLUSDToRedeem.add(singleRedemption.LUSDLot);
             totals.totalCollateralDrawn = totals.totalCollateralDrawn.add(singleRedemption.collateralLot);
+            totals.collateralFee = totals.collateralFee.add(singleRedemption.fee);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
             currentBorrower = nextUserToCheck;
@@ -476,14 +488,14 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Use the saved total LUSD supply value, from before it was reduced by the redemption.
         aggregator.updateBaseRateFromRedemption(totals.totalCollateralDrawn, totals.price, totals.par, totals.totalLUSDSupplyAtStart);
 
-        // Calculate the Collateral fee
-        totals.collateralFee = aggregator.getRedemptionFee(totals.totalCollateralDrawn);
+        // // Calculate the Collateral fee
+        // totals.collateralFee = aggregator.getRedemptionFee(totals.totalCollateralDrawn);
 
-        _requireUserAcceptsFee(totals.collateralFee, totals.totalCollateralDrawn, _maxFeePercentage);
+        // _requireUserAcceptsFee(totals.collateralFee, totals.totalCollateralDrawn, _maxFeePercentage);
 
-        // Send the collateral fee to the LQTY staking contract
-        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.collateralFee);
-        contractsCache.lqtyStaking.increaseF_Collateral(totals.collateralFee);
+        // // Send the collateral fee to the LQTY staking contract
+        // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.collateralFee);
+        // contractsCache.lqtyStaking.increaseF_Collateral(totals.collateralFee);
 
         totals.collateralToSendToRedeemer = totals.totalCollateralDrawn.sub(totals.collateralFee);
 
