@@ -54,6 +54,8 @@ interface IRewards is ILiquityBase {
 
     function resetTroveRewardSnapshots(address _borrower) external;
 
+    function getPendingRewards(address _borrower) external view returns (uint, uint, uint, uint);
+
     function getPendingCollateralReward(address _borrower) external view returns (uint);
     function getPendingBaseCollateralReward(address _borrower) external view returns (uint);
     function getPendingShieldedCollateralReward(address _borrower) external view returns (uint);

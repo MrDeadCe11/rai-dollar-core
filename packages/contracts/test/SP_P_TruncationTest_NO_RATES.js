@@ -28,6 +28,7 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   let lusdToken
   let stabilityPool
   let activePool
+  let activeShieldedPool
   let sortedTroves
   let troveManager
   let borrowerOperations
@@ -61,6 +62,7 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
       lusdToken = contracts.lusdToken
       stabilityPool = contracts.stabilityPool
       activePool = contracts.activePool
+      activeShieldedPool = contracts.activeShieldedPool
       sortedTroves = contracts.sortedTroves
       liquidations = contracts.liquidations
       troveManager = contracts.troveManager
@@ -80,7 +82,7 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
       const kickbackRate_F2 = toBN(dec(80, 16)) // F2 kicks 80% back to depositor
       const kickbackRate_F3 = toBN(dec(1, 18)) // F2 kicks 100% back to depositor
 
-      await th.mintCollateralTokensAndApproveActivePool(contracts, [owner,
+      await th.batchMintCollateralTokensAndApproveActivePool(contracts, [owner,
         whale,
         A, B, C, D, E, F, F1, F2, F3
       ], dec(100, 24))
@@ -91,14 +93,14 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
     })
  
   it("1. Liquidation succeeds after P reduced by a factor of 1e18", async () => {
-    // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }
@@ -160,13 +162,13 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   it("2. New deposits can be made after P reduced by a factor of 1e18", async () => {
     // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
     await collateralToken.approve(activePool.address, dec(1e8, 'ether'), { from: whale })
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }
@@ -227,13 +229,13 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   it("3. Liquidation succeeds after P reduced by a factwor of 1e18 and liquidation has newProductFactor == 1e9", async () => {
     // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
     await collateralToken.approve(activePool.address, dec(1e8, 'ether'), { from: whale })
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }
@@ -319,13 +321,13 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   it("4. Liquidation succeeds when P reduced by a factwor of 1e18 and liquidation has newProductFactor > 1e9", async () => {
     // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
     await collateralToken.approve(activePool.address, dec(1e8, 'ether'), { from: whale })
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }
@@ -413,13 +415,13 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   it("5. Depositor have correct depleted stake after deposit when P reduced by a factwor of 1e18 and scale changing liq (with newProductFactor == 1e9)", async () => {
     // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
     await collateralToken.approve(activePool.address, dec(1e8, 'ether'), { from: whale })
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }
@@ -513,13 +515,13 @@ contract('StabilityPool Scale Factor issue tests', async accounts => {
   it("6. Depositor have correct depleted stake after deposit when P reduced by a factwor of 1e18 and scale changing liq (with newProductFactor > 1e9)", async () => {
     // Whale opens Trove with 1e8 ETH and sends 5e9 LUSD to A
     await collateralToken.approve(activePool.address, dec(1e8, 'ether'), { from: whale })
-    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, { from: whale })
+    await borrowerOperations.openTrove(dec(1e8, 'ether'), await getOpenTroveLUSDAmount(dec(1e10, 18)), whale, whale, false, { from: whale })
     await lusdToken.transfer(A, dec(5e9, 18), {from: whale})
 
     // Open 3 Troves with 1e9 LUSD debt
     for (account of [A, B, C]) {
       await collateralToken.approve(activePool.address, dec(1e7, 'ether'), { from: account })
-      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, {from: account })
+      await borrowerOperations.openTrove(dec(1e7, 'ether'), await getLUSDAmountForDesiredDebt(1e9), account, account, false, {from: account })
       //assert.isTrue((await th.getTroveEntireDebt(contracts, account)).eq(th.toBN(dec(1e9, 18))))
       assert.isAtMost(th.getDifference(await th.getTroveEntireDebt(contracts, account), toBN(dec(1e9, 18))), 1)
     }

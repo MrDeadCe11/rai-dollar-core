@@ -1,3 +1,4 @@
+// TODO update these sets with address changes
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 
 contract('Deployment script - Sets correct contract addresses dependencies after deployment', async accounts => {
@@ -246,15 +247,6 @@ contract('Deployment script - Sets correct contract addresses dependencies after
     const recordedDefaultPoolAddress = await borrowerOperations.defaultPool()
     assert.equal(defaultPoolAddress, recordedDefaultPoolAddress)
   })
-
-  // LQTY Staking in BO
-  it('Sets the correct LQTYStaking address in BorrowerOperations', async () => {
-    const lqtyStakingAddress = lqtyStaking.address
-
-    const recordedLQTYStakingAddress = await borrowerOperations.lqtyStakingAddress()
-    assert.equal(lqtyStakingAddress, recordedLQTYStakingAddress)
-  })
-
 
   // --- LQTY Staking ---
 

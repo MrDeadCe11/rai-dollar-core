@@ -34,38 +34,15 @@ interface IBorrowerOperations is ILiquityBase {
 
     // --- Functions ---
 
-    /*
-    function setAddresses(
-        address _troveManagerAddress,
-        address _rewardsAddress,
-        address _activePoolAddress,
-        address _activeShieldedPoolAddress,
-        address _defaultPoolAddress,
-        address _defaultShieldedPoolAddress,
-        address _stabilityPoolAddress,
-        address _gasPoolAddress,
-        address _collSurplusPoolAddress,
-        address _priceFeedAddress,
-        address _sortedTrovesAddress,
-        address _sortedShieldedTrovesAddress,
-        address _lusdTokenAddress,
-        address _lqtyStakingAddress,
-        address _relayerAddress,
-        address _collateralTokenAddress
-    ) external;
-    */
-
    function setAddresses(address[] memory addresses) external;
 
     function collateralToken() external view returns (IERC20);
 
-    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
+    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external;
 
-    function openShieldedTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
+    function shieldTrove(address _upperHint, address _lowerHint) external;
 
-    function shieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
-
-    function unShieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
+    function unShieldTrove(address _upperHint, address _lowerHint) external;
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
 
@@ -79,7 +56,7 @@ interface IBorrowerOperations is ILiquityBase {
 
     function closeTrove() external;
 
-    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external;
+    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, bool _toggleShield, address _upperHint, address _lowerHint) external;
 
     function claimCollateral() external returns (uint256);
 

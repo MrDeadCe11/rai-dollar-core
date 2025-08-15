@@ -57,6 +57,19 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
       await th.assertRevert(contract[method](...newParams, { from: owner }), message)
     }
   }
+  const testZeroAddressWithArray = async (contract, array, method = 'setAddresses', skip = 0) => {
+    await testWrongAddressWithArray(contract, array, th.ZERO_ADDRESS, method, skip, 'Account cannot be zero address')
+  }
+  const testNonContractAddressWithArray = async (contract, array, method = 'setAddresses', skip = 0) => {
+    await testWrongAddressWithArray(contract, array, bob, method, skip, 'Account code size cannot be zero')
+  }
+  const testWrongAddressWithArray = async (contract, array, address, method, skip, message) => {
+    for (let i = skip; i < array.length; i++) {
+      const newArray = [...array]
+      newArray[i] = address
+      await th.assertRevert(contract[method](newArray, { from: owner }), message)
+    }
+  }
 
   const testSetAddresses = async (contract, numberOfAddresses) => {
     const dumbContract = await MockERC20.new("test", "TEST")
@@ -76,34 +89,52 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
     // fails if called twice
     await th.assertRevert(contract.setAddresses(...params, { from: owner }))
   }
+  const testSetAddressesWithArray = async (contract, numberOfAddresses) => {
+    const dumbContract = await MockERC20.new("test", "TEST")
+    const array = Array(numberOfAddresses).fill(dumbContract.address)
+
+    // Attempt call from alice
+    await th.assertRevert(contract.setAddresses(array, { from: alice }))
+
+    // Attempt to use zero address
+    await testZeroAddressWithArray(contract, array)
+    // Attempt to use non contract
+    await testNonContractAddressWithArray(contract, array)
+
+    // Owner can successfully set any address
+    const txOwner = await contract.setAddresses(array, { from: owner })
+    assert.isTrue(txOwner.receipt.status)
+    // fails if called twice
+    await th.assertRevert(contract.setAddresses(array, { from: owner }))
+  }
 
   describe('TroveManager', async accounts => {
-    it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(troveManager, 15)
+    it("setAddresses(): reverts when called by non-owner, with wrong address array, or twice", async () => {
+      await testSetAddressesWithArray(troveManager, 19)
     })
   })
 
   describe('BorrowerOperations', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(borrowerOperations, 12)
+      await testSetAddressesWithArray(borrowerOperations, 15)
     })
   })
 
   describe('DefaultPool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(defaultPool, 4)
+      await testSetAddresses(defaultPool, 5)
     })
   })
 
   describe('StabilityPool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(stabilityPool, 9)
+      await testSetAddresses(stabilityPool, 11)
     })
   })
 
   describe('ActivePool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(activePool, 7)
+      await testSetAddresses(activePool, 8)
     })
   })
 

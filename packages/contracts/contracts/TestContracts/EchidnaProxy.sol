@@ -68,8 +68,8 @@ contract EchidnaProxy {
     }
 
     // Borrower Operations
-    function openTrovePrx(uint _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable {
-        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint);
+    function openTrovePrx(uint _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external payable {
+        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint, _redemptionShield);
     }
 
     function addCollPrx(uint _collateralToAdd, address _upperHint, address _lowerHint) external {
@@ -92,8 +92,8 @@ contract EchidnaProxy {
         borrowerOperations.closeTrove();
     }
 
-    function adjustTrovePrx(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, address _upperHint, address _lowerHint) external {
-        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, _isDebtIncrease, _upperHint, _lowerHint);
+    function adjustTrovePrx(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, bool _toggleShield, address _upperHint, address _lowerHint) external {
+        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, _isDebtIncrease, _toggleShield, _upperHint, _lowerHint);
     }
 
     // Pool Manager

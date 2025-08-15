@@ -85,6 +85,8 @@ interface ITroveManager is ILiquityBase {
 
     function shielded(address _borrower) external view returns (bool);
 
+    function createTrove(address _borrower, uint _nicr, address _upperHint, address _lowerHint, bool _redemptionShield) external;
+
     function shieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
 
     function unShieldTrove(address _borrower, address _upperHint, address _lowerHint) external;
@@ -110,8 +112,6 @@ interface ITroveManager is ILiquityBase {
         uint _maxIterations,
         uint _maxFee
     ) external; 
-
-    function addTroveOwnerToArray(address _borrower, bool _shielded) external returns (uint index);
 
     function getEntireDebtAndColl(address _borrower) external view returns (
         uint debt, 

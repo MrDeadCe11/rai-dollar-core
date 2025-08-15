@@ -1912,7 +1912,7 @@ contract('StabilityPool', async accounts => {
       // 1 defaulter opens trove
       defaulterAmount = toBN(dec(10000, 18))
       await collateralToken.approve(activePool.address, dec(100, 'ether'), { from: defaulter_1 })
-      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(defaulterAmount), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(defaulterAmount), defaulter_1, defaulter_1, false, { from: defaulter_1 })
       const defaulterDebt = (await troveManager.getEntireDebtAndColl(defaulter_1))[0]
 
       // 6 Accounts open troves
@@ -2423,7 +2423,7 @@ contract('StabilityPool', async accounts => {
       await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(4, 18)), extraParams: { from: carol } })
 
       await collateralToken.approve(activePool.address, dec(100, 'ether'), { from: defaulter_1 })
-      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_1, defaulter_1, { from: defaulter_1 })
+      await borrowerOperations.openTrove(dec(100, 'ether'), await getOpenTroveLUSDAmount(dec(10000, 18)), defaulter_1, defaulter_1, false, { from: defaulter_1 })
 
       // A, B, C provides 10000, 5000, 3000 LUSD to SP
       const A_GAS_Used = th.gasUsed(await stabilityPool.provideToSP(dec(10000, 18), frontEnd_1, { from: alice, gasPrice: GAS_PRICE }))

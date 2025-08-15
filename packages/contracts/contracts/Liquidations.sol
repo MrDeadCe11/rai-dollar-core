@@ -188,7 +188,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                        uint256 actualDebt, uint256 totalNormLUSD);
     event Offset(uint actualBaseDebt, uint baseDebt, uint baseColl, uint actualShieldedDebt, uint shieldedDebt, uint shieldedColl);
     event DebtToOffset(uint debt);
-    event Value(uint value);
+    event Redistribute(uint baseDebt, uint baseColl, uint sDebt, uint sColl);
+
+
 
     // --- Dependency setter ---
 
@@ -440,6 +442,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         stabilityPoolCached.offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
                                    totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
+        emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
+                                        totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
+
         rewards.redistributeDebtAndColl(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
                                         
@@ -465,11 +470,11 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         _sendGasCompensation(contractsCache.activeShieldedPool, msg.sender, totals.totalShieldedLUSDGasCompensation, totals.totalShieldedCollGasCompensation);
     }
 
-    function _convertShieldedToBaseDebt(uint _shieldedDebt, uint accumulatedShieldRate, uint accumulatedRate) internal returns (uint baseDebt) {
+    function _convertShieldedToBaseDebt(uint _shieldedDebt, uint accumulatedShieldRate, uint accumulatedRate) internal pure returns (uint baseDebt) {
         baseDebt = _shieldedDebt * accumulatedShieldRate / accumulatedRate;
     }
 
-    function _convertBaseToShieldedDebt(uint _baseDebt, uint accumulatedShieldRate, uint accumulatedRate) internal returns (uint shieldedDebt) {
+    function _convertBaseToShieldedDebt(uint _baseDebt, uint accumulatedShieldRate, uint accumulatedRate) internal pure returns (uint shieldedDebt) {
         shieldedDebt = _baseDebt * accumulatedRate / accumulatedShieldRate;
     }
     /*
@@ -478,10 +483,10 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     }
     */
 
-    function _getNextLiquidatableBaseTrove(ISortedTroves sortedTroves, uint _price) internal returns (address troveOwner, uint icr) {
+    function _getNextLiquidatableBaseTrove(ISortedTroves _sortedTroves, uint _price) internal view returns (address troveOwner, uint icr) {
         if (troveManager.getTroveOwnersCount() == 1) return (address(0), 0);
 
-        address owner = sortedTroves.getLast();
+        address owner = _sortedTroves.getLast();
         icr = troveManager.getCurrentICR(owner, _price);
 
         if (icr < MCR) {
@@ -490,10 +495,10 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             return (address(0), 0);
         }
     }
-    function _getNextLiquidatableShieldedTrove(ISortedTroves sortedShieldedTroves, uint _price) internal returns (address troveOwner, uint icr) {
+    function _getNextLiquidatableShieldedTrove(ISortedTroves _sortedShieldedTroves, uint _price) internal view returns (address troveOwner, uint icr) {
         if (troveManager.getShieldedTroveOwnersCount() == 1) return (address(0), 0);
 
-        address owner = sortedShieldedTroves.getLast();
+        address owner = _sortedShieldedTroves.getLast();
         icr = troveManager.getCurrentICR(owner, _price);
 
         if (icr < HCR) {
@@ -581,6 +586,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                 singleLiquidation.shieldedCollToRedistribute = singleLiquidation.collToRedistribute;
                 singleLiquidation.shieldedCollToSendToSP = singleLiquidation.collToSendToSP;
                 singleLiquidation.shieldedCollGasCompensation = singleLiquidation.collGasCompensation;
+                singleLiquidation.shieldedLUSDGasCompensation = singleLiquidation.LUSDGasCompensation;
                 singleLiquidation.shieldedCollSurplus = singleLiquidation.collSurplus;
                 singleLiquidation.entireTroveShieldedDebt = singleLiquidation.entireTroveDebt;
              } else {
@@ -589,6 +595,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                 singleLiquidation.baseCollToRedistribute = singleLiquidation.collToRedistribute;
                 singleLiquidation.baseCollToSendToSP = singleLiquidation.collToSendToSP;
                 singleLiquidation.baseCollGasCompensation = singleLiquidation.collGasCompensation;
+                singleLiquidation.baseLUSDGasCompensation = singleLiquidation.LUSDGasCompensation;
                 singleLiquidation.baseCollSurplus = singleLiquidation.collSurplus;
                 singleLiquidation.entireTroveBaseDebt = singleLiquidation.entireTroveDebt;
              }
@@ -648,7 +655,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         stabilityPoolCached.offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
                                    totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
-        // redistribute uses norm debt
+        emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
+                                        totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
+
         rewards.redistributeDebtAndColl(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
 
@@ -667,6 +676,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         vars.liquidatedDebt = _actualDebt(totals.totalBaseDebtInSequence, vars.accumulatedRate) + _actualDebt(totals.totalShieldedDebtInSequence, vars.accumulatedShieldRate);
         vars.liquidatedColl = totals.totalCollInSequence.sub(totals.totalCollGasCompensation).sub(totals.totalCollSurplus);
         //vars.liquidatedColl = 0;
+
         emit Liquidation(vars.liquidatedDebt, vars.liquidatedColl, totals.totalCollGasCompensation, totals.totalLUSDGasCompensation);
 
         // Send gas compensation to caller
@@ -722,6 +732,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                     singleLiquidation.shieldedCollToRedistribute = singleLiquidation.collToRedistribute;
                     singleLiquidation.shieldedCollToSendToSP = singleLiquidation.collToSendToSP;
                     singleLiquidation.shieldedCollGasCompensation = singleLiquidation.collGasCompensation;
+                    singleLiquidation.shieldedLUSDGasCompensation = singleLiquidation.LUSDGasCompensation;
                     singleLiquidation.shieldedCollSurplus = singleLiquidation.collSurplus;
                     singleLiquidation.entireTroveShieldedDebt = singleLiquidation.entireTroveDebt;
                  } else {
@@ -730,6 +741,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                     singleLiquidation.baseCollToRedistribute = singleLiquidation.collToRedistribute;
                     singleLiquidation.baseCollToSendToSP = singleLiquidation.collToSendToSP;
                     singleLiquidation.baseCollGasCompensation = singleLiquidation.collGasCompensation;
+                    singleLiquidation.baseLUSDGasCompensation = singleLiquidation.LUSDGasCompensation;
                     singleLiquidation.baseCollSurplus = singleLiquidation.collSurplus;
                     singleLiquidation.entireTroveBaseDebt = singleLiquidation.entireTroveDebt;
                  }
@@ -744,7 +756,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
     // --- Liquidation helper functions ---
     function _addLiquidationValuesToTotals(LiquidationTotals memory oldTotals, LiquidationValues memory singleLiquidation)
-    internal view returns(LiquidationTotals memory newTotals) {
+    internal pure returns(LiquidationTotals memory newTotals) {
 
         // Tally all the values with their respective running totals
 

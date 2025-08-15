@@ -158,18 +158,6 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
       }
     })
 
-    // addTroveOwnerToArray
-    it("addTroveOwnerToArray(): reverts when called by an account that is not BorrowerOperations", async () => {
-      // Attempt call from alice
-      try {
-        const txAlice = await troveManager.addTroveOwnerToArray(bob, { from: alice })
-        
-      } catch (err) {
-         assert.include(err.message, "revert")
-        // assert.include(err.message, "Caller is not the BorrowerOperations contract")
-      }
-    })
-
     // setTroveStatus
     it("setTroveStatus(): reverts when called by an account that is not BorrowerOperations", async () => {
       // Attempt call from alice

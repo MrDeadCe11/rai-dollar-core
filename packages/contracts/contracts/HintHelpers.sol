@@ -123,10 +123,6 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         uint accShieldRate = troveManager.accumulatedShieldRate();
 
         while (currentTroveuser != address(0) && remainingLUSD > 0 && _maxIterations-- > 0) {
-            // norm
-            //uint netLUSDDebt = _getNetDebt(troveManager.getTroveDebt(currentTroveuser))
-            //    .add(troveManager.getPendingLUSDDebtReward(currentTroveuser));
-
             // actual
             uint netLUSDDebt = _getNetDebt(troveManager.getTroveActualDebt(currentTroveuser))
                 .add(troveManager.getPendingActualLUSDDebtReward(currentTroveuser));
@@ -206,8 +202,8 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         }
 
         // accumulators for NICR math
-        vars.accRate      = troveManager.accumulatedRate();
-        vars.accShieldRate= troveManager.accumulatedShieldRate();
+        vars.accRate = troveManager.accumulatedRate();
+        vars.accShieldRate = troveManager.accumulatedShieldRate();
 
         // --- merged walk to find partial NICR and truncated amount ---
         while (vars.remainingLUSD > 0 && _maxIterations-- > 0 && (vars.curBase != address(0) || vars.curSh != address(0))) {
@@ -228,7 +224,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             bool pickBase = (icrB <= icrS);
             address who = pickBase ? vars.curBase : vars.curSh;
 
-            // actual net debt (your helper already accounts for rewards in "actual" space)
+            // actual net debt
             uint netLUSDDebt = _getNetDebt(troveManager.getTroveActualDebt(who))
                 .add(troveManager.getPendingActualLUSDDebtReward(who));
 
@@ -345,8 +341,8 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         // Allocate trials across lists (proportional to sizes, but at least 1 if non-empty).
         uint tot = nB + nS;
 
-        uint tB = (tot == 0 || numTrials == 0) ? 0 : (numTrials * nB) / tot;
-        uint tS = (tot == 0 || numTrials == 0) ? 0 : (numTrials - tB);
+        tB = (tot == 0 || numTrials == 0) ? 0 : (numTrials * nB) / tot;
+        tS = (tot == 0 || numTrials == 0) ? 0 : (numTrials - tB);
         if (nB > 0 && tB == 0) tB = 1;
         if (nS > 0 && tS == 0) tS = 1;
 
@@ -414,7 +410,6 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         if (n == 0 || trials == 0) { return (address(0), 0, seed); }
 
         best = list.getLast();
-        //bestDiff = Abs.diff(troveManager.getNominalICR(best), targetNICR);
         bestDiff = LiquityMath._getAbsoluteDifference(troveManager.getNominalICR(best), targetNICR);
         seedOut = seed;
 

@@ -56,6 +56,7 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     sortedTroves = contracts.sortedTroves
     liquidations = contracts.liquidations
     troveManager = contracts.troveManager
+    rewards = contracts.rewards
     nameRegistry = contracts.nameRegistry
     activePool = contracts.activePool
     stabilityPool = contracts.stabilityPool
@@ -108,12 +109,17 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     assert.isTrue(txB.receipt.status)
     assert.isFalse(await sortedTroves.contains(dennis))
 
+
+    const [totalLiquidatedDebt, totalLiquidatedColl, totalCollGasComp, totalLusdGasComp] = th.getEmittedLiquidationValues(txD)
+    console.log("totalCollGasComp", totalCollGasComp.toString())
+    console.log("totalLusdGasComp", totalLusdGasComp.toString())
+
     // Get entire coll of A and C
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
     const carol_Coll = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     /* Expected collateral:
@@ -174,16 +180,16 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // Get entire coll of A, B, D and E
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
     const dennis_Coll = ((await troveManager.Troves(dennis))[1]
-      .add(await troveManager.getPendingCollateralReward(dennis)))
+      .add(await rewards.getPendingCollateralReward(dennis)))
       .toString()
     const erin_Coll = ((await troveManager.Troves(erin))[1]
-      .add(await troveManager.getPendingCollateralReward(erin)))
+      .add(await rewards.getPendingCollateralReward(erin)))
       .toString()
 
     /* Expected collateral:
@@ -286,23 +292,23 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // Get entire coll of A, B, D, E and F
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
     const carol_Coll = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
     const dennis_Coll = ((await troveManager.Troves(dennis))[1]
-      .add(await troveManager.getPendingCollateralReward(dennis)))
+      .add(await rewards.getPendingCollateralReward(dennis)))
       .toString()
     const erin_Coll = ((await troveManager.Troves(erin))[1]
-      .add(await troveManager.getPendingCollateralReward(erin)))
+      .add(await rewards.getPendingCollateralReward(erin)))
       .toString()
 
     const freddy_rawColl = (await troveManager.Troves(freddy))[1].toString()
-    const freddy_ETHReward = (await troveManager.getPendingCollateralReward(freddy)).toString()
+    const freddy_ETHReward = (await rewards.getPendingCollateralReward(freddy)).toString()
 
     /* Expected collateral:
      A-E should have been liquidated
@@ -450,10 +456,10 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // console.log(`A_collRedistribution: ${A_collRedistribution}`)
     // Check accumulated ETH gain for each trove
-    const B_ETHGain_1 = await troveManager.getPendingCollateralReward(B)
-    const C_ETHGain_1 = await troveManager.getPendingCollateralReward(C)
-    const D_ETHGain_1 = await troveManager.getPendingCollateralReward(D)
-    const E_ETHGain_1 = await troveManager.getPendingCollateralReward(E)
+    const B_ETHGain_1 = await rewards.getPendingCollateralReward(B)
+    const C_ETHGain_1 = await rewards.getPendingCollateralReward(C)
+    const D_ETHGain_1 = await rewards.getPendingCollateralReward(D)
+    const E_ETHGain_1 = await rewards.getPendingCollateralReward(E)
 
     // Check gains are what we'd expect from a distribution proportional to each trove's entire coll
     const B_expectedPendingETH_1 = A_collRedistribution.mul(B_entireColl_0).div(denominatorColl_1)
@@ -487,9 +493,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     const C_collRedistribution = C_entireColl_1.mul(toBN(995)).div(toBN(1000)) // remove the gas comp
     // console.log(`C_collRedistribution: ${C_collRedistribution}`)
 
-    const B_ETHGain_2 = await troveManager.getPendingCollateralReward(B)
-    const D_ETHGain_2 = await troveManager.getPendingCollateralReward(D)
-    const E_ETHGain_2 = await troveManager.getPendingCollateralReward(E)
+    const B_ETHGain_2 = await rewards.getPendingCollateralReward(B)
+    const D_ETHGain_2 = await rewards.getPendingCollateralReward(D)
+    const E_ETHGain_2 = await rewards.getPendingCollateralReward(E)
 
     // Since B topped up, he has no previous pending ETH gain
     const B_expectedPendingETH_2 = C_collRedistribution.mul(B_entireColl_1).div(denominatorColl_2)
@@ -525,8 +531,8 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     const E_collRedistribution = E_entireColl_2.mul(toBN(995)).div(toBN(1000)) // remove the gas comp
     // console.log(`E_collRedistribution: ${E_collRedistribution}`)
 
-    const B_ETHGain_3 = await troveManager.getPendingCollateralReward(B)
-    const D_ETHGain_3 = await troveManager.getPendingCollateralReward(D)
+    const B_ETHGain_3 = await rewards.getPendingCollateralReward(B)
+    const D_ETHGain_3 = await rewards.getPendingCollateralReward(D)
 
     // Since B topped up, he has no previous pending ETH gain
     const B_expectedPendingETH_3 = E_collRedistribution.mul(B_entireColl_2).div(denominatorColl_3)
@@ -559,7 +565,6 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     //Bob adds ETH to his trove
     const addedColl = toBN(dec(1, 'ether'))
     await collateralToken.approve(activePool.address, addedColl, { from: bob })
->>>>>>> 0ff589b8 (fix bo.openTrove() calls)
     await borrowerOperations.addColl(addedColl, bob, bob, { from: bob })
 
     // Alice withdraws LUSD
@@ -575,11 +580,11 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // Expect Bob now holds all Ether and LUSDDebt in the system: 2 + 0.4975+0.4975*0.995+0.995 Ether and 110*3 LUSD (10 each for gas compensation)
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const bob_LUSDDebt = ((await troveManager.Troves(bob))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(bob)))
+      .add(await rewards.getPendingLUSDDebtReward(bob)))
       .toString()
 
     const expected_B_coll = B_coll
@@ -642,19 +647,19 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     totalDebt 380 LUSD (includes 50 each for gas compensation)
     */
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const bob_LUSDDebt = ((await troveManager.Troves(bob))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(bob)))
+      .add(await rewards.getPendingLUSDDebtReward(bob)))
       .toString()
 
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const alice_LUSDDebt = ((await troveManager.Troves(alice))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(alice)))
+      .add(await rewards.getPendingLUSDDebtReward(alice)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).add(addedColl).add(th.applyLiquidationFee(C_coll))
@@ -698,9 +703,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await priceFeed.setPrice(dec(200, 18))
 
     // Expected rewards:  alice: 1 ETH, bob: 1 ETH, carol: 998 ETH
-    const alice_ETHReward_1 = await troveManager.getPendingCollateralReward(alice)
-    const bob_ETHReward_1 = await troveManager.getPendingCollateralReward(bob)
-    const carol_ETHReward_1 = await troveManager.getPendingCollateralReward(carol)
+    const alice_ETHReward_1 = await rewards.getPendingCollateralReward(alice)
+    const bob_ETHReward_1 = await rewards.getPendingCollateralReward(bob)
+    const carol_ETHReward_1 = await rewards.getPendingCollateralReward(carol)
 
     //Expect 1000 + 1000*0.995 ETH in system now
     const entireSystemColl_1 = (await activePool.getCollateral()).add(await defaultPool.getCollateral()).toString()
@@ -746,15 +751,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     */
 
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const carol_Coll = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).add(C_coll).add(th.applyLiquidationFee(D_coll)).add(C_addedColl)
@@ -797,9 +802,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await priceFeed.setPrice(dec(200, 18))
 
     // Expected rewards:  alice: 1 ETH, bob: 1 ETH, carol: 998 ETH (*0.995)
-    const alice_ETHReward_1 = await troveManager.getPendingCollateralReward(alice)
-    const bob_ETHReward_1 = await troveManager.getPendingCollateralReward(bob)
-    const carol_ETHReward_1 = await troveManager.getPendingCollateralReward(carol)
+    const alice_ETHReward_1 = await rewards.getPendingCollateralReward(alice)
+    const bob_ETHReward_1 = await rewards.getPendingCollateralReward(bob)
+    const carol_ETHReward_1 = await rewards.getPendingCollateralReward(carol)
 
     //Expect 1995 ETH in system now
     const entireSystemColl_1 = (await activePool.getCollateral()).add(await defaultPool.getCollateral()).toString()
@@ -851,15 +856,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     */
 
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const carol_Coll = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).add(C_coll).add(th.applyLiquidationFee(D_coll)).add(addedColl.mul(toBN(3)))
@@ -919,11 +924,11 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Expect Bob now holds all Ether and LUSDDebt in the system: 2.5 Ether and 300 LUSD
     // 1 + 0.995/2 - 0.5 + 1.4975*0.995
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const bob_LUSDDebt = ((await troveManager.Troves(bob))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(bob)))
+      .add(await rewards.getPendingLUSDDebtReward(bob)))
       .toString()
 
     const expected_B_coll = B_coll
@@ -988,19 +993,19 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     totalDebt 380 LUSD (Includes 50 in each trove for gas compensation)
     */
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const bob_LUSDDebt = ((await troveManager.Troves(bob))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(bob)))
+      .add(await rewards.getPendingLUSDDebtReward(bob)))
       .toString()
 
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const alice_LUSDDebt = ((await troveManager.Troves(alice))[0]
-      .add(await troveManager.getPendingLUSDDebtReward(alice)))
+      .add(await rewards.getPendingLUSDDebtReward(alice)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).sub(withdrawnColl).add(th.applyLiquidationFee(C_coll))
@@ -1049,9 +1054,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await priceFeed.setPrice(dec(200, 18))
 
     // Expected rewards:  alice: 1 ETH, bob: 1 ETH, carol: 998 ETH (*0.995)
-    const alice_ETHReward_1 = await troveManager.getPendingCollateralReward(alice)
-    const bob_ETHReward_1 = await troveManager.getPendingCollateralReward(bob)
-    const carol_ETHReward_1 = await troveManager.getPendingCollateralReward(carol)
+    const alice_ETHReward_1 = await rewards.getPendingCollateralReward(alice)
+    const bob_ETHReward_1 = await rewards.getPendingCollateralReward(bob)
+    const carol_ETHReward_1 = await rewards.getPendingCollateralReward(carol)
 
     //Expect 1995 ETH in system now
     const entireSystemColl_1 = (await activePool.getCollateral()).add(await defaultPool.getCollateral())
@@ -1096,15 +1101,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     */
 
     const alice_Coll = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const bob_Coll = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const carol_Coll = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).add(C_coll).add(th.applyLiquidationFee(D_coll)).sub(C_withdrawnColl)
@@ -1147,9 +1152,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await priceFeed.setPrice(dec(200, 18))
 
     // Expected rewards:  alice: 1 ETH, bob: 1 ETH, carol: 998 ETH (*0.995)
-    const alice_ETHReward_1 = await troveManager.getPendingCollateralReward(alice)
-    const bob_ETHReward_1 = await troveManager.getPendingCollateralReward(bob)
-    const carol_ETHReward_1 = await troveManager.getPendingCollateralReward(carol)
+    const alice_ETHReward_1 = await rewards.getPendingCollateralReward(alice)
+    const bob_ETHReward_1 = await rewards.getPendingCollateralReward(bob)
+    const carol_ETHReward_1 = await rewards.getPendingCollateralReward(carol)
 
     //Expect 1995 ETH in system now
     const entireSystemColl_1 = (await activePool.getCollateral()).add(await defaultPool.getCollateral())
@@ -1168,15 +1173,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await borrowerOperations.withdrawColl(withdrawnColl, carol, carol, { from: carol })
 
     const alice_Coll_1 = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const bob_Coll_1 = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const carol_Coll_1 = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     const totalColl_1 = A_coll.add(B_coll).add(C_coll)
@@ -1214,15 +1219,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     */
 
     const alice_Coll_2 = ((await troveManager.Troves(alice))[1]
-      .add(await troveManager.getPendingCollateralReward(alice)))
+      .add(await rewards.getPendingCollateralReward(alice)))
       .toString()
 
     const bob_Coll_2 = ((await troveManager.Troves(bob))[1]
-      .add(await troveManager.getPendingCollateralReward(bob)))
+      .add(await rewards.getPendingCollateralReward(bob)))
       .toString()
 
     const carol_Coll_2 = ((await troveManager.Troves(carol))[1]
-      .add(await troveManager.getPendingCollateralReward(carol)))
+      .add(await rewards.getPendingCollateralReward(carol)))
       .toString()
 
     const totalCollAfterL1 = A_coll.add(B_coll).add(C_coll).add(th.applyLiquidationFee(D_coll)).sub(withdrawnColl.mul(toBN(3)))
@@ -1264,13 +1269,13 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Check rewards for B and C
     const B_pendingRewardsAfterL1 = th.applyLiquidationFee(A_coll).mul(B_coll).div(B_coll.add(C_coll))
     const C_pendingRewardsAfterL1 = th.applyLiquidationFee(A_coll).mul(C_coll).div(B_coll.add(C_coll))
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(bob), B_pendingRewardsAfterL1), 1000000)
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(carol), C_pendingRewardsAfterL1), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(bob), B_pendingRewardsAfterL1), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(carol), C_pendingRewardsAfterL1), 1000000)
 
     const totalStakesSnapshotAfterL1 = B_coll.add(C_coll)
     const totalCollateralSnapshotAfterL1 = totalStakesSnapshotAfterL1.add(th.applyLiquidationFee(A_coll))
-    th.assertIsApproximatelyEqual(await troveManager.totalStakesSnapshot(), totalStakesSnapshotAfterL1)
-    th.assertIsApproximatelyEqual(await troveManager.totalCollateralSnapshot(), totalCollateralSnapshotAfterL1)
+    th.assertIsApproximatelyEqual(await rewards.totalStakesSnapshot(), totalStakesSnapshotAfterL1)
+    th.assertIsApproximatelyEqual(await rewards.totalCollateralSnapshot(), totalCollateralSnapshotAfterL1)
 
     // Price rises to 1000
     await priceFeed.setPrice(dec(1000, 18))
@@ -1301,14 +1306,14 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Check rewards for C and D
     const C_pendingRewardsAfterL2 = C_collAfterL1.mul(th.applyLiquidationFee(B_collAfterL1)).div(C_collAfterL1.add(D_coll))
     const D_pendingRewardsAfterL2 = D_coll.mul(th.applyLiquidationFee(B_collAfterL1)).div(C_collAfterL1.add(D_coll))
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(carol), C_pendingRewardsAfterL2), 1000000)
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(dennis), D_pendingRewardsAfterL2), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(carol), C_pendingRewardsAfterL2), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(dennis), D_pendingRewardsAfterL2), 1000000)
 
     const totalStakesSnapshotAfterL2 = totalStakesSnapshotAfterL1.add(D_coll.mul(totalStakesSnapshotAfterL1).div(totalCollateralSnapshotAfterL1)).sub(B_coll).sub(C_withdrawnColl.mul(totalStakesSnapshotAfterL1).div(totalCollateralSnapshotAfterL1))
     const defaultedAmountAfterL2 = th.applyLiquidationFee(B_coll.add(B_addedColl).add(B_pendingRewardsAfterL1)).add(C_pendingRewardsAfterL1)
     const totalCollateralSnapshotAfterL2 = C_coll.sub(C_withdrawnColl).add(D_coll).add(defaultedAmountAfterL2)
-    th.assertIsApproximatelyEqual(await troveManager.totalStakesSnapshot(), totalStakesSnapshotAfterL2)
-    th.assertIsApproximatelyEqual(await troveManager.totalCollateralSnapshot(), totalCollateralSnapshotAfterL2)
+    th.assertIsApproximatelyEqual(await rewards.totalStakesSnapshot(), totalStakesSnapshotAfterL2)
+    th.assertIsApproximatelyEqual(await rewards.totalCollateralSnapshot(), totalCollateralSnapshotAfterL2)
 
     // Price rises to 1000
     await priceFeed.setPrice(dec(1000, 18))
@@ -1332,13 +1337,13 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // Grab remaining troves' collateral
     const carol_rawColl = (await troveManager.Troves(carol))[1].toString()
-    const carol_pendingETHReward = (await troveManager.getPendingCollateralReward(carol)).toString()
+    const carol_pendingETHReward = (await rewards.getPendingCollateralReward(carol)).toString()
 
     const dennis_rawColl = (await troveManager.Troves(dennis))[1].toString()
-    const dennis_pendingETHReward = (await troveManager.getPendingCollateralReward(dennis)).toString()
+    const dennis_pendingETHReward = (await rewards.getPendingCollateralReward(dennis)).toString()
 
     const erin_rawColl = (await troveManager.Troves(erin))[1].toString()
-    const erin_pendingETHReward = (await troveManager.getPendingCollateralReward(erin)).toString()
+    const erin_pendingETHReward = (await rewards.getPendingCollateralReward(erin)).toString()
 
     // Check raw collateral of C, D, E
     const C_collAfterL2 = C_collAfterL1.add(C_pendingRewardsAfterL2)
@@ -1366,8 +1371,8 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Check system snapshots
     const totalStakesSnapshotAfterL3 = totalStakesSnapshotAfterL2.add(D_addedColl.add(E_coll).mul(totalStakesSnapshotAfterL2).div(totalCollateralSnapshotAfterL2))
     const totalCollateralSnapshotAfterL3 = C_coll.sub(C_withdrawnColl).add(D_coll).add(D_addedColl).add(E_coll).add(defaultedAmountAfterL2).add(th.applyLiquidationFee(F_coll))
-    const totalStakesSnapshot = (await troveManager.totalStakesSnapshot()).toString()
-    const totalCollateralSnapshot = (await troveManager.totalCollateralSnapshot()).toString()
+    const totalStakesSnapshot = (await rewards.totalStakesSnapshot()).toString()
+    const totalCollateralSnapshot = (await rewards.totalCollateralSnapshot()).toString()
     th.assertIsApproximatelyEqual(totalStakesSnapshot, totalStakesSnapshotAfterL3)
     th.assertIsApproximatelyEqual(totalCollateralSnapshot, totalCollateralSnapshotAfterL3)
 
@@ -1398,13 +1403,13 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Check rewards for B and C
     const B_pendingRewardsAfterL1 = th.applyLiquidationFee(A_coll).mul(B_coll).div(B_coll.add(C_coll))
     const C_pendingRewardsAfterL1 = th.applyLiquidationFee(A_coll).mul(C_coll).div(B_coll.add(C_coll))
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(bob), B_pendingRewardsAfterL1), 1000000)
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(carol), C_pendingRewardsAfterL1), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(bob), B_pendingRewardsAfterL1), 1000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(carol), C_pendingRewardsAfterL1), 1000000)
 
     const totalStakesSnapshotAfterL1 = B_coll.add(C_coll)
     const totalCollateralSnapshotAfterL1 = totalStakesSnapshotAfterL1.add(th.applyLiquidationFee(A_coll))
-    th.assertIsApproximatelyEqual(await troveManager.totalStakesSnapshot(), totalStakesSnapshotAfterL1)
-    th.assertIsApproximatelyEqual(await troveManager.totalCollateralSnapshot(), totalCollateralSnapshotAfterL1)
+    th.assertIsApproximatelyEqual(await rewards.totalStakesSnapshot(), totalStakesSnapshotAfterL1)
+    th.assertIsApproximatelyEqual(await rewards.totalCollateralSnapshot(), totalCollateralSnapshotAfterL1)
 
     // Price rises 
     await priceFeed.setPrice(dec(1, 27))
@@ -1436,14 +1441,14 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     const C_pendingRewardsAfterL2 = C_collAfterL1.mul(th.applyLiquidationFee(B_collAfterL1)).div(C_collAfterL1.add(D_coll))
     const D_pendingRewardsAfterL2 = D_coll.mul(th.applyLiquidationFee(B_collAfterL1)).div(C_collAfterL1.add(D_coll))
     const C_collAfterL2 = C_collAfterL1.add(C_pendingRewardsAfterL2)
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(carol), C_pendingRewardsAfterL2), 10000000)
-    assert.isAtMost(th.getDifference(await troveManager.getPendingCollateralReward(dennis), D_pendingRewardsAfterL2), 10000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(carol), C_pendingRewardsAfterL2), 10000000)
+    assert.isAtMost(th.getDifference(await rewards.getPendingCollateralReward(dennis), D_pendingRewardsAfterL2), 10000000)
 
     const totalStakesSnapshotAfterL2 = totalStakesSnapshotAfterL1.add(D_coll.mul(totalStakesSnapshotAfterL1).div(totalCollateralSnapshotAfterL1)).sub(B_coll).sub(C_withdrawnColl.mul(totalStakesSnapshotAfterL1).div(totalCollateralSnapshotAfterL1))
     const defaultedAmountAfterL2 = th.applyLiquidationFee(B_coll.add(B_addedColl).add(B_pendingRewardsAfterL1)).add(C_pendingRewardsAfterL1)
     const totalCollateralSnapshotAfterL2 = C_coll.sub(C_withdrawnColl).add(D_coll).add(defaultedAmountAfterL2)
-    th.assertIsApproximatelyEqual(await troveManager.totalStakesSnapshot(), totalStakesSnapshotAfterL2)
-    th.assertIsApproximatelyEqual(await troveManager.totalCollateralSnapshot(), totalCollateralSnapshotAfterL2)
+    th.assertIsApproximatelyEqual(await rewards.totalStakesSnapshot(), totalStakesSnapshotAfterL2)
+    th.assertIsApproximatelyEqual(await rewards.totalCollateralSnapshot(), totalCollateralSnapshotAfterL2)
 
     // Price rises 
     await priceFeed.setPrice(dec(1, 27))
@@ -1472,15 +1477,15 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // Grab remaining troves' collateral
     const carol_rawColl = (await troveManager.Troves(carol))[1].toString()
-    const carol_pendingETHReward = (await troveManager.getPendingCollateralReward(carol)).toString()
+    const carol_pendingETHReward = (await rewards.getPendingCollateralReward(carol)).toString()
     const carol_Stake = (await troveManager.Troves(carol))[2].toString()
 
     const dennis_rawColl = (await troveManager.Troves(dennis))[1].toString()
-    const dennis_pendingETHReward = (await troveManager.getPendingCollateralReward(dennis)).toString()
+    const dennis_pendingETHReward = (await rewards.getPendingCollateralReward(dennis)).toString()
     const dennis_Stake = (await troveManager.Troves(dennis))[2].toString()
 
     const erin_rawColl = (await troveManager.Troves(erin))[1].toString()
-    const erin_pendingETHReward = (await troveManager.getPendingCollateralReward(erin)).toString()
+    const erin_pendingETHReward = (await rewards.getPendingCollateralReward(erin)).toString()
     const erin_Stake = (await troveManager.Troves(erin))[2].toString()
 
     // Check raw collateral of C, D, E
@@ -1507,8 +1512,8 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     // Check system snapshots
     const totalStakesSnapshotAfterL3 = totalStakesSnapshotAfterL2.add(D_addedColl.add(E_coll).mul(totalStakesSnapshotAfterL2).div(totalCollateralSnapshotAfterL2))
     const totalCollateralSnapshotAfterL3 = C_coll.sub(C_withdrawnColl).add(D_coll).add(D_addedColl).add(E_coll).add(defaultedAmountAfterL2).add(th.applyLiquidationFee(F_coll))
-    const totalStakesSnapshot = (await troveManager.totalStakesSnapshot()).toString()
-    const totalCollateralSnapshot = (await troveManager.totalCollateralSnapshot()).toString()
+    const totalStakesSnapshot = (await rewards.totalStakesSnapshot()).toString()
+    const totalCollateralSnapshot = (await rewards.totalCollateralSnapshot()).toString()
     th.assertIsApproximatelyEqual(totalStakesSnapshot, totalStakesSnapshotAfterL3)
     th.assertIsApproximatelyEqual(totalCollateralSnapshot, totalCollateralSnapshotAfterL3)
 

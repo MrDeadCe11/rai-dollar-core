@@ -187,30 +187,31 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         _applyPendingShieldedRewards(_borrower, shielded);
     }
 
-    function _convertShieldedToBaseDebt(uint _shieldedDebt) internal returns (uint baseDebt) {
+    function _convertShieldedToBaseDebt(uint _shieldedDebt) internal view returns (uint baseDebt) {
         baseDebt = _shieldedDebt * troveManager.accumulatedShieldRate() / troveManager.accumulatedRate();
     }
 
-    function _convertBaseToShieldedDebt(uint _baseDebt) internal returns (uint shieldedDebt) {
+    function _convertBaseToShieldedDebt(uint _baseDebt) internal view returns (uint shieldedDebt) {
         shieldedDebt = _baseDebt * troveManager.accumulatedRate() / troveManager.accumulatedShieldRate();
     }
 
     // Add the borrowers's coll and debt rewards earned from redistributions, to their Trove
     function _applyPendingBaseRewards(address _borrower, bool _shielded) internal {
         if (hasPendingBaseRewards(_borrower)) {
-            // Compute pending rewards
+
+            // Compute and apply pending collateral rewards
             uint pendingCollateralReward = getPendingBaseCollateralReward(_borrower);
+            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
+
+            // Compute pending base debt
             uint pendingLUSDDebtReward = getPendingBaseLUSDDebtReward(_borrower);
 
+            // Apply pending base debt. Convert if needed
             if (_shielded) {
-                pendingLUSDDebtReward = _convertBaseToShieldedDebt(pendingLUSDDebtReward);
+                troveManager.increaseTroveDebt(_borrower, _convertBaseToShieldedDebt(pendingLUSDDebtReward));
+            } else {
+                troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
             }
-
-            // Apply pending rewards to trove's state
-            //Troves[_borrower].coll = Troves[_borrower].coll.add(pendingCollateralReward);
-            //Troves[_borrower].debt = Troves[_borrower].debt.add(pendingLUSDDebtReward);
-            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
-            troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
 
             _updateTroveRewardSnapshots(_borrower);
 
@@ -234,17 +235,19 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     function _applyPendingShieldedRewards(address _borrower, bool _shielded) internal {
         if (hasPendingShieldedRewards(_borrower)) {
 
-            // Compute pending rewards
+            // Compute and apply pending rewards
             uint pendingCollateralReward = getPendingShieldedCollateralReward(_borrower);
+            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
+
+            // Compute pending shielded debt
             uint pendingLUSDDebtReward = getPendingShieldedLUSDDebtReward(_borrower);
 
+            // Apply pending shielded debt.  Convert if needed
             if (!_shielded) {
-                pendingLUSDDebtReward = _convertShieldedToBaseDebt(pendingLUSDDebtReward);
+                troveManager.increaseTroveDebt(_borrower, _convertShieldedToBaseDebt(pendingLUSDDebtReward));
+            } else {
+                troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
             }
-
-            // Apply pending rewards to trove's state
-            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
-            troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
 
             _updateTroveRewardSnapshots(_borrower);
 
@@ -284,6 +287,13 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         rewardSnapshots[_borrower].LUSDDebt = 0;
         rewardSnapshots[_borrower].shieldedCollateral = 0;
         rewardSnapshots[_borrower].shieldedLUSDDebt = 0;
+    }
+
+    function getPendingRewards(address _borrower) public view override returns (uint, uint, uint, uint) {
+        return (getPendingBaseLUSDDebtReward(_borrower),
+                getPendingBaseCollateralReward(_borrower),
+                getPendingShieldedLUSDDebtReward(_borrower),
+                getPendingShieldedCollateralReward(_borrower));
     }
 
     function getPendingCollateralReward(address _borrower) public view override returns (uint) {
@@ -427,11 +437,48 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     }
     function redistributeDebtAndColl(uint _debt, uint _coll, uint _shieldedDebt, uint _shieldedColl) external override {
         _requireCallerIsLiquidations();
-        _redistributeDebtAndColl(_debt, _coll);
+        _redistributeBaseDebtAndColl(_debt, _coll);
         _redistributeShieldedDebtAndColl(_shieldedDebt, _shieldedColl);
     }
+
+    function _redistributeShieldedDebtAndColl(uint _debt, uint _coll) internal {
+        if (_debt == 0) { return; }
+
+        /*
+        * Add distributed coll and debt rewards-per-unit-staked to the running totals. Division uses a "feedback"
+        * error correction, to keep the cumulative error low in the running totals L_Coll and L_LUSDDebt:
+        *
+        * 1) Form numerators which compensate for the floor division errors that occurred the last time this
+        * function was called.
+        * 2) Calculate "per-unit-staked" ratios.
+        * 3) Multiply each ratio back by its denominator, to reveal the current floor division error.
+        * 4) Store these errors for use in the next correction when this function is called.
+        * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
+        */
+        uint collateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution);
+        uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution);
+
+        // Get the per-unit-staked terms
+        uint collateralRewardPerUnitStaked = collateralNumerator.div(totalStakes);
+        uint LUSDDebtRewardPerUnitStaked = LUSDDebtNumerator.div(totalStakes);
+
+        lastCollateralError_Redistribution_Shielded = collateralNumerator.sub(collateralRewardPerUnitStaked.mul(totalStakes));
+        lastLUSDDebtError_Redistribution_Shielded = LUSDDebtNumerator.sub(LUSDDebtRewardPerUnitStaked.mul(totalStakes));
+
+        // Add per-unit-staked terms to the running totals
+        L_CollShielded = L_CollShielded.add(collateralRewardPerUnitStaked);
+        L_LUSDDebtShielded = L_LUSDDebtShielded.add(LUSDDebtRewardPerUnitStaked);
+
+        emit ShieldedLTermsUpdated(L_CollShielded, L_LUSDDebtShielded);
+
+        // Transfer coll and debt from ActivePool to DefaultPool
+        activeShieldedPool.decreaseLUSDDebt(_debt);
+        defaultShieldedPool.increaseLUSDDebt(_debt);
+        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _coll);
+    }
+
     // norm debt
-    function _redistributeDebtAndColl(uint _debt, uint _coll) internal {
+    function _redistributeBaseDebtAndColl(uint _debt, uint _coll) internal {
         if (_debt == 0) { return; }
 
         /*
@@ -466,41 +513,7 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         defaultPool.increaseLUSDDebt(_debt);
         activePool.sendCollateral(address(defaultPool), _coll);
     }
-    function _redistributeShieldedDebtAndColl(uint _debt, uint _coll) internal {
-        if (_debt == 0) { return; }
 
-        /*
-        * Add distributed coll and debt rewards-per-unit-staked to the running totals. Division uses a "feedback"
-        * error correction, to keep the cumulative error low in the running totals L_Coll and L_LUSDDebt:
-        *
-        * 1) Form numerators which compensate for the floor division errors that occurred the last time this
-        * function was called.
-        * 2) Calculate "per-unit-staked" ratios.
-        * 3) Multiply each ratio back by its denominator, to reveal the current floor division error.
-        * 4) Store these errors for use in the next correction when this function is called.
-        * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
-        */
-        uint collateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution);
-        uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution);
-
-        // Get the per-unit-staked terms
-        uint collateralRewardPerUnitStaked = collateralNumerator.div(totalStakes);
-        uint LUSDDebtRewardPerUnitStaked = LUSDDebtNumerator.div(totalStakes);
-
-        lastCollateralError_Redistribution_Shielded = collateralNumerator.sub(collateralRewardPerUnitStaked.mul(totalStakes));
-        lastLUSDDebtError_Redistribution_Shielded = LUSDDebtNumerator.sub(LUSDDebtRewardPerUnitStaked.mul(totalStakes));
-
-        // Add per-unit-staked terms to the running totals
-        L_CollShielded = L_Coll.add(collateralRewardPerUnitStaked);
-        L_LUSDDebtShielded = L_LUSDDebt.add(LUSDDebtRewardPerUnitStaked);
-
-        emit ShieldedLTermsUpdated(L_CollShielded, L_LUSDDebtShielded);
-
-        // Transfer coll and debt from ActivePool to DefaultPool
-        activeShieldedPool.decreaseLUSDDebt(_debt);
-        defaultShieldedPool.increaseLUSDDebt(_debt);
-        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _coll);
-    }
 
     /*
     * Updates snapshots of system total stakes and total collateral, excluding a given collateral remainder from the calculation.

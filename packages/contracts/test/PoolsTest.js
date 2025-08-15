@@ -25,7 +25,10 @@ contract('StabilityPool', async accounts => {
     const mockActivePoolAddress = (await NonPayable.new()).address
     const dumbContractAddress = (await NonPayable.new()).address
     collateralToken = await CollateralToken.new("test", "test")
-    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
+    await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, dumbContractAddress,
+                                     mockActivePoolAddress, dumbContractAddress, dumbContractAddress,
+                                     dumbContractAddress, dumbContractAddress, dumbContractAddress,
+                                     dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -49,7 +52,9 @@ contract('ActivePool', async accounts => {
     mockBorrowerOperations = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
     collateralToken = await CollateralToken.new("test", "test")
-    await activePool.setAddresses(dumbContractAddress, mockBorrowerOperations.address, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, collateralToken.address)
+    await activePool.setAddresses(dumbContractAddress, dumbContractAddress, mockBorrowerOperations.address,
+                                  dumbContractAddress, dumbContractAddress, dumbContractAddress,
+                                  dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {
@@ -135,12 +140,15 @@ contract('DefaultPool', async accounts => {
     defaultPool = await DefaultPool.new()
     mockLiquidations = await NonPayable.new()
     mockTroveManager = await NonPayable.new()
+    mockRewards = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
     mockActivePool = await ActivePool.new()
     collateralToken = await CollateralToken.new("test", "test")
 
-    await defaultPool.setAddresses(mockLiquidations.address, mockTroveManager.address, mockActivePool.address, collateralToken.address)
-    await mockActivePool.setAddresses(mockLiquidations.address, dumbContractAddress, mockTroveManager.address, dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
+    await defaultPool.setAddresses(mockLiquidations.address, mockRewards.address, mockTroveManager.address,
+                                   mockActivePool.address, collateralToken.address)
+    await mockActivePool.setAddresses(mockLiquidations.address, mockRewards.address, dumbContractAddress, mockTroveManager.address,
+                                      dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
   })
 
   it('getCollateral(): gets the recorded LUSD balance', async () => {
@@ -159,7 +167,7 @@ contract('DefaultPool', async accounts => {
 
     // await defaultPool.increaseLUSDDebt(100, { from: mockTroveManagerAddress })
     const increaseLUSDDebtData = th.getTransactionData('increaseLUSDDebt(uint256)', ['0x64'])
-    const tx = await mockTroveManager.forward(defaultPool.address, increaseLUSDDebtData)
+    const tx = await mockRewards.forward(defaultPool.address, increaseLUSDDebtData)
     assert.isTrue(tx.receipt.status)
 
     const recordedLUSD_balanceAfter = await defaultPool.getLUSDDebt()
@@ -170,7 +178,7 @@ contract('DefaultPool', async accounts => {
     // start the pool on 100 wei
     //await defaultPool.increaseLUSDDebt(100, { from: mockTroveManagerAddress })
     const increaseLUSDDebtData = th.getTransactionData('increaseLUSDDebt(uint256)', ['0x64'])
-    const tx1 = await mockTroveManager.forward(defaultPool.address, increaseLUSDDebtData)
+    const tx1 = await mockRewards.forward(defaultPool.address, increaseLUSDDebtData)
     assert.isTrue(tx1.receipt.status)
 
     const recordedLUSD_balanceBefore = await defaultPool.getLUSDDebt()
@@ -178,7 +186,7 @@ contract('DefaultPool', async accounts => {
 
     // await defaultPool.decreaseLUSDDebt(100, { from: mockTroveManagerAddress })
     const decreaseLUSDDebtData = th.getTransactionData('decreaseLUSDDebt(uint256)', ['0x64'])
-    const tx2 = await mockTroveManager.forward(defaultPool.address, decreaseLUSDDebtData)
+    const tx2 = await mockRewards.forward(defaultPool.address, decreaseLUSDDebtData)
     assert.isTrue(tx2.receipt.status)
 
     const recordedLUSD_balanceAfter = await defaultPool.getLUSDDebt()
@@ -207,7 +215,7 @@ contract('DefaultPool', async accounts => {
     // send ether from pool to alice
     //await defaultPool.sendCollateralToActivePool(dec(1, 'ether'), { from: mockTroveManagerAddress })
     const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(uint256)', [web3.utils.toHex(dec(1, 'ether'))])
-    const tx2 = await mockTroveManager.forward(defaultPool.address, sendCollateralData, { from: owner })
+    const tx2 = await mockRewards.forward(defaultPool.address, sendCollateralData, { from: owner })
     assert.isTrue(tx2.receipt.status)
 
     const defaultPool_BalanceAfterTx = web3.utils.toBN(await collateralToken.balanceOf(defaultPool.address))

@@ -39,7 +39,7 @@ interface IBorrowerOperations {
         address _relayerAddress
     ) external;
 
-    function openTrove(uint _maxFee, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable;
+    function openTrove(uint256 _collateralAmount, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external payable;
 
     function addColl(address _upperHint, address _lowerHint) external payable;
 
@@ -47,13 +47,13 @@ interface IBorrowerOperations {
 
     function withdrawColl(uint _amount, address _upperHint, address _lowerHint) external;
 
-    function withdrawLUSD(uint _maxFee, uint _amount, address _upperHint, address _lowerHint) external;
+    function withdrawLUSD(uint _amount, address _upperHint, address _lowerHint) external;
 
     function repayLUSD(uint _amount, address _upperHint, address _lowerHint) external;
 
     function closeTrove() external;
 
-    function adjustTrove(uint _maxFee, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external payable;
+    function adjustTrove(uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, bool _redemptionShield, address _upperHint, address _lowerHint) external payable;
 
     function claimCollateral() external;
 

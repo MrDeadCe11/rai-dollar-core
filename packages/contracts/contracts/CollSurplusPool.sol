@@ -112,7 +112,7 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     }
 
     function addCollateral(address _account, uint _amount) external override {
-        _requireCallerIsActivePool();
+        _requireCallerIsAnActivePool();
         CT = CT.add(_amount);
         collateralToken.transferFrom(_account, address(this), _amount);
         emit CollateralSent(address(this), _amount);
@@ -133,15 +133,16 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
             "CollSurplusPool: Caller is not TroveManager or Liq");
     }
 
-    function _requireCallerIsActivePool() internal view {
+    function _requireCallerIsAnActivePool() internal view {
         require(
-            msg.sender == activePoolAddress,
-            "CollSurplusPool: Caller is not Active Pool");
+            msg.sender == activePoolAddress ||
+            msg.sender == activeShieldedPoolAddress,
+            "CollSurplusPool: Caller is not an Active Pool");
     }
     
 
     function processCollateralIncrease(uint _amount) external override {
-        _requireCallerIsActivePool();
+        _requireCallerIsAnActivePool();
         CT = CT.add(_amount);
         emit CollateralSent(address(this), _amount);
     }

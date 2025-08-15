@@ -48,11 +48,11 @@ contract('HintHelpers', async accounts => {
  const openTrove = async (account, index) => {
    const amountFinney = 2000 + index * 10
    const coll = web3.utils.toWei((amountFinney.toString()), 'finney')
-   await borrowerOperations.openTrove(th._100pct, 0, account, account, { from: account, value: coll })
+   await borrowerOperations.openTrove(coll, 0, account, account, false, { from: account })
  }
 
  const withdrawLUSDfromTrove = async (account) => {
-  await borrowerOperations.withdrawLUSD(th._100pct, '100000000000000000000', account, account, { from: account })
+  await borrowerOperations.withdrawLUSD('100000000000000000000', account, account, { from: account })
  }
 
  // Sequentially add coll and withdraw LUSD, 1 account at a time
