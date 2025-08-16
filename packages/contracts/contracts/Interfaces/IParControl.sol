@@ -10,7 +10,8 @@ interface IParControl {
     function elapsed() external view returns (uint256);
     function errorIntegral() external view returns (int256);
     function getNextErrorIntegral(int256 error, uint256 timeElapsed) external view returns (int256, int256);
-    function getNextPiOutput(int256 error, uint256 timeElapsed) external view returns (int256, int256, int256);
+    function getNextPiOutput(int256 error, uint256 timeElapsed) external view returns (int256, int256, int256, int256);
+    function getNextPiOutput(int256 error) external view returns (int256, int256, int256, int256);
     function getRawPiOutput(int256 error, int256 errorI) external view returns (int256, int256);
     function KI() external view returns (int256);
     function KP() external view returns (int256);

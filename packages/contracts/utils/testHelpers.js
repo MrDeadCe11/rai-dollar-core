@@ -1239,8 +1239,8 @@ class TestHelper {
     extraParams = {}
   }) {
 
-    if (!extraLUSDAmount) extraLUSDAmount = this.toBN(0)
-    else if (typeof extraLUSDAmount == 'string') extraLUSDAmount = this.toBN(extraLUSDAmount)
+    //if (!extraLUSDAmount) extraLUSDAmount = this.toBN(0)
+    if (typeof extraLUSDAmount == 'string') extraLUSDAmount = this.toBN(extraLUSDAmount)
 
     /*
     if (!shielded) shielded = false

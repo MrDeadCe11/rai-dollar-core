@@ -464,6 +464,9 @@ contract('TroveManager', async accounts => {
 
     const defaultPool_Collateral = th.applyLiquidationFee(B_collateral)
 
+    console.log("defaultPool_Collateral_After", defaultPool_Collateral_After.toString())
+    console.log("defaultPool_Collateral", defaultPool_Collateral.toString())
+
     // TODO: should these be exactly equal?
     //assert.equal(defaultPool_Collateral_After, defaultPool_Collateral)
     assert.isAtMost(th.getDifference(defaultPool_Collateral_After, defaultPool_Collateral), 1)
@@ -4850,13 +4853,57 @@ contract('TroveManager', async accounts => {
   });
 
   it('getRedemptionHints(): returns 0 as partialRedemptionHintNICR when reaching _maxIterations', async () => {
+    // This original test is broken in Liquity V1
+    // as it doesn't actually test the intended description
+    // partialNICR is zero because all troves are at MIN_NET_DEBT
     // --- SETUP ---
     const { lusdAmount, netDebt, totalDebt } = await openTrove({ ICR: toBN(dec(310, 16)), extraParams: { from: alice } })
+    await openTrove({ ICR: toBN(dec(290, 16)), extraLUSDAmount: dec(30, 18), extraParams: { from: bob } })
+    await openTrove({ ICR: toBN(dec(250, 16)), extraLUSDAmount: dec(30, 18), extraParams: { from: carol } })
+    await openTrove({ ICR: toBN(dec(180, 16)), extraLUSDAmount: dec(170, 18), extraParams: { from: dennis } })
+
+    /*
     await openTrove({ ICR: toBN(dec(290, 16)), extraParams: { from: bob } })
     await openTrove({ ICR: toBN(dec(250, 16)), extraParams: { from: carol } })
     await openTrove({ ICR: toBN(dec(180, 16)), extraParams: { from: dennis } })
+    */
 
     const price = await priceFeed.getPrice();
+
+
+    // Base Troves ICR must be MCR < ICR
+    // to be redeemable
+    MCR = await troveManager.MCR()
+
+    aliceICR = await troveManager.getCurrentICR(alice, price)
+    bobICR = await troveManager.getCurrentICR(bob, price)
+    carolICR = await troveManager.getCurrentICR(carol, price)
+    dennisICR = await troveManager.getCurrentICR(dennis, price)
+
+    assert(aliceICR.gt(MCR))
+    assert(bobICR.gt(MCR))
+    assert(carolICR.gt(MCR))
+    assert(dennisICR.gt(MCR))
+
+    const MIN_NET_DEBT = await borrowerOperations.MIN_NET_DEBT()
+    const aliceNetDebt = (await troveManager.getTroveDebt(alice)).sub(await troveManager.LUSD_GAS_COMPENSATION())
+    const bobNetDebt = (await troveManager.getTroveDebt(bob)).sub(await troveManager.LUSD_GAS_COMPENSATION())
+    const carolNetDebt = (await troveManager.getTroveDebt(carol)).sub(await troveManager.LUSD_GAS_COMPENSATION())
+    const dennisNetDebt = (await troveManager.getTroveDebt(dennis)).sub(await troveManager.LUSD_GAS_COMPENSATION())
+    console.log("MIN_NET_DEBT", MIN_NET_DEBT.toString())
+    console.log("aliceNetDebt", aliceNetDebt.toString())
+    console.log("bobNetDebt", bobNetDebt.toString())
+    console.log("carolNetDebt", carolNetDebt.toString())
+    console.log("dennisNetDebt", dennisNetDebt.toString())
+
+    assert.isTrue(aliceNetDebt.eq(MIN_NET_DEBT))
+    console.log("bobNetDebt", bobNetDebt.toString())
+    console.log("carolNetDebt", carolNetDebt.toString())
+    console.log("dennisNetDebt", dennisNetDebt.toString())
+
+    extra = toBN(dec(20, 18))
+
+    requestedAmount = dennisNetDebt.add(carolNetDebt).add(extra)
 
     // --- TEST ---
 
@@ -4866,15 +4913,16 @@ contract('TroveManager', async accounts => {
       firstRedemptionHint,
       partialRedemptionHintNICR,
       truncatedLUSDamount
-    } = await hintHelpers.getRedemptionHints('210' + _18_zeros, price, 2) // limit _maxIterations to 2
+    } = await hintHelpers.getRedemptionHints(requestedAmount, price, 2) // limit _maxIterations to 2
 
-    assert.equal(partialRedemptionHintNICR, '0')
-    /*
+    //assert.equal(partialRedemptionHintNICR, '0')
     console.log("firstRedemptionHint", firstRedemptionHint.toString())
     console.log("partialRedemptionHintNICR", partialRedemptionHintNICR.toString())
     console.log("truncatedLUSDamount", truncatedLUSDamount.toString())
+
     assert.isTrue(partialRedemptionHintNICR.eq(toBN('0')))
-    */
+    assert.isTrue(truncatedLUSDamount.gt(toBN('0')))
+    assert.isTrue(truncatedLUSDamount.eq(requestedAmount.sub(extra)))
   });
 
   it('redeemCollateral(): cancels the provided LUSD with debt from Troves with the lowest ICRs and sends an equivalent amount of Collateral', async () => {

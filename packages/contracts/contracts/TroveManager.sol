@@ -657,6 +657,13 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     // Return the current collateral ratio (ICR) of a given Trove. Takes a trove's pending coll and debt rewards from redistributions into account.
     function getCurrentICR(address _borrower, uint _price) public view override returns (uint) {
         uint par = relayer.par();
+
+        /*
+        uint secondsPassed = block.timestamp - lastAccRateUpdateTime;
+        uint256 newAccRate = _calcAccumulatedRate(existingAccRate, interestRate, secondsPassed);
+        uint256 newAccShieldRate = _calcAccumulatedRate(existingAccShieldRate, shieldedInterestRate, secondsPassed);
+        return _getCurrentICR(_borrower, _price, par, newAccRate, newAccShieldRate);
+        */
         return _getCurrentICR(_borrower, _price, par);
     }
 
@@ -666,7 +673,32 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         return ICR;
     }
 
-    // return debts in norm of trove(shielded or unshielded)
+    function getNextICR(address _borrower, uint _price) public view override returns (uint) {
+        (uint nextRate, uint nextPar) = relayer.nextRateAndPar();
+
+        uint secondsPassed = block.timestamp - lastAccRateUpdateTime;
+        bool isShielded = shielded[_borrower];
+        uint accRate = accumulatedRate;
+
+        if (isShielded) {
+            nextRate = nextRate.sub(RATE_PRECISION).mul(kappa).div(DECIMAL_PRECISION).add(RATE_PRECISION) : 
+            accRate = accumulatedShieldRate;
+        }
+        
+        uint256 newAccRate = _calcAccumulatedRate(accRate, nextRate, secondsPassed);
+
+        return _getCurrentICR(_borrower, _price, nextPar, newAccRate);
+    }
+
+    function _getNextICR(address _borrower, uint _price, uint _par, uint _accRate) internal view returns (uint) {
+        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
+        uint ICR = LiquityMath._computeCR(currentCollateral,
+                                          currentLUSDDebt.mul(accRate).div(RATE_PRECISION),
+                                          _price,
+                                          _par);
+        return ICR;
+    }
+
     function _getCurrentTroveAmounts(address _borrower) internal view returns (uint, uint) {
 
         // Compute and apply pending collateral rewards
@@ -674,21 +706,15 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint currentCollateral = Troves[_borrower].coll.add(pendingCollateralReward);
 
         // Compute pending base debt
-        uint pendingBaseLUSDDebtReward = rewards.getPendingBaseLUSDDebtReward(_borrower);
-        uint pendingShieldedLUSDDebtReward = rewards.getPendingShieldedLUSDDebtReward(_borrower);
-
-        // Apply pending debt rewards, convert where needed
-        uint currentLUSDDebt = shielded[_borrower] ?
-            Troves[_borrower].debt.add(pendingShieldedLUSDDebtReward).add(pendingBaseLUSDDebtReward * accumulatedRate / accumulatedShieldRate) :
-            Troves[_borrower].debt.add(pendingBaseLUSDDebtReward).add(pendingShieldedLUSDDebtReward * accumulatedShieldRate / accumulatedRate);
+        uint pendingLUSDDebtReward = rewards.getPendingLUSDDebtReward(_borrower);
+        uint currentLUSDDebt = Troves[_borrower].debt.add(pendingLUSDDebtReward);
 
         return (currentCollateral, currentLUSDDebt);
     }
 
     // Get the borrower's pending accumulated LUSD reward, earned by their stake
-    // TODO improve
     function getPendingActualLUSDDebtReward(address _borrower) public view override returns (uint) {
-        return _actualDebt(rewards.getPendingBaseLUSDDebtReward(_borrower), false).add(_actualDebt(rewards.getPendingShieldedLUSDDebtReward(_borrower), true));
+        return _actualDebt(rewards.getPendingLUSDDebtReward(_borrower), shielded[_borrower]);
     }
 
     // Return the Troves entire debt and coll, including pending rewards from redistributions.
@@ -698,38 +724,17 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         public
         view
         override
-        returns (uint debt, uint coll, uint pendingBaseLUSDDebtReward, uint pendingBaseCollateralReward,
-                 uint pendingShieldedLUSDDebtReward, uint pendingShieldedCollateralReward)
+        returns (uint debt, uint coll, uint pendingLUSDDebtReward, uint pendingCollateralReward)
     {
         debt = Troves[_borrower].debt;
         coll = Troves[_borrower].coll;
 
-        (pendingBaseLUSDDebtReward,
-         pendingBaseCollateralReward,
-         pendingShieldedLUSDDebtReward,
-         pendingShieldedCollateralReward) = rewards.getPendingRewards(_borrower);
+        (pendingLUSDDebtReward,
+         pendingCollateralReward) = rewards.getPendingRewards(_borrower);
 
-        /*
-        pendingBaseLUSDDebtReward = rewards.getPendingBaseLUSDDebtReward(_borrower);
-        pendingBaseCollateralReward = rewards.getPendingBaseCollateralReward(_borrower);
+        debt = debt.add(pendingLUSDDebtReward);
+        coll = coll.add(pendingCollateralReward);
 
-        pendingShieldedLUSDDebtReward = rewards.getPendingShieldedLUSDDebtReward(_borrower);
-        pendingShieldedCollateralReward = rewards.getPendingShieldedCollateralReward(_borrower);
-        */
-
-        bool isShielded = shielded[_borrower];
-
-        // add debt, converting shield <-> base where needed
-        if (isShielded) {
-            debt = debt.add(pendingShieldedLUSDDebtReward);
-            debt = debt.add(pendingBaseLUSDDebtReward * accumulatedRate / accumulatedShieldRate);
-        } else {
-            debt = debt.add(pendingBaseLUSDDebtReward);
-            debt = debt.add(pendingShieldedLUSDDebtReward * accumulatedShieldRate / accumulatedRate);
-        }
-
-        coll = coll.add(pendingBaseCollateralReward);
-        coll = coll.add(pendingShieldedCollateralReward);
     }
 
     function closeTrove(address _borrower) external override {

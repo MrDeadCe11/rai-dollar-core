@@ -46,6 +46,9 @@ interface IRewards is ILiquityBase {
                                                         IDefaultPool _defaultPool, IDefaultPool _defaultShieldedPool,
                                                         uint _collRemainder) external;
 
+    function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
+                                                  uint _LUSD, uint _collateral) external;
+
     function updateStakeAndTotalStakes(address _borrower) external returns (uint);
 
     function updateTroveRewardSnapshots(address _borrower) external;
@@ -54,15 +57,12 @@ interface IRewards is ILiquityBase {
 
     function resetTroveRewardSnapshots(address _borrower) external;
 
-    function getPendingRewards(address _borrower) external view returns (uint, uint, uint, uint);
+    function getPendingRewards(address _borrower) external view returns (uint, uint);
 
     function getPendingCollateralReward(address _borrower) external view returns (uint);
+
     function getPendingBaseCollateralReward(address _borrower) external view returns (uint);
     function getPendingShieldedCollateralReward(address _borrower) external view returns (uint);
-
-    function movePendingTroveRewardsToActivePools(IActivePool _activePool, IDefaultPool _defaultPool,
-                                                  IActivePool _activeShieldedPool, IDefaultPool _defaultShieldedPool,
-                                                  uint _debt, uint _coll, uint _shieldedDebt, uint _shieldedColl) external;
 
     function getPendingLUSDDebtReward(address _borrower) external view returns (uint);
     function getPendingBaseLUSDDebtReward(address _borrower) external view returns (uint);
@@ -72,8 +72,8 @@ interface IRewards is ILiquityBase {
 
     function hasPendingRewards(address _borrower) external view returns (bool);
 
-    function hasPendingBaseRewards(address _borrower) external view returns (bool);
-    function hasPendingShieldedRewards(address _borrower) external view returns (bool);
+    //function hasPendingBaseRewards(address _borrower) external view returns (bool);
+    //function hasPendingShieldedRewards(address _borrower) external view returns (bool);
 
     function removeStake(address _borrower) external;
 }

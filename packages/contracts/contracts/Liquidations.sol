@@ -92,10 +92,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     }
 
     struct LiquidateInputs {
-        IActivePool activePool;
-        IDefaultPool defaultPool;
-        IActivePool activeShieldedPool;
-        IDefaultPool defaultShieldedPool;
+        IActivePool currentActivePool;
+        IDefaultPool currentDefaultPool;
         address borrower;
         uint LUSDInSPForOffsets;
         uint price;
@@ -187,7 +185,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     event TroveLiqInfo(uint256 entireColl, uint256 normDebt, uint256 collToLiquidate, uint256 collToSp, uint256 collToRedistribute,
                        uint256 actualDebt, uint256 totalNormLUSD);
     event Offset(uint actualBaseDebt, uint baseDebt, uint baseColl, uint actualShieldedDebt, uint shieldedDebt, uint shieldedColl);
-    event DebtToOffset(uint debt);
+    event Value(uint value);
     event Redistribute(uint baseDebt, uint baseColl, uint sDebt, uint sColl);
 
 
@@ -300,7 +298,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
     function getCappedOffsetAndRedistributionVals(LiquidationOffsetInputs memory i)
         internal
-        pure
         returns (uint debtToOffset, uint collToSendToSP, uint debtToRedistribute, uint collToRedistribute, uint collSurplus)
     {
         if (i.LUSDInSPForOffsets > 0) {
@@ -309,6 +306,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             collToSendToSP = i.coll.mul(debtToOffset) / i.entireTroveDebt;
 
             uint maxToSP = _maxPenaltyColl(actualDebtToOffset, i.par, i.liqPenalty, i.price);
+            //emit Value(maxToSP);
+            //emit Value(actualDebtToOffset);
+            //emit Value(i.troveRate);
             if (collToSendToSP > maxToSP) collToSendToSP = maxToSP;
 
             if (actualDebtToOffset < i.actualTroveDebt) {
@@ -339,15 +339,12 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         (singleLiquidation.entireTroveDebt, //normalized
         singleLiquidation.entireTroveColl,
         vars.pendingDebtReward, //normalized
-        vars.pendingCollReward,
-        vars.pendingShieldedDebtReward, //normalized
-        vars.pendingShieldedCollReward) = troveManager.getEntireDebtAndColl(_i.borrower);
+        vars.pendingCollReward) = troveManager.getEntireDebtAndColl(_i.borrower);
 
         uint actualTroveDebt = _actualDebt(singleLiquidation.entireTroveDebt, _i.troveRate);
 
-        rewards.movePendingTroveRewardsToActivePools(_i.activePool, _i.defaultPool, _i.activeShieldedPool, _i.defaultShieldedPool,
-                                                    vars.pendingDebtReward, vars.pendingCollReward,
-                                                    vars.pendingShieldedDebtReward, vars.pendingShieldedCollReward);
+        rewards.movePendingTroveRewardsToActivePool(_i.currentActivePool, _i.currentDefaultPool,
+                                                    vars.pendingDebtReward, vars.pendingCollReward);
         rewards.removeStake(_i.borrower);
 
         singleLiquidation.collGasCompensation = _getCollGasCompensation(singleLiquidation.entireTroveColl);
@@ -370,8 +367,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         singleLiquidation.collToRedistribute,
         singleLiquidation.collSurplus) = getCappedOffsetAndRedistributionVals(offsetInputs);
 
-        emit DebtToOffset(singleLiquidation.debtToOffset);
-        //emit DebtToOffset(_i.LUSDInSPForOffsets);
+        //emit Value(singleLiquidation.collSurplus);
 
 
         singleLiquidation.actualDebtToOffset = _actualDebt(singleLiquidation.debtToOffset, _i.troveRate);
@@ -528,10 +524,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         LiquidationValues memory singleLiquidation;
         LiquidateInputs memory liquidateInputs; 
 
-        liquidateInputs.activePool = _activePool;
-        liquidateInputs.activeShieldedPool = _activeShieldedPool;
-        liquidateInputs.defaultPool = _defaultPool;
-        liquidateInputs.defaultShieldedPool = _defaultShieldedPool;
         liquidateInputs.price = _price;
         liquidateInputs.par = _par;
 
@@ -571,6 +563,10 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             }
 
             //if (vars.user == address(0)) break;
+
+            // set corresponding pools
+            liquidateInputs.currentActivePool = vars.shielded ? _activeShieldedPool : _activePool;
+            liquidateInputs.currentDefaultPool = vars.shielded ? _defaultShieldedPool : _defaultPool;
 
             vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
 
@@ -675,7 +671,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         vars.liquidatedDebt = _actualDebt(totals.totalBaseDebtInSequence, vars.accumulatedRate) + _actualDebt(totals.totalShieldedDebtInSequence, vars.accumulatedShieldRate);
         vars.liquidatedColl = totals.totalCollInSequence.sub(totals.totalCollGasCompensation).sub(totals.totalCollSurplus);
-        //vars.liquidatedColl = 0;
 
         emit Liquidation(vars.liquidatedDebt, vars.liquidatedColl, totals.totalCollGasCompensation, totals.totalLUSDGasCompensation);
 
@@ -694,8 +689,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         uint _LUSDInSPForOffsets,
         address[] memory _troveArray,
         uint _par,
-        uint accumulatedRate,
-        uint accumulatedShieldRate
+        uint _accumulatedRate,
+        uint _accumulatedShieldRate
     )
         internal
         returns(LiquidationTotals memory totals)
@@ -703,26 +698,33 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         LocalVariables_LiquidationSequence memory vars;
         LiquidationValues memory singleLiquidation;
 
+        LiquidateInputs memory liquidateInputs;
+        liquidateInputs.price = _price;
+        liquidateInputs.par = _par;
+
+        emit Value(_accumulatedShieldRate);
+
         vars.remainingLUSDInSPForOffsets = _LUSDInSPForOffsets;
 
         for (vars.i = 0; vars.i < _troveArray.length; vars.i++) {
             vars.user = _troveArray[vars.i];
             vars.ICR = troveManager.getCurrentICR(vars.user, _price);
-            vars.shielded = troveManager.shielded(vars.user);
 
-            if (vars.shielded) {
-                vars.troveRate = accumulatedShieldRate;
-            } else {
-                vars.troveRate = accumulatedRate;
-            }
+            if (vars.ICR < MCR) {
 
-            // assumes HCR > MCR
-            if (vars.ICR < MCR || (vars.shielded && vars.ICR < HCR)) {
+                vars.shielded = troveManager.shielded(vars.user);
+
+                vars.troveRate = vars.shielded ? _accumulatedShieldRate : _accumulatedRate;
 
                 vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
 
-                LiquidateInputs memory liquidateInputs = LiquidateInputs(_activePool, _defaultPool, _activeShieldedPool, _defaultShieldedPool,
-                                                   vars.user, vars.availableLUSDNorm, _price, _par, vars.troveRate);
+
+                liquidateInputs.currentActivePool = vars.shielded ? _activeShieldedPool : _activePool;
+                liquidateInputs.currentDefaultPool = vars.shielded ? _defaultShieldedPool : _defaultPool;
+
+                liquidateInputs.borrower = vars.user;
+                liquidateInputs.LUSDInSPForOffsets = vars.availableLUSDNorm;
+                liquidateInputs.troveRate = vars.troveRate;
 
                 singleLiquidation = _liquidate(liquidateInputs);
 

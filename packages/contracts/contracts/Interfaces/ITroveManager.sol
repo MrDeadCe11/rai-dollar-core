@@ -117,9 +117,7 @@ interface ITroveManager is ILiquityBase {
         uint debt, 
         uint coll, 
         uint pendingLUSDDebtReward, 
-        uint pendingCollateralReward,
-        uint pendingShieldedLUSDDebtReward, 
-        uint pendingShieldedCollateralReward
+        uint pendingCollateralReward
     );
 
     function drip() external;
