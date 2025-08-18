@@ -21,6 +21,7 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
     // Controller output bias
     int256 public CO_BIAS = 158153903837946259; // 0.5% annual, [TWENTY_SEVEN_DECIMAL_NUMBER]
+
     //int256 public CO_BIAS = 0; // 0.5% annual, [TWENTY_SEVEN_DECIMAL_NUMBER]
 
     // The per second leak applied to errorIntegral before the latest error is added
@@ -54,6 +55,11 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
     uint256 internal constant TWENTY_SEVEN_DECIMAL_NUMBER = 10 ** 27;
     uint256 internal constant EIGHTEEN_DECIMAL_NUMBER = 10 ** 18;
+
+    struct PiComponents {
+        int256 p;
+        int256 i;
+    }
 
     event RelayerAddressChanged(address _relayerAddress);
 
@@ -101,22 +107,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
     }
 
     /*
-    * @notice Return bounded controller output
-    * @param piOutput The raw output computed from the error and integral terms
-    */
-    function boundPiOutput(int256 piOutput) public view returns (int256) {
-        int256 boundedPIOutput = piOutput;
-
-        if (piOutput < OUTPUT_LOWER_BOUND) {
-            boundedPIOutput = OUTPUT_LOWER_BOUND;
-        } else if (piOutput > OUTPUT_UPPER_BOUND) {
-            boundedPIOutput = OUTPUT_UPPER_BOUND;
-        }
-
-        return boundedPIOutput;
-    }
-
-    /*
     * @notice Return maximum of two int256 values
     * @param a first value
     * @param b second value
@@ -138,12 +128,10 @@ contract RateControl is Ownable, CheckContract, IRateControl {
      * @notice Bounds the raw PI-controller output by both
      *         (a) absolute limits  and  (b) maximum slew-rate,
      *         and clamps the error-integral once if a bound is hit.
-     *         Clamping logic is specific to direct-acting control, where
-     *         sign of output equals sign or error
      *
-     * @param _piOutput       Raw bias + P + I output
+     * @param _piOutput       Raw   P + I output for this step
      * @param _errorIntegral  Current accumulated integral term
-     * @param _newArea        Signed area added to the integral
+     * @param _newArea        Signed area added to the integral this step
      * @param _timeElapsed    Seconds since the previous update
      *
      * @return boundedOutput   Output after both bounds are applied
@@ -157,26 +145,39 @@ contract RateControl is Ownable, CheckContract, IRateControl {
         boundedOutput = _piOutput;
         clampedIntegral = _errorIntegral;
 
-        /* ── compute the per-step Δ envelope ───────────────────────────── */
+        // compute output bounds for this update
+        // for first output, timeElapsed=0 -> maxDelta=0
         int256 maxDelta = int256(MAX_DELTA_PER_HOUR * _timeElapsed / 3600);
         int256 upperBound = int256(min(OUTPUT_UPPER_BOUND, lastOutput + maxDelta));
         int256 lowerBound = int256(max(OUTPUT_LOWER_BOUND, lastOutput - maxDelta));
 
-        /* ── apply bounds & integral clamp ────────────────────── */
+        // apply bounds and optional integral clamp
         if (_piOutput < lowerBound) {
             boundedOutput = lowerBound;
-            // don't accumulate error in the same direction as the bound
             if (_newArea < 0 && _errorIntegral < 0) {
                 clampedIntegral -= _newArea;
             }
         } else if (_piOutput > upperBound) {
             boundedOutput = upperBound;
-            // don't accumulate error in the same direction as the bound
             if (_newArea > 0 && _errorIntegral > 0) {
                 clampedIntegral -= _newArea;
             }
         }
     }
+
+    /*
+    function boundPiOutput(int256 piOutput) public view returns (int256) {
+        int256 boundedPIOutput = piOutput;
+
+        if (piOutput < OUTPUT_LOWER_BOUND) {
+            boundedPIOutput = OUTPUT_LOWER_BOUND;
+        } else if (piOutput > OUTPUT_UPPER_BOUND) {
+            boundedPIOutput = OUTPUT_UPPER_BOUND;
+        }
+
+        return boundedPIOutput;
+    }
+    */
 
     /*
     * @notice Compute a new error Integral
@@ -193,23 +194,38 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
         return (errorIntegral + newTimeAdjustedError, newTimeAdjustedError);
     }
-
     /*
-    * @notice Apply Kp to the error and Ki to the error integral(by multiplication)
-    * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
-    * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
-    * @return pOutput, iOutput TWENTY_SEVEN_DECIMAL_NUMBER
-    */
     function getRawPiOutput(int256 error, int256 errorI) public view returns (int256, int256) {
         int256 pOutput = error * int256(KP) / int256(EIGHTEEN_DECIMAL_NUMBER);
         int256 iOutput = errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
         return (pOutput, iOutput);
     }
+    */
 
     /*
-    * @notice Process a new error and return controller output
+    * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
     * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
+    * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
+    * @return pOutput, iOutput TWENTY_SEVEN_DECIMAL_NUMBER
     */
+    function getRawPiOutput(int256 _error, int256 _errorI) external view returns (int256, int256) {
+        PiComponents memory output = _getRawPiOutput(_error, _errorI);
+        return (output.p, output.i);
+    }
+
+    /*
+    * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
+    * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
+    * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
+    * @return PiComponents TWENTY_SEVEN_DECIMAL_NUMBER
+    */
+    function _getRawPiOutput(int256 _error, int256 _errorI) internal view returns (PiComponents memory) {
+        int256 pOutput = _error * int256(KP) / int256(EIGHTEEN_DECIMAL_NUMBER);
+        int256 iOutput = _errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
+        return PiComponents(pOutput, iOutput);
+    }
+
+    /*
     function update(int256 error) external returns (int256, int256, int256) {
         _requireCallerIsRelayer();
         uint256 timeElapsed = (lastUpdateTime == 0) ? 0 : block.timestamp - lastUpdateTime;
@@ -231,12 +247,26 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
         return (boundedPiOutput, pOutput, iOutput);
     }
-    /*
-    * @notice Compute and return the output given an error
-    * @param error The system error
-    * @param error Time elapsed since last update
     */
 
+    /*
+    * @notice Process a new error and return controller output. First update will output the bias
+    * @param error The system error EIGHTEEN_DECIMAL_NUMBER
+    */
+    function update(int256 _error) external returns (int256, int256, int256) {
+        _requireCallerIsRelayer();
+        require(block.timestamp > lastUpdateTime, "RateControl/wait-longer");
+
+        (int256 boundedPiOutput, int256 newErrorIntegral, int256 pOutput, int256 iOutput) = getNextPiOutput(_error);
+
+        lastUpdateTime = block.timestamp;
+        lastError = _error;
+        lastOutput = boundedPiOutput;
+        errorIntegral = newErrorIntegral;
+
+        return (boundedPiOutput, pOutput, iOutput);
+    }
+    /*
     function getNextPiOutput(int256 error, uint256 timeElapsed) public view returns (int256, int256, int256) {
         (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(error, timeElapsed);
         (int256 pOutput, int256 iOutput) = getRawPiOutput(error, newErrorIntegral);
@@ -246,11 +276,44 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
         return (boundedPiOutput, pOutput, iOutput);
     }
+    */
+
+    /*
+    * @notice Compute and return the output given an error 
+    * @param error The system error
+    * @param timeElapsed Time since last update
+    */
+
+    function getNextPiOutput(int256 _error, uint256 _timeElapsed)
+        public
+        view
+        returns (int256, int256, int256, int256)
+    {
+        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(_error, _timeElapsed);
+
+        PiComponents memory output = _getRawPiOutput(_error, newErrorIntegral);
+        int256 piOutput = output.p + output.i;
+
+        (int256 boundedPiOutput, int256 clampedErrorIntegral) =
+            boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, _timeElapsed);
+
+        return (boundedPiOutput, clampedErrorIntegral, output.p, output.i);
+    }
+
+    /*
+    * @notice Compute and return the output given an error
+    * @param error The system error
+    */
+
+    function getNextPiOutput(int256 _error) public view returns (int256, int256, int256, int256) {
+        return getNextPiOutput(_error, elapsed());
+    }
 
     /*
     * @notice Returns the time elapsed since the last update call
     */
-    function elapsed() external view returns (uint256) {
+    function elapsed() public view returns (uint256) {
         return (lastUpdateTime == 0) ? 0 : block.timestamp - lastUpdateTime;
     }
 }
+

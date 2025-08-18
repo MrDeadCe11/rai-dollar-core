@@ -23,6 +23,8 @@ interface IRelayer {
     function getPar() external returns (uint256, uint256);
     function getRate() external returns (uint256, uint256);
 
+    function nextRateAndPar() external view returns (uint256, uint256, uint256, uint256);
+
     function updateRateAndPar() external returns (uint256, uint256);
     function updatePar() external returns (uint256);
     function updateParWithMarket(uint256 marketPrice) external returns (uint256);

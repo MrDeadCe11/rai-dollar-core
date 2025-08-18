@@ -232,15 +232,17 @@ contract Relayer is Ownable, CheckContract {
         int256 error = _parControlError(marketPrice);
         int256 rampedError =  _rampErrorDec(error, PAR_EPSILON_1, PAR_EPSILON_2);
 
-        (int256 newPar, int256 pOutput, int256 iOutput) = parControl.getNextPiOutput(rampedError);
+        (int256 newPar,,int256 pOutput, int256 iOutput) = parControl.getNextPiOutput(rampedError);
     }
 
-    function nextRate() public view returns (uint256 newRate) {
+    function nextRate() public view returns (uint256) {
         uint256 marketPrice = marketOracle.price();
         int256 error = _parControlError(marketPrice);
         int256 rampedError =  _rampErrorDec(error, RATE_EPSILON_1, RATE_EPSILON_2);
 
-        (int256 newRate, int256 pOutput, int256 iOutput) = rateControl.getNextPiOutput(rampedError);
+        (int256 newRate,, int256 pOutput, int256 iOutput) = rateControl.getNextPiOutput(rampedError);
+
+        return RATE_PRECISION + uint256(newRate);
     }
 
     function nextRateAndPar() public view returns (uint newRate, uint newPar) {

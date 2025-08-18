@@ -236,8 +236,8 @@ contract('BorrowerOperations', async accounts => {
 
       assert.isFalse(await sortedTroves.contains(carol))
 
-      const L_COLL = await rewards.L_Coll()
-      const L_LUSDDebt = await rewards.L_LUSDDebt()
+      const L_COLL = await rewards.L_CollBase()
+      const L_LUSDDebt = await rewards.L_LUSDDebtBase()
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
       const alice_rewardSnapshot_Before = await rewards.rewardSnapshots(alice)
@@ -592,8 +592,8 @@ contract('BorrowerOperations', async accounts => {
       // close Carol's Trove, liquidating her 1 ether and 180LUSD.
       await liquidations.liquidate(carol, { from: owner });
 
-      const L_COLL = await rewards.L_Coll()
-      const L_LUSDDebt = await rewards.L_LUSDDebt()
+      const L_COLL = await rewards.L_CollBase()
+      const L_LUSDDebt = await rewards.L_LUSDDebtBase()
 
       // check Alice and Bob's reward snapshots are zero before they alter their Troves
       const alice_rewardSnapshot_Before = await rewards.rewardSnapshots(alice)
@@ -3619,8 +3619,8 @@ contract('BorrowerOperations', async accounts => {
       /* with total stakes = 10 ether, after liquidation, L_COLL should equal 1/10 ether per-ether-staked,
        and L_LUSD should equal 18 LUSD per-ether-staked. */
 
-      const L_COLL = await rewards.L_Coll()
-      const L_LUSD = await rewards.L_LUSDDebt()
+      const L_COLL = await rewards.L_CollBase()
+      const L_LUSD = await rewards.L_LUSDDebtBase()
 
       assert.isTrue(L_COLL.gt(toBN('0')))
       assert.isTrue(L_LUSD.gt(toBN('0')))

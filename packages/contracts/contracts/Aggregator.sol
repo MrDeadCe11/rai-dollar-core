@@ -137,6 +137,7 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     }
 
     function _calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) internal pure returns (uint) {
+        if (_ETHDrawn == 0) return 0;
         uint redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
         require(redemptionFee < _ETHDrawn, "TroveManager: Fee would eat up all returned collateral");
         return redemptionFee;

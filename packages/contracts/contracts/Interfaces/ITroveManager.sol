@@ -99,6 +99,8 @@ interface ITroveManager is ILiquityBase {
 
     function getCurrentICR(address _borrower, uint _price) external view returns (uint);
 
+    //function getNextICR(address _borrower, uint _price) external view returns (uint);
+
     function getPendingActualLUSDDebtReward(address _borrower) external view returns (uint);
 
     function redeemCollateral(

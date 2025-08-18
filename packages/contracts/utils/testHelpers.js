@@ -1258,7 +1258,7 @@ class TestHelper {
       await this.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
     )
 
-    const lusdAmount = MIN_DEBT.add(extraLUSDAmount)
+    const lusdAmount = MIN_DEBT.add(this.toBN(extraLUSDAmount))
 
     if (!ICR && !extraParams.value) ICR = this.toBN(this.dec(15, 17)) // 150%
     else if (typeof ICR == 'string') ICR = this.toBN(ICR)

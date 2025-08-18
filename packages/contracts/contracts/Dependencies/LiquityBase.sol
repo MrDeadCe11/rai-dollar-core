@@ -78,11 +78,14 @@ contract LiquityBase is BaseMath, ILiquityBase {
     }
 
     function getEntireSystemDebt(uint accumulatedRate, uint accumulatedShieldRate) public view returns (uint) {
-        return _getEntireNormalizedBaseDebt().mul(accumulatedRate).div(RATE_PRECISION) +
-               _getEntireNormalizedShieldedDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
+        uint baseDebt = _getEntireNormalizedBaseDebt().mul(accumulatedRate).div(RATE_PRECISION);
+        uint shieldedDebt = _getEntireNormalizedShieldedDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
+        return baseDebt + shieldedDebt;
     }
 
     function _getEntireNormalizedBaseDebt() internal view returns (uint) {
+        activePool.getLUSDDebt();
+        defaultPool.getLUSDDebt();
         return activePool.getLUSDDebt().add(defaultPool.getLUSDDebt());
     }
 

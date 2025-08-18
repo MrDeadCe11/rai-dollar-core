@@ -306,8 +306,10 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             collToSendToSP = i.coll.mul(debtToOffset) / i.entireTroveDebt;
 
             uint maxToSP = _maxPenaltyColl(actualDebtToOffset, i.par, i.liqPenalty, i.price);
-            //emit Value(maxToSP);
+            emit Value(collToSendToSP);
             //emit Value(actualDebtToOffset);
+            //emit Value(debtToOffset);
+            //emit Value(maxToSP);
             //emit Value(i.troveRate);
             if (collToSendToSP > maxToSP) collToSendToSP = maxToSP;
 
@@ -425,7 +427,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         totals = _getTotalsFromLiquidate(contractsCache.activePool, contractsCache.defaultPool, contractsCache.activeShieldedPool, contractsCache.defaultShieldedPool,
                                          vars.price, vars.LUSDInSPForOffsets, _n, par, vars.accumulatedRate, vars.accumulatedShieldRate);
 
-        require(totals.totalBaseDebtInSequence > 0 || totals.totalShieldedDebtInSequence > 0, "TroveManager: nothing to liquidate");
+        require(totals.totalBaseDebtInSequence > 0 || totals.totalShieldedDebtInSequence > 0, "Liquidations: nothing to liquidate");
  
         // Move liquidated ETH and LUSD to the appropriate pools
 
@@ -491,13 +493,14 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             return (address(0), 0);
         }
     }
+
     function _getNextLiquidatableShieldedTrove(ISortedTroves _sortedShieldedTroves, uint _price) internal view returns (address troveOwner, uint icr) {
         if (troveManager.getShieldedTroveOwnersCount() == 1) return (address(0), 0);
 
         address owner = _sortedShieldedTroves.getLast();
         icr = troveManager.getCurrentICR(owner, _price);
 
-        if (icr < HCR) {
+        if (icr < MCR) {
             return (owner, icr);
         } else {
             return (address(0), 0);
@@ -534,6 +537,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         (vars.baseNext, vars.baseICR) = _getNextLiquidatableBaseTrove(sortedTrovesCached, _price);
         (vars.shieldedNext, vars.shieldedICR) = _getNextLiquidatableShieldedTrove(sortedShieldedTrovesCached, _price);
+
         while (vars.i < _n) {
 
             // nothing liquidatable -> stop
@@ -616,7 +620,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     * Attempt to liquidate a custom list of troves provided by the caller.
     */
     function batchLiquidate(address[] memory _troveArray) public override {
-        require(_troveArray.length != 0, "TroveManager: address array must not be empty");
+        require(_troveArray.length != 0, "Liquidations: address array must not be empty");
 
         IActivePool activePoolCached = activePool;
         IDefaultPool defaultPoolCached = defaultPool;
@@ -640,7 +644,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         totals = _getTotalsFromBatchLiquidate(activePoolCached, defaultPoolCached, activeShieldedPoolCached, defaultShieldedPoolCached, vars.price, vars.LUSDInSPForOffsets,
                                               _troveArray, par, vars.accumulatedRate, vars.accumulatedShieldRate);
 
-        require(totals.totalBaseDebtInSequence > 0 || totals.totalShieldedDebtInSequence > 0, "TroveManager: nothing to liquidate");
+        require(totals.totalBaseDebtInSequence > 0 || totals.totalShieldedDebtInSequence > 0, "Liquidations: nothing to liquidate");
 
         uint totalActualBaseDebtToOffset = totals.totalBaseDebtToOffset.mul(vars.accumulatedRate).div(RATE_PRECISION);
         uint totalActualShieldedDebtToOffset = totals.totalShieldedDebtToOffset.mul(vars.accumulatedShieldRate).div(RATE_PRECISION);
@@ -653,7 +657,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
-
+        // batchLiquidate
+        //emit Value(totals.totalShieldedCollToRedistribute);
         rewards.redistributeDebtAndColl(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
 
@@ -702,8 +707,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         liquidateInputs.price = _price;
         liquidateInputs.par = _par;
 
-        emit Value(_accumulatedShieldRate);
-
         vars.remainingLUSDInSPForOffsets = _LUSDInSPForOffsets;
 
         for (vars.i = 0; vars.i < _troveArray.length; vars.i++) {
@@ -711,6 +714,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             vars.ICR = troveManager.getCurrentICR(vars.user, _price);
 
             if (vars.ICR < MCR) {
+
+                //emit Value(vars.ICR);
 
                 vars.shielded = troveManager.shielded(vars.user);
 
@@ -834,6 +839,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     // --- 'require' wrapper functions ---
 
     function _requireCallerIsBorrowerOperations() internal view {
-        require(msg.sender == borrowerOperationsAddress, "TroveManager: Caller is not BO contract");
+        require(msg.sender == borrowerOperationsAddress, "Liquidations: Caller is not BO contract");
     }
 }

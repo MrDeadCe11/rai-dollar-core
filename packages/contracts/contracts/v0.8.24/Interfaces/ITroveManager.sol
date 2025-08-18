@@ -66,6 +66,8 @@ interface ITroveManager is ILiquityBase {
     function getNominalICR(address _borrower) external view returns (uint);
     function getCurrentICR(address _borrower, uint _price) external view returns (uint);
 
+    //function getNextICR(address _borrower, uint _price) external view returns (uint);
+
     function liquidate(address _borrower) external;
 
     function liquidateTroves(uint _n) external;

@@ -104,6 +104,8 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         redeemCollateral
     }
 
+    event Value(uint value);
+
 
     // --- Dependency setter ---
 
@@ -173,8 +175,13 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
     function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
-                                                  uint _LUSD, uint _collateral) public override {
+                                                  uint _LUSD, uint _collateral) external override {
         _requireCallerIsLiquidations();
+        _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, _LUSD, _collateral);
+    }
+
+    function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
+                                                  uint _LUSD, uint _collateral) internal {
         _defaultPool.decreaseLUSDDebt(_LUSD);
         _activePool.increaseLUSDDebt(_LUSD);
         _defaultPool.sendCollateralToActivePool(_collateral);
@@ -194,6 +201,14 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     }
     */
 
+    function _convertShieldedToBaseDebt(uint _shieldedDebt) internal view returns (uint baseDebt) {
+        baseDebt = _shieldedDebt * troveManager.accumulatedShieldRate() / troveManager.accumulatedRate();
+    }
+
+    function _convertBaseToShieldedDebt(uint _baseDebt) internal view returns (uint shieldedDebt) {
+        shieldedDebt = _baseDebt * troveManager.accumulatedRate() / troveManager.accumulatedShieldRate();
+    }
+
     function applyPendingRewards(address _borrower) external override {
         // TODO drip here?
         _requireCallerIsBorrowerOperationsOrTM();
@@ -202,13 +217,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         _applyPendingRewards(_borrower, troveManager.shielded(_borrower));
     }
 
-    function _convertShieldedToBaseDebt(uint _shieldedDebt) internal view returns (uint baseDebt) {
-        baseDebt = _shieldedDebt * troveManager.accumulatedShieldRate() / troveManager.accumulatedRate();
-    }
-
-    function _convertBaseToShieldedDebt(uint _baseDebt) internal view returns (uint shieldedDebt) {
-        shieldedDebt = _baseDebt * troveManager.accumulatedRate() / troveManager.accumulatedShieldRate();
-    }
 
     // Add the borrowers's coll and debt rewards earned from redistributions, to their Trove
     function _applyPendingRewards(address _borrower, bool _shielded) internal {
@@ -228,9 +236,9 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
 
             // Transfer from DefaultPool to ActivePool
             if (_shielded) {
-                movePendingTroveRewardsToActivePool(activeShieldedPool, defaultShieldedPool, pendingLUSDDebtReward, pendingCollateralReward);
+                _movePendingTroveRewardsToActivePool(activeShieldedPool, defaultShieldedPool, pendingLUSDDebtReward, pendingCollateralReward);
             } else {
-                movePendingTroveRewardsToActivePool(activePool, defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
+                _movePendingTroveRewardsToActivePool(activePool, defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
             }
 
             // TODO improve
@@ -516,18 +524,21 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         // shielded debt converted to shielded debt
         uint shieldedBaseDebt = _convertBaseToShieldedDebt(_baseDebt);
 
+        // base and shielded troves use the same stakes pool, so it looks like
+        // debt is being redistributed twice here, but each is effectively adjusted
+        // for base and shielded proportions of totalstakes
         _redistributeBaseDebtAndColl(_baseDebt.add(baseShieldedDebt), totalColl);
         _redistributeShieldedDebtAndColl(_shieldedDebt.add(shieldedBaseDebt), totalColl);
-
 
         // Transfer coll and debt from ActivePools to DefaultPools
         activePool.decreaseLUSDDebt(_baseDebt);
         defaultPool.increaseLUSDDebt(_baseDebt);
         activePool.sendCollateral(address(defaultPool), _baseColl);
 
+        //emit Value(_shieldedColl);
         activeShieldedPool.decreaseLUSDDebt(_shieldedDebt);
         defaultShieldedPool.increaseLUSDDebt(_shieldedDebt);
-        activeShieldedPool.sendCollateral(address(defaultPool), _shieldedColl);
+        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _shieldedColl);
     }
 
     function _redistributeShieldedDebtAndColl(uint _debt, uint _coll) internal {
@@ -544,8 +555,8 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         * 4) Store these errors for use in the next correction when this function is called.
         * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
         */
-        uint collateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution);
-        uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution);
+        uint collateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution_Shielded);
+        uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution_Shielded);
 
         // Get the per-unit-staked terms
         uint collateralRewardPerUnitStaked = collateralNumerator.div(totalStakes);
