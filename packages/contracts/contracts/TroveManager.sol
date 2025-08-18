@@ -462,6 +462,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                                     _lowerPartialRedemptionHint,
                                     _partialRedemptionHintNICR);
 
+                                    
+
             SingleRedemptionValues memory singleRedemption = _redeemCollateralFromTrove(
                 contractsCache,
                 currentBorrower,
@@ -476,6 +478,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
             totals.totalLUSDToRedeem  = totals.totalLUSDToRedeem.add(singleRedemption.LUSDLot);
             totals.totalCollateralDrawn = totals.totalCollateralDrawn.add(singleRedemption.collateralLot);
+
             totals.collateralFee = totals.collateralFee.add(singleRedemption.fee);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
@@ -486,7 +489,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // Decay the baseRate due to time passed, and then increase it according to the size of this redemption.
         // Use the saved total LUSD supply value, from before it was reduced by the redemption.
-        aggregator.updateBaseRateFromRedemption(totals.totalCollateralDrawn, totals.price, totals.par, totals.totalLUSDSupplyAtStart);
+        // aggregator.updateBaseRateFromRedemption(totals.totalCollateralDrawn, totals.price, totals.par, totals.totalLUSDSupplyAtStart);
 
         // // Calculate the Collateral fee
         // totals.collateralFee = aggregator.getRedemptionFee(totals.totalCollateralDrawn);
