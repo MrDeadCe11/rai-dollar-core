@@ -15,7 +15,7 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-//import "./Dependencies/console.sol";
+import "./Dependencies/console.sol";
 
 contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     string constant public NAME = "TroveManager";
@@ -144,7 +144,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     struct SingleRedemptionValues {
         uint LUSDLot;
         uint collateralLot;
-        uint fee;
+        uint collateralFee;
         uint256 newDebt;
         uint256 newColl;
         bool cancelledPartial;
@@ -279,13 +279,20 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
+        
+        // if collateralLot is greater than 0, calculate the fee and execute redemption else return lusd 0 and collateral 0 fee
+        if(singleRedemption.collateralLot > 0) {
+            singleRedemption.LUSDLot = 0;
+            return singleRedemption;
+        }
 
-        // subtract fee from collateralLot so fee remains in trove
-        singleRedemption.fee = aggregator.getRedemptionFee(singleRedemption.collateralLot);
+            // subtract fee from collateralLot so fee remains in trove
+        singleRedemption.collateralFee = aggregator.getRedemptionFee(singleRedemption.collateralLot);
+        
 
-        _requireUserAcceptsFee(singleRedemption.fee, singleRedemption.collateralLot, _maxFeePercentage);
+        _requireUserAcceptsFee(singleRedemption.collateralFee, singleRedemption.collateralLot, _maxFeePercentage);
 
-        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.fee);
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 
         uint normDebt = _normalizedDebt(singleRedemption.LUSDLot);
         if (normDebt.mul(accumulatedRate).div(RATE_PRECISION) < _actualDebt(singleRedemption.LUSDLot)) {
@@ -334,7 +341,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 TroveManagerOperation.redeemCollateral
             );
         }
-
+       
         return singleRedemption;
     }
 
@@ -479,7 +486,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             totals.totalLUSDToRedeem  = totals.totalLUSDToRedeem.add(singleRedemption.LUSDLot);
             totals.totalCollateralDrawn = totals.totalCollateralDrawn.add(singleRedemption.collateralLot);
 
-            totals.collateralFee = totals.collateralFee.add(singleRedemption.fee);
+            totals.collateralFee = totals.collateralFee.add(singleRedemption.collateralFee);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
             currentBorrower = nextUserToCheck;

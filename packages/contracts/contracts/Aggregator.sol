@@ -14,6 +14,7 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
+import "./Dependencies/console.sol";
 
 contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     string constant public NAME = "Aggregator";
@@ -136,9 +137,9 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return _calcRedemptionFee(getRedemptionRateWithDecay(), _ETHDrawn);
     }
 
-    function _calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) internal pure returns (uint) {
+    function _calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) internal view returns (uint) {
         uint redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
-        require(redemptionFee < _ETHDrawn, "TroveManager: Fee would eat up all returned collateral");
+        require(redemptionFee < _ETHDrawn || _ETHDrawn == 0, "TroveManager: Fee would eat up all returned collateral");
         return redemptionFee;
     }
 
