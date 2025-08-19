@@ -23,7 +23,6 @@ interface ILiquidations is ILiquityBase {
     event ActivePoolAddressChanged(address _activePoolAddress);
     event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
-    event DefaultShieldedPoolAddressChanged(address _defaultShieldedPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
@@ -54,7 +53,6 @@ interface ILiquidations is ILiquityBase {
         address _activePoolAddress,
         address _activeShieldedPoolAddress,
         address _defaultPoolAddress,
-        address _defaultShieldedPoolAddress,
         address _stabilityPoolAddress,
         address _gasPoolAddress,
         address _collSurplusPoolAddress,

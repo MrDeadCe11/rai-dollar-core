@@ -25,7 +25,6 @@ interface ITroveManager is ILiquityBase {
     event ActivePoolAddressChanged(address _activePoolAddress);
     event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
-    event DefaultShieldedPoolAddressChanged(address _defaultShieldedPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
@@ -39,7 +38,8 @@ interface ITroveManager is ILiquityBase {
     event Redemption(uint _attemptedLUSDAmount, uint _actualLUSDAmount, uint _collateralSent, uint _collateralFee);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, uint8 operation);
-    event TroveIndexUpdated(address _borrower, uint _newIndex);
+    //event TroveIndexUpdated(address _borrower, uint _newIndex);
+    event TroveIndexUpdated(address _borrower, uint _newIndex, bool _shielded);
     event ShieldedTroveIndexUpdated(address _borrower, uint _newIndex);
 
     event AccInterestRateUpdated(uint256 rate, uint256 shieldRate);
@@ -54,7 +54,6 @@ interface ITroveManager is ILiquityBase {
         address _activePoolAddress,
         address _activeShieldedPoolAddress,
         address _defaultPoolAddress,
-        address _defaultShieldedPoolAddress,
         address _stabilityPoolAddress,
         address _gasPoolAddress,
         address _collSurplusPoolAddress,

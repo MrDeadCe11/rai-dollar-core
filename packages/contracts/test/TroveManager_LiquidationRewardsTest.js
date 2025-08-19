@@ -69,7 +69,7 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
-    await th.mintCollateralTokensAndApproveActivePool(contracts, [owner,
+    await th.batchMintCollateralTokensAndApproveActivePool(contracts, [owner,
       alice, bob, carol, dennis, erin, freddy, greta, harry, ida,
       A, B, C, D, E,
       whale, defaulter_1, defaulter_2, defaulter_3, defaulter_4], toBN(dec(1000, 26)))

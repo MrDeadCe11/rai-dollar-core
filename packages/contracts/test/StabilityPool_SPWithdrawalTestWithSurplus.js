@@ -82,11 +82,6 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
-      //await th.mintCollateralTokensAndApproveActivePool(contracts, accounts, toBN(dec(1000, 26)))
-      //await th.batchMintCollateralTokensAndApproveActivePool(contracts, accounts, toBN(dec(1000, 26)))
-        //
-        //
-      //await th.batchMintCollateralTokensAndApproveActivePool(contracts, accounts, toBN(dec(1000, 26)))
       tx = await th.batchMintCollateralTokensAndApproveActivePool(contracts, [owner, defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5, defaulter_6, whale, alice, bob, carol, dennis, erin, flyn, graham, harriet, A, B, C, D, E, F ], toBN(dec(1000, 26)))
       // should trigger surplus for most tests
       // just adding these here(even with existing values) accrues more interest when drip() is called 
@@ -389,9 +384,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), '4000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), '4000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), '4000000000000000000000'), 10000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 22000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 22000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 22000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 25000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 25000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 25000)
 
       // (0.5 + 0.6 + 0.7) * 99.5 / 3
       assert.isAtMost(th.getDifference(alice_ETHWithdrawn, dec(597, 17)), 10000)

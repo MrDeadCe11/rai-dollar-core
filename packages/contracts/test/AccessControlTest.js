@@ -70,7 +70,7 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     await deploymentHelper.connectCoreContracts(coreContracts, LQTYContracts)
     await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, coreContracts)
     // mint tokens
-    await th.mintCollateralTokens(coreContracts, accounts.slice(0, 10), dec(10, 24))
+    await th.batchMintCollateralTokens(coreContracts, accounts.slice(0, 10), dec(10, 24))
 
     for (account of accounts.slice(0, 10)) {
       await th.openTrove(coreContracts, { extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: account } })
@@ -270,10 +270,10 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
 
   describe('DefaultPool', async accounts => {
     // sendCollateralToActivePool
-    it("sendCollateralToActivePool(): reverts when called by an account that is not TroveManager", async () => {
+    it("sendCollateralToActivePool(): reverts when called by an account that is not Rewards", async () => {
       // Attempt call from alice
       try {
-        const txAlice = await defaultPool.sendCollateralToActivePool(100, { from: alice })
+        const txAlice = await defaultPool.sendCollateralToActivePool(activePool.address, 100, { from: alice })
         
       } catch (err) {
         assert.include(err.message, "revert")

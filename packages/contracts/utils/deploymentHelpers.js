@@ -7,7 +7,6 @@ const LUSDToken = artifacts.require("./LUSDToken.sol")
 const ActivePool = artifacts.require("./ActivePool.sol");
 const ActiveShieldedPool = artifacts.require("./ActivePool.sol");
 const DefaultPool = artifacts.require("./DefaultPool.sol");
-const DefaultShieldedPool = artifacts.require("./DefaultPool.sol");
 const StabilityPool = artifacts.require("./StabilityPool.sol")
 const GasPool = artifacts.require("./GasPool.sol")
 const CollSurplusPool = artifacts.require("./CollSurplusPool.sol")
@@ -34,7 +33,6 @@ const StabilityPoolTester = artifacts.require("./StabilityPoolTester.sol")
 const ActivePoolTester = artifacts.require("./ActivePoolTester.sol")
 const ActiveShieldedPoolTester = artifacts.require("./ActivePoolTester.sol")
 const DefaultPoolTester = artifacts.require("./DefaultPoolTester.sol")
-const DefaultShieldedPoolTester = artifacts.require("./DefaultPoolTester.sol")
 const LiquityMathTester = artifacts.require("./LiquityMathTester.sol")
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
@@ -115,7 +113,6 @@ class DeploymentHelper {
     const stabilityPool = await StabilityPool.new()
     const gasPool = await GasPool.new()
     const defaultPool = await DefaultPool.new()
-    const defaultShieldedPool = await DefaultShieldedPool.new()
     const collSurplusPool = await CollSurplusPool.new()
     const functionCaller = await FunctionCaller.new()
     const borrowerOperations = await BorrowerOperations.new()
@@ -136,7 +133,6 @@ class DeploymentHelper {
     CollateralToken.setAsDeployed(collateralToken)
     LUSDToken.setAsDeployed(lusdToken)
     DefaultPool.setAsDeployed(defaultPool)
-    DefaultShieldedPool.setAsDeployed(defaultShieldedPool)
     PriceFeedTestnet.setAsDeployed(priceFeedTestnet)
     SortedTroves.setAsDeployed(sortedTroves)
     SortedTroves.setAsDeployed(sortedShieldedTroves)
@@ -172,7 +168,6 @@ class DeploymentHelper {
       stabilityPool,
       gasPool,
       defaultPool,
-      defaultShieldedPool,
       collSurplusPool,
       functionCaller,
       borrowerOperations,
@@ -200,7 +195,6 @@ class DeploymentHelper {
     testerContracts.activePool = await ActivePoolTester.new()
     testerContracts.activeShieldedPool = await ActivePoolTester.new()
     testerContracts.defaultPool = await DefaultPoolTester.new()
-    testerContracts.defaultShieldedPool = await DefaultPoolTester.new()
     testerContracts.stabilityPool = await StabilityPoolTester.new()
     testerContracts.gasPool = await GasPool.new()
     testerContracts.collSurplusPool = await CollSurplusPool.new()
@@ -297,7 +291,6 @@ class DeploymentHelper {
     const stabilityPool = await StabilityPool.new()
     const gasPool = await GasPool.new()
     const defaultPool = await DefaultPool.new()
-    const defaultShieldedPool = await DefaultShieldedPool.new()
     const collSurplusPool = await CollSurplusPool.new()
     const functionCaller = await FunctionCaller.new()
     const borrowerOperations = await BorrowerOperations.new()
@@ -322,7 +315,6 @@ class DeploymentHelper {
       stabilityPool,
       gasPool,
       defaultPool,
-      defaultShieldedPool,
       collSurplusPool,
       functionCaller,
       borrowerOperations,
@@ -441,7 +433,6 @@ class DeploymentHelper {
       contracts.activePool.address,
       contracts.activeShieldedPool.address,
       contracts.defaultPool.address,
-      contracts.defaultShieldedPool.address,
       contracts.stabilityPool.address,
       contracts.gasPool.address,
       contracts.collSurplusPool.address,
@@ -470,7 +461,7 @@ class DeploymentHelper {
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       contracts.stabilityPool.address,
-      contracts.defaultShieldedPool.address,
+      contracts.defaultPool.address,
       contracts.collSurplusPool.address,
       contracts.collateralToken.address
     )
@@ -482,7 +473,6 @@ class DeploymentHelper {
       contracts.activePool.address,
       contracts.activeShieldedPool.address,
       contracts.defaultPool.address,
-      contracts.defaultShieldedPool.address,
       contracts.stabilityPool.address,
       contracts.gasPool.address,
       contracts.collSurplusPool.address,
@@ -503,7 +493,6 @@ class DeploymentHelper {
       contracts.activePool.address,
       contracts.activeShieldedPool.address,
       contracts.defaultPool.address,
-      contracts.defaultShieldedPool.address
     )
 
     // set contracts in the Liquidations
@@ -514,7 +503,6 @@ class DeploymentHelper {
       contracts.activePool.address,
       contracts.activeShieldedPool.address,
       contracts.defaultPool.address,
-      contracts.defaultShieldedPool.address,
       contracts.stabilityPool.address,
       contracts.gasPool.address,
       contracts.collSurplusPool.address,
@@ -551,13 +539,6 @@ class DeploymentHelper {
       contracts.rewards.address,
       contracts.troveManager.address,
       contracts.activePool.address,
-      contracts.collateralToken.address
-    )
-
-    await contracts.defaultShieldedPool.setAddresses(
-      contracts.liquidations.address,
-      contracts.rewards.address,
-      contracts.troveManager.address,
       contracts.activeShieldedPool.address,
       contracts.collateralToken.address
     )

@@ -44,7 +44,7 @@ contract('CollSurplusPool', async accounts => {
     borrowerOperations = contracts.borrowerOperations
     collateralToken = contracts.collateralToken
     // mint tokens
-    await th.mintCollateralTokensAndApproveActivePool(contracts, [A,B], dec(10, 24))
+    await th.batchMintCollateralTokensAndApproveActivePool(contracts, [A,B], dec(10, 24))
 
     await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
     await deploymentHelper.connectLQTYContracts(LQTYContracts)
@@ -65,7 +65,8 @@ contract('CollSurplusPool', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus
-    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=5)
+    //await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=5)
+    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt)
 
     const COLL_2 = await collSurplusPool.getCollateral()
     th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))

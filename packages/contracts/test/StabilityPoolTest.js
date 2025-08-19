@@ -94,7 +94,7 @@ contract('StabilityPool', async accounts => {
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
       // mint tokens to accounts
-      await th.mintCollateralTokens (contracts, [owner,
+      await th.batchMintCollateralTokens (contracts, [owner,
         defaulter_1, defaulter_2, defaulter_3,
         whale,
         alice, bob, carol, dennis, erin, flyn,

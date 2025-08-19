@@ -64,29 +64,23 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     *
     * Where L_Coll(0) and L_LUSDDebt(0) are snapshots of L_Coll and L_LUSDDebt for the active Trove taken at the instant the stake was made
     */
-    uint public L_CollBase;
-    uint public L_LUSDDebtBase;
-    uint public L_CollShielded;
-    uint public L_LUSDDebtShielded;
+    uint public L_Coll;
+    uint public L_LUSDDebt;
 
     // Map addresses with active troves to their RewardSnapshot
     mapping (address => RewardSnapshot) public rewardSnapshots;
 
     // Object containing the collateral and LUSD snapshots for a given active trove
-    struct RewardSnapshot { uint baseCollateral; uint baseLUSDDebt; uint shieldedCollateral ;uint shieldedLUSDDebt;}
+    struct RewardSnapshot { uint collateral; uint LUSDDebt;}
 
     // Error trackers for the trove redistribution calculation
     uint public lastCollateralError_Redistribution;
     uint public lastLUSDDebtError_Redistribution;
 
-    uint public lastCollateralError_Redistribution_Shielded;
-    uint public lastLUSDDebtError_Redistribution_Shielded;
-
     struct ContractsCache {
         IActivePool activePool;
         IActivePool activeShieldedPool;
         IDefaultPool defaultPool;
-        IDefaultPool defaultShieldedPool;
     }
 
     enum Status {
@@ -115,8 +109,7 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         address _borrowerOperationsAddress,
         address _activePoolAddress,
         address _activeShieldedPoolAddress,
-        address _defaultPoolAddress,
-        address _defaultShieldedPoolAddress
+        address _defaultPoolAddress
     )
         external
         override
@@ -142,7 +135,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         checkContract(_activePoolAddress);
         checkContract(_activeShieldedPoolAddress);
         checkContract(_defaultPoolAddress);
-        checkContract(_defaultShieldedPoolAddress);
 
         troveManager = ITroveManager(_troveManagerAddress);
         liquidationsAddress = _liquidationsAddress;
@@ -150,7 +142,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         activePool = IActivePool(_activePoolAddress);
         activeShieldedPool = IActivePool(_activeShieldedPoolAddress);
         defaultPool = IDefaultPool(_defaultPoolAddress);
-        defaultShieldedPool = IDefaultPool(_defaultShieldedPoolAddress);
 
         emit TroveManagerAddressChanged(address(_troveManagerAddress));
         emit LiquidationsAddressChanged(liquidationsAddress);
@@ -175,37 +166,23 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
     function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
-                                                  uint _LUSD, uint _collateral) external override {
+                                                  uint _nLUSD, uint _LUSD, uint _collateral) external override {
         _requireCallerIsLiquidations();
-        _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, _LUSD, _collateral);
+        _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, _nLUSD, _LUSD, _collateral);
     }
 
     function _movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
-                                                  uint _LUSD, uint _collateral) internal {
+                                                  uint _nLUSD, uint _LUSD, uint _collateral) internal {
+        _activePool.increaseLUSDDebt(_nLUSD);
         _defaultPool.decreaseLUSDDebt(_LUSD);
-        _activePool.increaseLUSDDebt(_LUSD);
-        _defaultPool.sendCollateralToActivePool(_collateral);
+        _defaultPool.sendCollateralToActivePool(_activePool, _collateral);
     }
 
-    /*
-    function applyPendingRewardsOld(address _borrower) external override {
-        // TODO drip here?
-        _requireCallerIsBorrowerOperationsOrTM();
-        _requireTroveIsActive(_borrower);
-
-        if (troveManager.shielded(_borrower)) {
-            _applyPendingShieldedRewards(_borrower);
-        } else {
-            _applyPendingBaseRewards(_borrower);
-        }
-    }
-    */
-
-    function _convertShieldedToBaseDebt(uint _shieldedDebt) internal view returns (uint baseDebt) {
+    function _convertShieldedToActualDebt(uint _shieldedDebt) internal view returns (uint baseDebt) {
         baseDebt = _shieldedDebt * troveManager.accumulatedShieldRate() / troveManager.accumulatedRate();
     }
 
-    function _convertBaseToShieldedDebt(uint _baseDebt) internal view returns (uint shieldedDebt) {
+    function _convertBaseToActualDebt(uint _baseDebt) internal view returns (uint shieldedDebt) {
         shieldedDebt = _baseDebt * troveManager.accumulatedRate() / troveManager.accumulatedShieldRate();
     }
 
@@ -214,32 +191,34 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         _requireCallerIsBorrowerOperationsOrTM();
         _requireTroveIsActive(_borrower);
 
-        _applyPendingRewards(_borrower, troveManager.shielded(_borrower));
+        if (troveManager.shielded(_borrower)) {
+            _applyPendingRewards(activeShieldedPool, defaultPool, _borrower, troveManager.accumulatedShieldRate());
+        } else {
+            _applyPendingRewards(activePool, defaultPool, _borrower, troveManager.accumulatedRate());
+        }
     }
 
 
     // Add the borrowers's coll and debt rewards earned from redistributions, to their Trove
-    function _applyPendingRewards(address _borrower, bool _shielded) internal {
-        if (_hasPendingRewards(_borrower, _shielded)) {
+    function _applyPendingRewards(IActivePool _activePool, IDefaultPool _defaultPool, address _borrower, uint _accRate) internal {
+        if (hasPendingRewards(_borrower)) {
 
             // Compute and apply pending collateral rewards
-            uint pendingCollateralReward = _getPendingCollateralReward(_borrower, _shielded);
+            uint pendingCollateralReward = getPendingCollateralReward(_borrower);
             troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
 
-            // Compute pending base debt
-            uint pendingLUSDDebtReward = _getPendingLUSDDebtReward(_borrower, _shielded);
+            // Compute pending debt
+            uint pendingLUSDDebtReward = getPendingLUSDDebtReward(_borrower);
 
-            // Apply pending base debt
+            uint normalizedPendingDebt = pendingLUSDDebtReward.mul(RATE_PRECISION).div(_accRate);
+
+            // Apply pending debt
             troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
 
             _updateTroveRewardSnapshots(_borrower);
 
-            // Transfer from DefaultPool to ActivePool
-            if (_shielded) {
-                _movePendingTroveRewardsToActivePool(activeShieldedPool, defaultShieldedPool, pendingLUSDDebtReward, pendingCollateralReward);
-            } else {
-                _movePendingTroveRewardsToActivePool(activePool, defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
-            }
+            // Transfer from default pool to active pool
+            _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, normalizedPendingDebt, pendingLUSDDebtReward, pendingCollateralReward);
 
             // TODO improve
             (uint debt, uint coll) = troveManager.getTroveDebtAndColl(_borrower);
@@ -332,82 +311,38 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     }
 
     function _updateTroveRewardSnapshots(address _borrower) internal {
-        rewardSnapshots[_borrower].baseCollateral = L_CollBase;
-        rewardSnapshots[_borrower].baseLUSDDebt = L_LUSDDebtBase;
-        rewardSnapshots[_borrower].shieldedCollateral = L_CollShielded;
-        rewardSnapshots[_borrower].shieldedLUSDDebt = L_LUSDDebtShielded;
-        emit TroveSnapshotsUpdated(L_CollBase, L_CollShielded, L_LUSDDebtBase, L_LUSDDebtShielded);
+        rewardSnapshots[_borrower].collateral = L_Coll;
+        rewardSnapshots[_borrower].LUSDDebt = L_LUSDDebt;
+        emit TroveSnapshotsUpdated(L_Coll, L_Coll);
     }
 
     function resetTroveRewardSnapshots(address _borrower) external override {
-        rewardSnapshots[_borrower].baseCollateral = 0;
-        rewardSnapshots[_borrower].baseLUSDDebt = 0;
-        rewardSnapshots[_borrower].shieldedCollateral = 0;
-        rewardSnapshots[_borrower].shieldedLUSDDebt = 0;
+        rewardSnapshots[_borrower].collateral = 0;
+        rewardSnapshots[_borrower].LUSDDebt = 0;
     }
 
-    function getPendingRewards(address _borrower) public view override returns (uint, uint) {
-        return _getPendingRewards(_borrower, troveManager.shielded(_borrower));
-    }
-
-    function _getPendingRewards(address _borrower, bool _shielded) internal view returns (uint, uint) {
-        return (_getPendingLUSDDebtReward(_borrower, _shielded),
-                _getPendingCollateralReward(_borrower, _shielded));
+    function getPendingRewards(address _borrower) external view override returns (uint, uint) {
+        return (getPendingLUSDDebtReward(_borrower),
+                getPendingCollateralReward(_borrower));
     }
 
     function getPendingCollateralReward(address _borrower) public view override returns (uint) {
-        uint stake = troveManager.getTroveStake(_borrower);
-        return troveManager.shielded(_borrower) ? _getPendingShieldedCollateralReward(_borrower, stake) : _getPendingBaseCollateralReward(_borrower, stake);
-    }
-
-    function _getPendingCollateralReward(address _borrower, bool _shielded) internal view returns (uint) {
-        return _shielded ? getPendingShieldedCollateralReward(_borrower) : getPendingBaseCollateralReward(_borrower);
-    }
-
-    function getPendingBaseCollateralReward(address _borrower) public view override returns (uint) {
-        uint stake = troveManager.getTroveStake(_borrower);
-        return _getPendingBaseCollateralReward(_borrower, stake);
-    }
-
-    function _getPendingBaseCollateralReward(address _borrower, uint stake) internal view returns (uint) {
-        uint snapshotCollateral = rewardSnapshots[_borrower].baseCollateral;
-        uint rewardPerUnitStaked = L_CollBase.sub(snapshotCollateral);
+        uint snapshotCollateral = rewardSnapshots[_borrower].collateral;
+        uint rewardPerUnitStaked = L_Coll.sub(snapshotCollateral);
 
         if ( rewardPerUnitStaked == 0 || troveManager.getTroveStatus(_borrower) != uint(Status.active)) { return 0; }
+
+        uint stake = troveManager.getTroveStake(_borrower);
 
         uint pendingCollateralReward = stake.mul(rewardPerUnitStaked).div(DECIMAL_PRECISION);
 
         return pendingCollateralReward;
     }
 
-    function getPendingShieldedCollateralReward(address _borrower) public view override returns (uint) {
-        uint stake = troveManager.getTroveStake(_borrower);
-        return _getPendingShieldedCollateralReward(_borrower, stake);
-
-    }
-    // Get the borrower's pending accumulated shielded Collateral reward, earned by their stake
-    function _getPendingShieldedCollateralReward(address _borrower, uint stake) internal view returns (uint) {
-        uint snapshotCollateral = rewardSnapshots[_borrower].shieldedCollateral;
-        uint rewardPerUnitStaked = L_CollShielded.sub(snapshotCollateral);
-
-        if ( rewardPerUnitStaked == 0 || troveManager.getTroveStatus(_borrower) != uint(Status.active)) { return 0; }
-
-        uint pendingCollateralReward = stake.mul(rewardPerUnitStaked).div(DECIMAL_PRECISION);
-
-        return pendingCollateralReward;
-    }
-    
-    function getPendingLUSDDebtReward(address _borrower) public view override returns (uint) {
-        return troveManager.shielded(_borrower) ? getPendingShieldedLUSDDebtReward(_borrower) : getPendingBaseLUSDDebtReward(_borrower);
-    }
-
-    function _getPendingLUSDDebtReward(address _borrower, bool _shielded) internal view returns (uint) {
-        return _shielded ? getPendingShieldedLUSDDebtReward(_borrower) : getPendingBaseLUSDDebtReward(_borrower);
-    }
     // Get the borrower's pending accumulated LUSD reward, earned by their stake
-    function getPendingBaseLUSDDebtReward(address _borrower) public view override returns (uint) {
-        uint snapshotLUSDDebt = rewardSnapshots[_borrower].baseLUSDDebt;
-        uint rewardPerUnitStaked = L_LUSDDebtBase.sub(snapshotLUSDDebt);
+    function getPendingLUSDDebtReward(address _borrower) public view override returns (uint) {
+        uint snapshotLUSDDebt = rewardSnapshots[_borrower].LUSDDebt;
+        uint rewardPerUnitStaked = L_LUSDDebt.sub(snapshotLUSDDebt);
 
         if ( rewardPerUnitStaked == 0 || troveManager.getTroveStatus(_borrower) != uint(Status.active)) { return 0; }
 
@@ -417,55 +352,11 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
 
         return pendingLUSDDebtReward;
     }
-    // Get the borrower's pending accumulated shielded LUSD reward, earned by their stake
-    function getPendingShieldedLUSDDebtReward(address _borrower) public view override returns (uint) {
-        uint snapshotShieldedLUSDDebt = rewardSnapshots[_borrower].shieldedLUSDDebt;
-        uint rewardPerUnitStaked = L_LUSDDebtShielded.sub(snapshotShieldedLUSDDebt);
-
-        if ( rewardPerUnitStaked == 0 || troveManager.getTroveStatus(_borrower) != uint(Status.active)) { return 0; }
-
-        uint stake = troveManager.getTroveStake(_borrower);
-
-        uint pendingShieldedLUSDDebtReward = stake.mul(rewardPerUnitStaked).div(DECIMAL_PRECISION);
-
-        return pendingShieldedLUSDDebtReward;
-    }
-
-    // Get the borrower's pending accumulated LUSD reward, earned by their stake
-    // TODO improve
-    function getPendingActualLUSDDebtReward(address _borrower) public view override returns (uint) {
-        //return _actualDebt(getPendingLUSDDebtReward(_borrower), shielded[_borrower]);
-        return troveManager.getPendingActualLUSDDebtReward(_borrower);
-    }
 
     function hasPendingRewards(address _borrower) public view override returns (bool) {
-        return _hasPendingRewards(_borrower, troveManager.shielded(_borrower));
-    }
-
-    function _hasPendingRewards(address _borrower, bool _shielded) internal view returns (bool) {
         if (troveManager.getTroveStatus(_borrower) != uint(Status.active)) {return false;}
-
-        return _shielded ? (rewardSnapshots[_borrower].shieldedCollateral < L_CollShielded) : (rewardSnapshots[_borrower].baseCollateral < L_CollBase);
+        return rewardSnapshots[_borrower].collateral < L_Coll;
     }
-
-    
-    /*
-    * A Trove has pending rewards if its snapshot is less than the current rewards per-unit-staked sum:
-    * this indicates that rewards have occured since the snapshot was made, and the user therefore has
-    * pending rewards
-    */
-    /*
-    function hasPendingBaseRewards(address _borrower) public view override returns (bool) {
-        if (troveManager.getTroveStatus(_borrower) != uint(Status.active)) {return false;}
-       
-        return (rewardSnapshots[_borrower].baseCollateral < L_CollBase);
-    }
-    function hasPendingRewards(address _borrower) public view override returns (bool) {
-        if (troveManager.getTroveStatus(_borrower) != uint(Status.active)) {return false;}
-       
-        return (rewardSnapshots[_borrower].shieldedCollateral < L_CollShielded);
-    }
-    */ 
 
     function removeStake(address _borrower) external override {
         _requireCallerIsBOorLiqOrTM();
@@ -513,74 +404,32 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         }
         return stake;
     }
-    function redistributeDebtAndColl(uint _baseDebt, uint _baseColl, uint _shieldedDebt, uint _shieldedColl) external override {
+    function redistributeDebtAndColl(uint _baseDebt, uint _baseColl, uint _shieldedDebt, uint _shieldedColl, uint _accRate, uint _accShieldedRate) external override {
         _requireCallerIsLiquidations();
 
         uint totalColl = _baseColl.add(_shieldedColl);
 
-        // shielded debt converted to base debt
-        uint baseShieldedDebt = _convertShieldedToBaseDebt(_shieldedDebt);
+        uint totalActualDebt = _actualDebt(_baseDebt, _accRate) + _actualDebt(_shieldedDebt, _accShieldedRate);
 
-        // shielded debt converted to shielded debt
-        uint shieldedBaseDebt = _convertBaseToShieldedDebt(_baseDebt);
+        _redistributeActualDebtAndColl(totalActualDebt, totalColl);
 
-        // base and shielded troves use the same stakes pool, so it looks like
-        // debt is being redistributed twice here, but each is effectively adjusted
-        // for base and shielded proportions of totalstakes
-        _redistributeBaseDebtAndColl(_baseDebt.add(baseShieldedDebt), totalColl);
-        _redistributeShieldedDebtAndColl(_shieldedDebt.add(shieldedBaseDebt), totalColl);
-
-        // Transfer coll and debt from ActivePools to DefaultPools
+        // Remove debt from active pool
         activePool.decreaseLUSDDebt(_baseDebt);
-        defaultPool.increaseLUSDDebt(_baseDebt);
+        // Remove coll from active pool and send to default
         activePool.sendCollateral(address(defaultPool), _baseColl);
 
-        //emit Value(_shieldedColl);
+
+        // Remove debt from active shielded pool
         activeShieldedPool.decreaseLUSDDebt(_shieldedDebt);
-        defaultShieldedPool.increaseLUSDDebt(_shieldedDebt);
-        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _shieldedColl);
+
+        // Remove coll from active shielded pool and send to default
+        activeShieldedPool.sendCollateral(address(defaultPool), _shieldedColl);
+
+        // Send all debt to default pool
+        defaultPool.increaseLUSDDebt(totalActualDebt);
     }
 
-    function _redistributeShieldedDebtAndColl(uint _debt, uint _coll) internal {
-        if (_debt == 0) { return; }
-
-        /*
-        * Add distributed coll and debt rewards-per-unit-staked to the running totals. Division uses a "feedback"
-        * error correction, to keep the cumulative error low in the running totals L_Coll and L_LUSDDebt:
-        *
-        * 1) Form numerators which compensate for the floor division errors that occurred the last time this
-        * function was called.
-        * 2) Calculate "per-unit-staked" ratios.
-        * 3) Multiply each ratio back by its denominator, to reveal the current floor division error.
-        * 4) Store these errors for use in the next correction when this function is called.
-        * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
-        */
-        uint collateralNumerator = _coll.mul(DECIMAL_PRECISION).add(lastCollateralError_Redistribution_Shielded);
-        uint LUSDDebtNumerator = _debt.mul(DECIMAL_PRECISION).add(lastLUSDDebtError_Redistribution_Shielded);
-
-        // Get the per-unit-staked terms
-        uint collateralRewardPerUnitStaked = collateralNumerator.div(totalStakes);
-        uint LUSDDebtRewardPerUnitStaked = LUSDDebtNumerator.div(totalStakes);
-
-        lastCollateralError_Redistribution_Shielded = collateralNumerator.sub(collateralRewardPerUnitStaked.mul(totalStakes));
-        lastLUSDDebtError_Redistribution_Shielded = LUSDDebtNumerator.sub(LUSDDebtRewardPerUnitStaked.mul(totalStakes));
-
-        // Add per-unit-staked terms to the running totals
-        L_CollShielded = L_CollShielded.add(collateralRewardPerUnitStaked);
-        L_LUSDDebtShielded = L_LUSDDebtShielded.add(LUSDDebtRewardPerUnitStaked);
-
-        emit ShieldedLTermsUpdated(L_CollShielded, L_LUSDDebtShielded);
-
-        // Transfer coll and debt from ActivePool to DefaultPool
-        /*
-        activeShieldedPool.decreaseLUSDDebt(_debt);
-        defaultShieldedPool.increaseLUSDDebt(_debt);
-        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _coll);
-        */
-    }
-
-    // norm debt
-    function _redistributeBaseDebtAndColl(uint _debt, uint _coll) internal {
+    function _redistributeActualDebtAndColl(uint _debt, uint _coll) internal {
         if (_debt == 0) { return; }
 
         /*
@@ -605,16 +454,16 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         lastLUSDDebtError_Redistribution = LUSDDebtNumerator.sub(LUSDDebtRewardPerUnitStaked.mul(totalStakes));
 
         // Add per-unit-staked terms to the running totals
-        L_CollBase = L_CollBase.add(collateralRewardPerUnitStaked);
-        L_LUSDDebtBase = L_LUSDDebtBase.add(LUSDDebtRewardPerUnitStaked);
+        L_Coll = L_Coll.add(collateralRewardPerUnitStaked);
+        L_LUSDDebt = L_LUSDDebt.add(LUSDDebtRewardPerUnitStaked);
 
-        emit LTermsUpdated(L_CollBase, L_LUSDDebtBase);
+        emit LTermsUpdated(L_Coll, L_LUSDDebt);
 
-        /*
         // Transfer coll and debt from ActivePool to DefaultPool
-        activePool.decreaseLUSDDebt(_debt);
-        defaultPool.increaseLUSDDebt(_debt);
-        activePool.sendCollateral(address(defaultPool), _coll);
+        /*
+        activeShieldedPool.decreaseLUSDDebt(_debt);
+        defaultShieldedPool.increaseLUSDDebt(_debt);
+        activeShieldedPool.sendCollateral(address(defaultShieldedPool), _coll);
         */
     }
 
@@ -630,18 +479,17 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     * The collateral as compensation must be excluded as it is always sent out at the very end of the liquidation sequence.
     */
     function updateSystemSnapshots_excludeCollRemainder(IActivePool _activePool, IActivePool _activeShieldedPool,
-                                                        IDefaultPool _defaultPool, IDefaultPool _defaultShieldedPool,
+                                                        IDefaultPool _defaultPool,
                                                         uint _collRemainder) external override {
         _requireCallerIsLiquidations();
 
         totalStakesSnapshot = totalStakes;
 
         uint activeBaseColl = _activePool.getCollateral();
-        uint liquidatedBaseColl = _defaultPool.getCollateral();
         uint activeShieldedColl = _activeShieldedPool.getCollateral();
-        uint liquidatedShieldedColl = _defaultShieldedPool.getCollateral();
+        uint liquidatedColl = _defaultPool.getCollateral();
 
-        totalCollateralSnapshot = activeBaseColl.add(activeShieldedColl).sub(_collRemainder).add(liquidatedBaseColl).add(liquidatedShieldedColl);
+        totalCollateralSnapshot = activeBaseColl.add(activeShieldedColl).sub(_collRemainder).add(liquidatedColl);
 
         emit SystemSnapshotsUpdated(totalStakesSnapshot, totalCollateralSnapshot);
     }

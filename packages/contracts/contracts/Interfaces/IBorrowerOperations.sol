@@ -16,7 +16,6 @@ interface IBorrowerOperations is ILiquityBase {
     event ActivePoolAddressChanged(address _activePoolAddress);
     event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
-    event DefaultShieldedPoolAddressChanged(address _defaultShieldedPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);

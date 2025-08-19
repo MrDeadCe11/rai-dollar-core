@@ -87,9 +87,7 @@ contract MultiTroveGetter {
             ) = troveManager.Troves(currentTroveowner);
             (
                 _troves[idx].snapshotColl,
-                _troves[idx].snapshotShieldedColl,
-                _troves[idx].snapshotLUSDDebt,
-                _troves[idx].snapshotShieldedLUSDDebt
+                _troves[idx].snapshotLUSDDebt
             ) = rewards.rewardSnapshots(currentTroveowner);
 
             currentTroveowner = sortedTroves.getNext(currentTroveowner);
@@ -118,9 +116,7 @@ contract MultiTroveGetter {
             ) = troveManager.Troves(currentTroveowner);
             (
                 _troves[idx].snapshotColl,
-                _troves[idx].snapshotShieldedColl,
-                _troves[idx].snapshotLUSDDebt,
-                _troves[idx].snapshotShieldedLUSDDebt
+                _troves[idx].snapshotLUSDDebt
             ) = rewards.rewardSnapshots(currentTroveowner);
 
             currentTroveowner = sortedTroves.getPrev(currentTroveowner);

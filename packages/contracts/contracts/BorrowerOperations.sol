@@ -93,8 +93,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolAddressChanged(address _activePoolAddress);
-    event DefaultPoolAddressChanged(address _defaultPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
+    event DefaultPoolAddressChanged(address _defaultPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
     event PriceFeedAddressChanged(address  _newPriceFeedAddress);
@@ -105,7 +105,6 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, BorrowerOperation operation);
-    //event LUSDBorrowingFeePaid(address indexed _borrower, uint _LUSDFee);
 
     // --- Dependency setters ---
 
@@ -128,32 +127,30 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         activePool = IActivePool(addresses[2]);
         activeShieldedPool = IActivePool(addresses[3]);
         defaultPool = IDefaultPool(addresses[4]);
-        defaultShieldedPool = IDefaultPool(addresses[5]);
-        stabilityPoolAddress = addresses[6];
-        gasPoolAddress = addresses[7];
-        collSurplusPool = ICollSurplusPool(addresses[8]);
-        priceFeed = IPriceFeed(addresses[9]);
-        sortedTroves = ISortedTroves(addresses[10]);
-        sortedShieldedTroves = ISortedTroves(addresses[11]);
-        lusdToken = ILUSDToken(addresses[12]);
-        relayer = IRelayer(addresses[13]);
-        collateralToken = IERC20(addresses[14]);
+        stabilityPoolAddress = addresses[5];
+        gasPoolAddress = addresses[6];
+        collSurplusPool = ICollSurplusPool(addresses[7]);
+        priceFeed = IPriceFeed(addresses[8]);
+        sortedTroves = ISortedTroves(addresses[9]);
+        sortedShieldedTroves = ISortedTroves(addresses[10]);
+        lusdToken = ILUSDToken(addresses[11]);
+        relayer = IRelayer(addresses[12]);
+        collateralToken = IERC20(addresses[13]);
 
         emit TroveManagerAddressChanged(addresses[0]);
         emit RewardsAddressChanged(addresses[1]);
         emit ActivePoolAddressChanged(addresses[2]);
         emit ActiveShieldedPoolAddressChanged(addresses[3]);
         emit DefaultPoolAddressChanged(addresses[4]);
-        emit DefaultShieldedPoolAddressChanged(addresses[5]);
-        emit StabilityPoolAddressChanged(addresses[6]);
-        emit GasPoolAddressChanged(addresses[7]);
-        emit CollSurplusPoolAddressChanged(addresses[8]);
-        emit PriceFeedAddressChanged(addresses[9]);
-        emit SortedTrovesAddressChanged(addresses[10]);
-        emit SortedShieldedTrovesAddressChanged(addresses[11]);
-        emit LUSDTokenAddressChanged(addresses[12]);
-        emit RelayerAddressChanged(addresses[13]);
-        emit CollateralTokenAddressChanged(addresses[14]);
+        emit StabilityPoolAddressChanged(addresses[5]);
+        emit GasPoolAddressChanged(addresses[6]);
+        emit CollSurplusPoolAddressChanged(addresses[7]);
+        emit PriceFeedAddressChanged(addresses[8]);
+        emit SortedTrovesAddressChanged(addresses[9]);
+        emit SortedShieldedTrovesAddressChanged(addresses[10]);
+        emit LUSDTokenAddressChanged(addresses[11]);
+        emit RelayerAddressChanged(addresses[12]);
+        emit CollateralTokenAddressChanged(addresses[13]);
 
         _renounceOwnership();
     }
@@ -183,7 +180,11 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         
         vars.ICR = LiquityMath._computeCR(_collateralAmount, vars.compositeDebt, vars.price, vars.par);
 
-        _requireICRisAboveMCR(vars.ICR, _redemptionShield);
+        if (_redemptionShield) {
+            _requireICRisAboveHCR(vars.ICR);
+        } else {
+            _requireICRisAboveMCR(vars.ICR);
+        }
 
         uint256 nCompositeDebt = _redemptionShield ? _normalizedDebt(vars.compositeDebt, vars.accShieldRate) : _normalizedDebt(vars.compositeDebt, vars.accRate);
         vars.NICR = LiquityMath._computeNominalCR(_collateralAmount, nCompositeDebt);
@@ -252,12 +253,14 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     function shieldTrove(address _upperHint, address _lowerHint) external override {
         // TODO add drip() here. It will break tests
         //troveManager.shieldTrove(_borrower);
+        require(!troveManager.shielded(msg.sender), "Trove is already shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }
     // un-Shield Trove
     function unShieldTrove(address _upperHint, address _lowerHint) external override {
         // TODO add drip() here. It will break tests
         //troveManager.shieldTrove(_borrower);
+        require(troveManager.shielded(msg.sender), "Trove is already un-shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }
 
@@ -277,6 +280,19 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
                           bool _toggleShield, address _upperHint, address _lowerHint) internal {
         ContractsCache memory contractsCache = ContractsCache(troveManager, rewards, activePool, lusdToken, collateralToken);
         LocalVariables_adjustTrove memory vars;
+
+        // Confirm the operation is either a borrower adjusting their own trove, or a pure Collateral transfer from the Stability Pool to a trove
+        assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && _collateralToAdd > 0 && _LUSDChange == 0));
+
+        // Pre-adjust checks
+        if (_isDebtIncrease) {
+            _requireNonZeroDebtChange(_LUSDChange);
+        }
+
+        _requireSingularCollChange(_collWithdrawal, _collateralToAdd);
+        _requireNonZeroAdjustment(_collWithdrawal, _LUSDChange, _collateralToAdd, _toggleShield);
+        _requireTroveisActive(contractsCache.troveManager, _borrower);
+        _requireSufficientCollateralBalance(collateralToken, _borrower, _collateralToAdd);
 
         // TODO add drip() here. It will break tests
 
@@ -300,19 +316,6 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
         vars.price = priceFeed.fetchPrice();
-        //bool isRecoveryMode = _checkRecoveryMode(vars.price, vars.accRate);
-
-        if (_isDebtIncrease) {
-            _requireNonZeroDebtChange(_LUSDChange);
-        }
-
-        _requireSingularCollChange(_collWithdrawal, _collateralToAdd);
-        _requireNonZeroAdjustment(_collWithdrawal, _LUSDChange, _collateralToAdd, _toggleShield);
-        _requireTroveisActive(contractsCache.troveManager, _borrower);
-        _requireSufficientCollateralBalance(collateralToken, _borrower, _collateralToAdd);
-
-        // Confirm the operation is either a borrower adjusting their own trove, or a pure Collateral transfer from the Stability Pool to a trove
-        assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && _collateralToAdd > 0 && _LUSDChange == 0));
 
         contractsCache.rewards.applyPendingRewards(_borrower);
 
@@ -333,7 +336,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
                                                 vars.netDebtChange, _isDebtIncrease, vars.price, vars.par);
         assert(_collWithdrawal <= vars.coll); 
         // Check the adjustment satisfies all conditions for the current system mode
-        _requireValidAdjustment(_collWithdrawal, _isDebtIncrease, vars, vars.shielded);
+        _requireValidAdjustment(_collWithdrawal, _isDebtIncrease, vars);
             
         // When the adjustment is a debt repayment, check it's a valid amount and that the caller has enough LUSD
         if (!_isDebtIncrease && _LUSDChange > 0) {
@@ -553,8 +556,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     (
         uint _collWithdrawal,
         bool _isDebtIncrease, 
-        LocalVariables_adjustTrove memory _vars,
-        bool _redemptionShield
+        LocalVariables_adjustTrove memory _vars
     ) 
         internal 
         view 
@@ -573,14 +575,22 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         * - The adjustment won't pull the TCR below CCR
         */        
 
+        // TODO re-visit this entire logic
+
+        // shielded troves can improve their ICR when ICR < MCR
+        if (_vars.shielded && !(_vars.newICR > _vars.oldICR)) {
+            _requireICRisAboveHCR(_vars.newICR);
+        }
+
         if (_getTCR(_vars.price, _vars.accRate, _vars.accShieldRate) < CCR) {
             _requireNoCollWithdrawal(_collWithdrawal);
             if (_isDebtIncrease) {
+                // TODO add this? ->>>>  _requireNewTCRisAboveCCR(_vars.newTCR)
                 _requireICRisAboveCCR(_vars.newICR);
                 _requireNewICRisAboveOldICR(_vars.newICR, _vars.oldICR);
             }      
         } else { // if Normal Mode
-            _requireICRisAboveMCR(_vars.newICR, _redemptionShield);
+            _requireICRisAboveMCR(_vars.newICR);
             _vars.newTCR = _getNewTCRFromTroveChange(_vars.collChange, _vars.isCollIncrease,
                                                      _vars.netDebtChange, _isDebtIncrease, _vars.price,
                                                     _vars.par, _vars.accRate, _vars.accShieldRate);
@@ -588,12 +598,12 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         }
     }
 
-    function _requireICRisAboveMCR(uint _newICR, bool _redemptionShield) internal pure {
-        if (_redemptionShield) {
-            require(_newICR >= HCR, "BorrowerOps: An operation on a shielded trove that would result in ICR < HCR is not permitted");
-        } else {
-            require(_newICR >= MCR, "BorrowerOps: An operation that would result in ICR < MCR is not permitted");
-        }
+    function _requireICRisAboveHCR(uint _newICR) internal pure {
+        require(_newICR >= HCR, "BorrowerOps: Opening a shielded trove with ICR < HCR is not permitted");
+    }
+
+    function _requireICRisAboveMCR(uint _newICR) internal pure {
+        require(_newICR >= MCR, "BorrowerOps: An operation that would result in ICR < MCR is not permitted");
     }
 
     function _requireICRisAboveCCR(uint _newICR) internal pure {

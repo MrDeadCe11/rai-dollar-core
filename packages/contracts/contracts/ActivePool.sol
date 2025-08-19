@@ -154,13 +154,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     // --- 'require' functions ---
 
-    function _requireCallerIsBorrowerOperationsOrDefaultPool() internal view {
-        require(
-            msg.sender == borrowerOperationsAddress ||
-            msg.sender == defaultPoolAddress,
-            "ActivePool: Caller is neither BO nor Default Pool");
-    }
-
     function _requireCallerIsBOorTroveMorSP() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
@@ -196,11 +189,4 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager");
     }
 
-    // --- Fallback function ---
-
-    // receive() external payable {
-    //     _requireCallerIsBorrowerOperationsOrDefaultPool();
-    //     ETH = ETH.add(msg.value);
-    //     emit ActivePoolCollateralBalanceUpdated(ETH);
-    // }
 }

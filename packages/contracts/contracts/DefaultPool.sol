@@ -26,6 +26,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     address public rewardsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
+    address public activeShieldedPoolAddress;
     uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;  // debt
 
@@ -40,6 +41,7 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         address _rewardsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _collateralTokenAddress
     )
         external
@@ -49,12 +51,14 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         checkContract(_rewardsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
+        checkContract(_activeShieldedPoolAddress);
         checkContract(_collateralTokenAddress);
 
         liquidationsAddress = _liquidationsAddress;
         rewardsAddress = _rewardsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
+        activeShieldedPoolAddress = _activeShieldedPoolAddress;
         collateralToken = IERC20(_collateralTokenAddress);
 
         emit LiquidationsAddressChanged(_liquidationsAddress);
@@ -81,17 +85,17 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     // --- Pool functionality ---
 
-    function sendCollateralToActivePool(uint _amount) external override {
+    function sendCollateralToActivePool(IActivePool _activePool, uint _amount) external override {
         _requireCallerIsRewards();
-        IActivePool activePool = IActivePool(activePoolAddress);
         CT = CT.sub(_amount);
+
         emit DefaultPoolCollateralBalanceUpdated(CT);
-        emit CollateralSent(activePoolAddress, _amount);
+        emit CollateralSent(address(_activePool), _amount);
         
         // transfer collateral to active pool
-        collateralToken.transfer(activePoolAddress, _amount);
+        collateralToken.transfer(address(_activePool), _amount);
         // process collateral increase
-        activePool.processCollateralIncrease(_amount);
+        _activePool.processCollateralIncrease(_amount);
     }
 
     function addCollateral(address _account, uint _amount) external override {
@@ -114,7 +118,6 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
-        //_requireCallerIsLiquidations();
         _requireCallerIsRewards();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit DefaultPoolLUSDDebtUpdated(LUSDDebt);
@@ -143,7 +146,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     function _requireCallerIsTroveMorActivePool() internal view {
         require(
             msg.sender == troveManagerAddress ||
-            msg.sender == activePoolAddress,
+            msg.sender == activePoolAddress ||
+            msg.sender == activeShieldedPoolAddress,
             "DefaultPool: Caller is neither TM nor ActivePool");
     }
 }

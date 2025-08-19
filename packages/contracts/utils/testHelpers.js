@@ -370,6 +370,9 @@ class TestHelper {
       await contracts.collateralToken.mint(account, amount)
     }
   }
+  static async batchMintCollateralTokens(contracts, accounts, amount) {  
+    await contracts.collateralToken.batchMint(accounts, amount)
+  }
 
   static async approveCollateralTokens(contracts, accounts, amount) {
     for (const account of accounts) {
@@ -1281,12 +1284,34 @@ class TestHelper {
       }
     }
     collateralAmount = extraParams.value;
+
+    // commenting this out since it's overwriting the large batch approval done in beforeEach
     // Approve ERC20 tokens instead of sending ETH
-  await contracts.collateralToken.approve(
-    contracts.activePool.address, 
-    collateralAmount, 
-    { from: extraParams.from }
-  )
+    /*
+    await contracts.collateralToken.approve(
+      contracts.activePool.address, 
+      collateralAmount, 
+      { from: extraParams.from }
+    )
+    */
+    
+    if (shielded) {
+        if (this.toBN(await contracts.collateralToken.allowance(extraParams.from, contracts.activeShieldedPool.address)).lt(this.toBN(collateralAmount))) {
+            await contracts.collateralToken.approve(
+              contracts.activeShieldedPool.address, 
+              collateralAmount, 
+              { from: extraParams.from }
+            )
+        }
+    } else {
+        if (this.toBN(await contracts.collateralToken.allowance(extraParams.from, contracts.activePool.address)).lt(this.toBN(collateralAmount))) {
+            await contracts.collateralToken.approve(
+              contracts.activePool.address, 
+              collateralAmount, 
+              { from: extraParams.from }
+            )
+        }
+    }
     const tx = await contracts.borrowerOperations.openTrove(collateralAmount, lusdAmount, upperHint, lowerHint, shielded, { from: extraParams.from})
 
     return {

@@ -143,10 +143,11 @@ contract('DefaultPool', async accounts => {
     mockRewards = await NonPayable.new()
     const dumbContractAddress = (await NonPayable.new()).address
     mockActivePool = await ActivePool.new()
+    mockActiveShieldedPool = await ActivePool.new()
     collateralToken = await CollateralToken.new("test", "test")
 
     await defaultPool.setAddresses(mockLiquidations.address, mockRewards.address, mockTroveManager.address,
-                                   mockActivePool.address, collateralToken.address)
+                                   mockActivePool.address, mockActiveShieldedPool.address, collateralToken.address)
     await mockActivePool.setAddresses(mockLiquidations.address, mockRewards.address, dumbContractAddress, mockTroveManager.address,
                                       dumbContractAddress, defaultPool.address, dumbContractAddress, collateralToken.address)
   })
@@ -214,7 +215,7 @@ contract('DefaultPool', async accounts => {
 
     // send ether from pool to alice
     //await defaultPool.sendCollateralToActivePool(dec(1, 'ether'), { from: mockTroveManagerAddress })
-    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(uint256)', [web3.utils.toHex(dec(1, 'ether'))])
+    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(address,uint256)', [mockActivePool.address, web3.utils.toHex(dec(1, 'ether'))])
     const tx2 = await mockRewards.forward(defaultPool.address, sendCollateralData, { from: owner })
     assert.isTrue(tx2.receipt.status)
 

@@ -51,8 +51,6 @@ contract LiquityBase is BaseMath, ILiquityBase {
 
     IDefaultPool public defaultPool;
 
-    IDefaultPool public defaultShieldedPool;
-
     IPriceFeed public override priceFeed;
 
     IRelayer public relayer; 
@@ -74,23 +72,13 @@ contract LiquityBase is BaseMath, ILiquityBase {
     }
 
     function getEntireSystemColl() public view returns (uint) {
-        return activePool.getCollateral().add(defaultPool.getCollateral()).add(activeShieldedPool.getCollateral()).add(defaultShieldedPool.getCollateral());
+        return activePool.getCollateral().add(activeShieldedPool.getCollateral()).add(defaultPool.getCollateral());
     }
 
     function getEntireSystemDebt(uint accumulatedRate, uint accumulatedShieldRate) public view returns (uint) {
-        uint baseDebt = _getEntireNormalizedBaseDebt().mul(accumulatedRate).div(RATE_PRECISION);
-        uint shieldedDebt = _getEntireNormalizedShieldedDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
-        return baseDebt + shieldedDebt;
-    }
-
-    function _getEntireNormalizedBaseDebt() internal view returns (uint) {
-        activePool.getLUSDDebt();
-        defaultPool.getLUSDDebt();
-        return activePool.getLUSDDebt().add(defaultPool.getLUSDDebt());
-    }
-
-    function _getEntireNormalizedShieldedDebt() internal view returns (uint) {
-        return activeShieldedPool.getLUSDDebt().add(defaultShieldedPool.getLUSDDebt());
+        uint baseDebt = activePool.getLUSDDebt().mul(accumulatedRate).div(RATE_PRECISION);
+        uint shieldedDebt = activeShieldedPool.getLUSDDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
+        return baseDebt + shieldedDebt + defaultPool.getLUSDDebt();
     }
 
     /*

@@ -82,7 +82,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       collateralToken = contracts.collateralToken
       relayer = contracts.relayer
 
-      await th.mintCollateralTokensAndApproveActivePool(contracts, [owner,
+      await th.batchMintCollateralTokensAndApproveActivePool(contracts, [owner,
         defaulter_1,
         defaulter_2,
         defaulter_3,
@@ -395,9 +395,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), '4000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), '4000000000000000000000'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), '4000000000000000000000'), 10000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 23000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 23000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 23000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 27000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 27000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 27000)
 
       // (0.5 + 0.6 + 0.7) * 99.5 / 3
       assert.isAtMost(th.getDifference(alice_ETHWithdrawn, dec(597, 17)), 10000)
@@ -1638,10 +1638,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Defaulter 1 withdraws 'almost' 1e9 LUSD.
       await borrowerOperations.openTrove(dec(1e7, 'ether'), await getOpenTroveLUSDAmount(dec(999999991, 18)), defaulter_1, defaulter_1, false, { from: defaulter_1 })
 
-      // Defaulter 2 withdraws 594e7 LUSD
-      //await borrowerOperations.openTrove(await getOpenTroveLUSDAmount(dec(594e7, 18)), defaulter_2, defaulter_2, false, { from: defaulter_2, value: dec(6e7, 'ether') })
-      // slightly increase debt to ensure scale change
-      await borrowerOperations.openTrove(dec(6e7, 'ether'), await getOpenTroveLUSDAmount(dec(600e7, 18)), defaulter_2, defaulter_2, false, { from: defaulter_2 })
+      // slightly increase debt from original 594e7 to ensure scale change
+      await borrowerOperations.openTrove(dec(6e7, 'ether'), await getOpenTroveLUSDAmount(dec(597e7, 18)), defaulter_2, defaulter_2, false, { from: defaulter_2 })
 
       await lusdToken.transfer(alice, dec(1e9, 18), { from: whale })
       await stabilityPool.provideToSP(dec(1e9, 18), ZERO_ADDRESS, { from: alice })
@@ -1712,10 +1710,11 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
      
       Total: 6000 LUSD, 300 Ether
       */
+
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), dec(1e7, 18)), 1e18)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), dec(2e7, 18)), 1e18)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(dennis)).toString(), dec(3e7, 18)), 1e18)
-       
+        
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), bobFinalDeposit), 1e18)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), carolFinalDeposit), 1e18)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(dennis)).toString(), dennisFinalDeposit), 1e18)

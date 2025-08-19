@@ -34,8 +34,8 @@ contract('DefaultPool', async accounts => {
 
     // try to send collateral from pool to non-payable
     //await th.assertRevert(defaultPool.sendCollateralToActivePool(amount, { from: owner }), 'DefaultPool: sending Collateral failed')
-    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(uint256)', [web3.utils.toHex(amount)])
-    await th.assertRevert(mockTroveManager.forward(defaultPool.address, sendETHData, { from: owner }), 'DefaultPool: sending ETH failed')
+    const sendCollateralData = th.getTransactionData('sendCollateralToActivePool(address,uint256)', [mockActivePool.address, web3.utils.toHex(amount)])
+    await th.assertRevert(mockTroveManager.forward(defaultPool.address, sendCollateralData, { from: owner }), 'DefaultPool: sending Collateral failed')
   })
 })
 

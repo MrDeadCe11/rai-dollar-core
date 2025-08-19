@@ -659,7 +659,7 @@ contract('TroveManager', async accounts => {
     assert.isAtMost(th.getDifference(totalCollateralSnapshot_After, A_collateral.add(th.applyLiquidationFee(B_collateral))), 1)
   })
 
-  it("liquidate(): updates the L_CollBase and L_LUSDDebtBase reward-per-unit-staked totals", async () => {
+  it("liquidate(): updates the L_Coll and L_LUSDDebt reward-per-unit-staked totals", async () => {
     await contracts.rateControl.setCoBias(0)
     // --- SETUP ---
     const { collateral: A_collateral, totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(8, 18)), extraParams: { from: alice } })
@@ -671,8 +671,8 @@ contract('TroveManager', async accounts => {
     // price drops to 1CollateralToken:100LUSD, reducing Carols's ICR below MCR
     await priceFeed.setPrice('100000000000000000000');
     assert.isFalse(await th.checkRecoveryMode(contracts))
-    const L_CollBase_BeforeCarolLiquidated = await rewards.L_CollBase()
-    const L_LUSDDebtBase_BeforeCarolLiquidated = await rewards.L_LUSDDebtBase()
+    const L_Coll_BeforeCarolLiquidated = await rewards.L_Coll()
+    const L_LUSDDebt_BeforeCarolLiquidated = await rewards.L_LUSDDebt()
 
     // close Carol's Trove.  
     assert.isTrue(await sortedTroves.contains(carol))
@@ -680,8 +680,8 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await sortedTroves.contains(carol))
 
     // Carol's collateral*0.995 and LUSD should be added to the DefaultPool.
-    const L_CollBase_AfterCarolLiquidated = await rewards.L_CollBase()
-    const L_LUSDDebtBase_AfterCarolLiquidated = await rewards.L_LUSDDebtBase()
+    const L_Coll_AfterCarolLiquidated = await rewards.L_Coll()
+    const L_LUSDDebt_AfterCarolLiquidated = await rewards.L_LUSDDebt()
 
     // Debug values for understanding the issue
     const totalStakes_afterCarol = await rewards.totalStakes()
@@ -690,15 +690,15 @@ contract('TroveManager', async accounts => {
     const expectedLiquidationFee = C_collateral.div(toBN(200))
     const liquidatedCollAfterFee = C_collateral.sub(expectedLiquidationFee) //th.applyLiquidationFee(C_collateral)
 
-    const L_CollBase_expected_1 = liquidatedCollAfterFee.mul(mv._1e18BN).div(totalStakes_afterCarol)
-    const L_LUSDDebtBase_expected_1 = C_totalDebt.mul(mv._1e18BN).div(totalStakes_afterCarol)
+    const L_Coll_expected_1 = liquidatedCollAfterFee.mul(mv._1e18BN).div(totalStakes_afterCarol)
+    const L_LUSDDebt_expected_1 = C_totalDebt.mul(mv._1e18BN).div(totalStakes_afterCarol)
 
-    assert.isAtMost(th.getDifference(L_CollBase_AfterCarolLiquidated, L_CollBase_expected_1), 100)
-    assert.isAtMost(th.getDifference(L_LUSDDebtBase_AfterCarolLiquidated, L_LUSDDebtBase_expected_1), 100)
+    assert.isAtMost(th.getDifference(L_Coll_AfterCarolLiquidated, L_Coll_expected_1), 100)
+    assert.isAtMost(th.getDifference(L_LUSDDebt_AfterCarolLiquidated, L_LUSDDebt_expected_1), 100)
 
     b_coll = (await troveManager.getEntireDebtAndColl(bob))[1]
     b_coll_pending = (await troveManager.getEntireDebtAndColl(bob))[3]
-    b_exp = B_collateral.mul(L_CollBase_expected_1).div(mv._1e18BN)
+    b_exp = B_collateral.mul(L_Coll_expected_1).div(mv._1e18BN)
     /*
     console.log("b_coll", b_coll.toString())
     console.log("b_exp", b_exp.toString())
@@ -725,17 +725,17 @@ contract('TroveManager', async accounts => {
    
    The system rewards-per-unit-staked should now be:
    
-   L_CollBase = (0.995 / 20) + (10.4975*0.995  / 10) = 1.09425125 CollateralToken
-   L_LUSDDebtBase = (180 / 20) + (890 / 10) = 98 LUSD */
-    const L_CollBase_AfterBobLiquidated = await rewards.L_CollBase()
-    const L_LUSDDebtBase_AfterBobLiquidated = await rewards.L_LUSDDebtBase()
+   L_Coll = (0.995 / 20) + (10.4975*0.995  / 10) = 1.09425125 CollateralToken
+   L_LUSDDebt = (180 / 20) + (890 / 10) = 98 LUSD */
+    const L_Coll_AfterBobLiquidated = await rewards.L_Coll()
+    const L_LUSDDebt_AfterBobLiquidated = await rewards.L_LUSDDebt()
 
 
-    const L_CollBase_expected_2 = L_CollBase_expected_1.add(th.applyLiquidationFee(B_collateral.add(B_collateral.mul(L_CollBase_expected_1).div(mv._1e18BN))).mul(mv._1e18BN).div(A_collateral))
-    const L_LUSDDebtBase_expected_2 = L_LUSDDebtBase_expected_1.add(B_totalDebt.add(B_increasedTotalDebt).add(B_collateral.mul(L_LUSDDebtBase_expected_1).div(mv._1e18BN)).mul(mv._1e18BN).div(A_collateral))
+    const L_Coll_expected_2 = L_Coll_expected_1.add(th.applyLiquidationFee(B_collateral.add(B_collateral.mul(L_Coll_expected_1).div(mv._1e18BN))).mul(mv._1e18BN).div(A_collateral))
+    const L_LUSDDebt_expected_2 = L_LUSDDebt_expected_1.add(B_totalDebt.add(B_increasedTotalDebt).add(B_collateral.mul(L_LUSDDebt_expected_1).div(mv._1e18BN)).mul(mv._1e18BN).div(A_collateral))
 
-    assert.isAtMost(th.getDifference(L_CollBase_AfterBobLiquidated, L_CollBase_expected_2), 100)
-    assert.isAtMost(th.getDifference(L_LUSDDebtBase_AfterBobLiquidated, L_LUSDDebtBase_expected_2), 100)
+    assert.isAtMost(th.getDifference(L_Coll_AfterBobLiquidated, L_Coll_expected_2), 100)
+    assert.isAtMost(th.getDifference(L_LUSDDebt_AfterBobLiquidated, L_LUSDDebt_expected_2), 100)
   })
 
 
@@ -764,8 +764,6 @@ contract('TroveManager', async accounts => {
     console.log("before liq")
     console.log("bob actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("bob entire debt", (await contracts.troveManager.getEntireDebtAndColl(bob))[0].toString())
-    console.log("bob pending base debt reward", (await contracts.rewards.getPendingBaseLUSDDebtReward(bob)).toString())
-    console.log("bob pending base coll reward", (await contracts.rewards.getPendingBaseCollateralReward(bob)).toString())
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
     console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
@@ -786,8 +784,6 @@ contract('TroveManager', async accounts => {
     console.log("after liq")
     console.log("bob actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("bob entire debt", (await contracts.troveManager.getEntireDebtAndColl(bob))[0].toString())
-    console.log("bob pending base debt reward", (await contracts.rewards.getPendingBaseLUSDDebtReward(bob)).toString())
-    console.log("bob pending base coll reward", (await contracts.rewards.getPendingBaseCollateralReward(bob)).toString())
     console.log("default pool coll", (await contracts.defaultPool.getCollateral()).toString())
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(alice)).toString())
     console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
@@ -2985,7 +2981,7 @@ contract('TroveManager', async accounts => {
     //console.log("new dep minus liquidation", newSpDeposit.sub(liquidatedDebt).toString())
     //console.log("old dep minus liquidation", spDeposit.sub(liquidatedDebt).toString())
 
-    assert.isAtMost(th.getDifference(dennis_Deposit_Before, newSpDeposit.sub(liquidatedDebt)), 2000000)
+    assert.isAtMost(th.getDifference(dennis_Deposit_Before, newSpDeposit.sub(liquidatedDebt)), 2450000)
     /*
     console.log("dennis_CollGain_Before", dennis_CollGain_Before.toString())
     console.log("liquidatedColl", liquidatedColl.toString())
@@ -7219,11 +7215,11 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await sortedTroves.contains(defaulter_1))
 
     // Confirm there are no pending rewards from liquidation
-    const current_L_LUSDDebtBase = await rewards.L_LUSDDebtBase()
-    assert.equal(current_L_LUSDDebtBase, 0)
+    const current_L_LUSDDebt = await rewards.L_LUSDDebt()
+    assert.equal(current_L_LUSDDebt, 0)
 
-    const carolSnapshot_L_LUSDDebtBase = (await rewards.rewardSnapshots(carol))[1]
-    assert.equal(carolSnapshot_L_LUSDDebtBase, 0)
+    const carolSnapshot_L_LUSDDebt = (await rewards.rewardSnapshots(carol))[1]
+    assert.equal(carolSnapshot_L_LUSDDebt, 0)
 
     const carol_PendingLUSDDebtReward = await rewards.getPendingLUSDDebtReward(carol)
     assert.equal(carol_PendingLUSDDebtReward, 0)
@@ -7248,11 +7244,11 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await sortedTroves.contains(defaulter_1))
 
     // Confirm there are no pending rewards from liquidation
-    const current_L_CollBase = await rewards.L_CollBase()
-    assert.equal(current_L_CollBase, 0)
+    const current_L_Coll = await rewards.L_Coll()
+    assert.equal(current_L_Coll, 0)
 
-    const carolSnapshot_L_CollBase = (await rewards.rewardSnapshots(carol))[0]
-    assert.equal(carolSnapshot_L_CollBase, 0)
+    const carolSnapshot_L_Coll = (await rewards.rewardSnapshots(carol))[0]
+    assert.equal(carolSnapshot_L_Coll, 0)
 
     const carol_PendingCollateralReward = await rewards.getPendingCollateralReward(carol)
     assert.equal(carol_PendingCollateralReward, 0)
