@@ -4,7 +4,6 @@ pragma solidity 0.6.11;
 
 import "../Dependencies/IERC20.sol";
 import "../Interfaces/ILiquityBase.sol";
-
 import "../Dependencies/IERC20.sol";
 
 // Common interface for the Trove Manager.
@@ -13,7 +12,9 @@ interface IBorrowerOperations is ILiquityBase {
     // --- Events ---
 
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
+    event RewardsAddressChanged(address _newRewardsAddress);
     event ActivePoolAddressChanged(address _activePoolAddress);
+    event ActiveShieldedPoolAddressChanged(address _activeShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _defaultPoolAddress);
     event StabilityPoolAddressChanged(address _stabilityPoolAddress);
     event GasPoolAddressChanged(address _gasPoolAddress);
@@ -23,29 +24,24 @@ interface IBorrowerOperations is ILiquityBase {
     event LUSDTokenAddressChanged(address _lusdTokenAddress);
     event LQTYStakingAddressChanged(address _lqtyStakingAddress);
     event RelayerAddressChanged(address _relayerAddress);
+    event CollateralTokenAddressChanged(address _collateralTokenAddress);
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
+    event ShieldedTroveCreated(address indexed _borrower, uint arrayIndex);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
     event LUSDBorrowingFeePaid(address indexed _borrower, uint _LUSDFee);
 
     // --- Functions ---
 
-    function setAddresses(
-        address _collateralTokenAddress,
-        address _troveManagerAddress,
-        address _activePoolAddress,
-        address _defaultPoolAddress,
-        address _stabilityPoolAddress,
-        address _gasPoolAddress,
-        address _collSurplusPoolAddress,
-        address _priceFeedAddress,
-        address _sortedTrovesAddress,
-        address _lusdTokenAddress,
-        address _lqtyStakingAddress,
-        address _relayerAddress
-    ) external;
+   function setAddresses(address[] memory addresses) external;
+
     function collateralToken() external view returns (IERC20);
-    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external;
+
+    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external;
+
+    function shieldTrove(address _upperHint, address _lowerHint) external;
+
+    function unShieldTrove(address _upperHint, address _lowerHint) external;
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external;
 
@@ -59,7 +55,7 @@ interface IBorrowerOperations is ILiquityBase {
 
     function closeTrove() external;
 
-    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external;
+    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, bool _toggleShield, address _upperHint, address _lowerHint) external;
 
     function claimCollateral() external returns (uint256);
 

@@ -43,9 +43,9 @@ contract('TroveManager', async accounts => {
   const getOpenTroveLUSDAmount = async (totalDebt) => th.getOpenTroveLUSDAmount(contracts, totalDebt)
  
   const getSnapshotsRatio = async () => {
-    const ratio = (await troveManager.totalStakesSnapshot())
+    const ratio = (await rewards.totalStakesSnapshot())
       .mul(toBN(dec(1, 18)))
-      .div((await troveManager.totalCollateralSnapshot()))
+      .div((await rewards.totalCollateralSnapshot()))
 
     return ratio
   }
@@ -67,6 +67,7 @@ contract('TroveManager', async accounts => {
     sortedTroves = contracts.sortedTroves
     liquidations = contracts.liquidations
     troveManager = contracts.troveManager
+    rewards = contracts.rewards
     activePool = contracts.activePool
     stabilityPool = contracts.stabilityPool
     defaultPool = contracts.defaultPool
@@ -90,21 +91,21 @@ contract('TroveManager', async accounts => {
     await priceFeed.setPrice(dec(100, 18))
   
     // Make 1 mega troves A at ~50% total collateral
-    await borrowerOperations.openTrove(dec(2, 29), await getOpenTroveLUSDAmount(dec(1, 31)), ZERO_ADDRESS, ZERO_ADDRESS, { from: A })
+    await borrowerOperations.openTrove(dec(2, 29), await getOpenTroveLUSDAmount(dec(1, 31)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: A })
     
     // Make 5 large troves B, C, D, E, F at ~10% total collateral
-    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, { from: B })
-    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, { from: C })
-    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, { from: D })
-    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, { from: E })
-    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, { from: F })
+    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: B })
+    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: C })
+    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: D })
+    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: E })
+    await borrowerOperations.openTrove(dec(4, 28), await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: F })
   
     // Make 10 tiny troves at relatively negligible collateral (~1e-9 of total)
     const tinyTroves = accounts.slice(10, 20)
     for (account of tinyTroves) {
       await collateralToken.mint(account, dec(2, 20), { from: owner })
       await collateralToken.approve(activePool.address, dec(2, 20), { from: account })
-      await borrowerOperations.openTrove(dec(2, 20), await getOpenTroveLUSDAmount(dec(1, 22)), ZERO_ADDRESS, ZERO_ADDRESS, { from: account })
+      await borrowerOperations.openTrove(dec(2, 20), await getOpenTroveLUSDAmount(dec(1, 22)), ZERO_ADDRESS, ZERO_ADDRESS, false, { from: account })
     }
 
     // liquidate 1 trove at ~50% total system collateral
@@ -113,15 +114,15 @@ contract('TroveManager', async accounts => {
     assert.isTrue(await th.checkRecoveryMode(contracts))
     await liquidations.liquidate(A)
 
-    console.log(`totalStakesSnapshot after L1: ${await troveManager.totalStakesSnapshot()}`)
-    console.log(`totalCollateralSnapshot after L1: ${await troveManager.totalCollateralSnapshot()}`)
+    console.log(`totalStakesSnapshot after L1: ${await rewards.totalStakesSnapshot()}`)
+    console.log(`totalCollateralSnapshot after L1: ${await rewards.totalCollateralSnapshot()}`)
     console.log(`Snapshots ratio after L1: ${await getSnapshotsRatio()}`)
-    console.log(`B pending ETH reward after L1: ${await troveManager.getPendingCollateralReward(B)}`)
+    console.log(`B pending ETH reward after L1: ${await rewards.getPendingCollateralReward(B)}`)
     console.log(`B stake after L1: ${(await troveManager.Troves(B))[2]}`)
 
     // adjust trove B 1 wei: apply rewards
     
-    await borrowerOperations.adjustTrove(0, 0, 1, false, ZERO_ADDRESS, ZERO_ADDRESS, {from: B})  // B repays 1 wei
+    await borrowerOperations.adjustTrove(0, 0, 1, false, false, ZERO_ADDRESS, ZERO_ADDRESS, {from: B})  // B repays 1 wei
     console.log(`B stake after A1: ${(await troveManager.Troves(B))[2]}`)
     console.log(`Snapshots ratio after A1: ${await getSnapshotsRatio()}`)
 
@@ -132,7 +133,7 @@ contract('TroveManager', async accounts => {
       await liquidations.liquidate(trove)
       console.log(`B stake after L${idx + 2}: ${(await troveManager.Troves(B))[2]}`)
       console.log(`Snapshots ratio after L${idx + 2}: ${await getSnapshotsRatio()}`)
-      await borrowerOperations.adjustTrove(0, 0, 1, false, ZERO_ADDRESS, ZERO_ADDRESS, {from: B})  // A repays 1 wei
+      await borrowerOperations.adjustTrove(0, 0, 1, false, false, ZERO_ADDRESS, ZERO_ADDRESS, {from: B})  // A repays 1 wei
       console.log(`B stake after A${idx + 2}: ${(await troveManager.Troves(B))[2]}`)
     }
   })

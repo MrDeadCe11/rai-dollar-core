@@ -11,7 +11,8 @@ contract TroveManagerTester is TroveManager {
 
     function computeICR(uint _coll, uint _debt, uint _price) external view returns (uint) {
         uint par = relayer.par();
-        return LiquityMath._computeCR(_coll, _actualDebt(_debt), _price, par);
+        // TODO: use shielded bool instead of false
+        return LiquityMath._computeCR(_coll, _actualDebt(_debt, false), _price, par);
     }
 
     function getCollGasCompensation(uint _coll) external pure returns (uint) {
@@ -31,7 +32,6 @@ contract TroveManagerTester is TroveManager {
     }
 
     function callInternalRemoveTroveOwner(address _troveOwner) external {
-        uint troveOwnersArrayLength = TroveOwners.length;
-        _removeTroveOwner(_troveOwner, troveOwnersArrayLength);
+        _removeTroveOwner(_troveOwner, shielded[_troveOwner]);
     }
 }

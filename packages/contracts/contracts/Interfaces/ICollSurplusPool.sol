@@ -11,6 +11,8 @@ interface ICollSurplusPool {
     event LiquidationsAddressChanged(address _newLiquidationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
+    event ActiveShieldedPoolAddressChanged(address _newActiveShieldedPoolAddress);
+    event CollateralTokenAddressChanged(address _newCollateralTokenAddress);
 
     event CollBalanceUpdated(address indexed _account, uint _newBalance);
     event CollateralSent(address _to, uint _amount);
@@ -22,6 +24,7 @@ interface ICollSurplusPool {
         address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _collateralTokenAddress
     ) external;
 

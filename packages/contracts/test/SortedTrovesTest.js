@@ -85,6 +85,8 @@ contract('SortedTroves', async accounts => {
       await deploymentHelper.connectLQTYContracts(LQTYContracts)
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+
+      await th.mintCollateralTokens(contracts, accounts, toBN(dec(1000, 26)))
     })
 
     it('contains(): returns true for addresses that have opened troves', async () => {
@@ -248,26 +250,26 @@ contract('SortedTroves', async accounts => {
     it.skip("stays ordered after troves with 'infinite' ICR receive a redistribution", async () => {
 
       // make several troves with 0 debt and collateral, in random order
-      await borrowerOperations.openTrove(th._100pct, 0, whale, whale, { from: whale, value: dec(50, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, 0, A, A, { from: A, value: dec(1, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, 0, B, B, { from: B, value: dec(37, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, 0, C, C, { from: C, value: dec(5, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, 0, D, D, { from: D, value: dec(4, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, 0, E, E, { from: E, value: dec(19, 'ether') })
+      await borrowerOperations.openTrove(dec(50, 'ether'), 0, whale, whale, false, { from: whale })
+      await borrowerOperations.openTrove(dec(1, 'ether'), 0, A, A, false, { from: A })
+      await borrowerOperations.openTrove(dec(37, 'ether'), 0, B, B, false, { from: B })
+      await borrowerOperations.openTrove(dec(5, 'ether'), 0, C, C, false, { from: C })
+      await borrowerOperations.openTrove(dec(4, 'ether'), 0, D, D, false, { from: D })
+      await borrowerOperations.openTrove(dec(19, 'ether'), 0, E, E, false, { from: E })
 
       // Make some troves with non-zero debt, in random order
-      await borrowerOperations.openTrove(th._100pct, dec(5, 19), F, F, { from: F, value: dec(1, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, dec(3, 18), G, G, { from: G, value: dec(37, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, dec(2, 20), H, H, { from: H, value: dec(5, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, dec(17, 18), I, I, { from: I, value: dec(4, 'ether') })
-      await borrowerOperations.openTrove(th._100pct, dec(5, 21), J, J, { from: J, value: dec(1345, 'ether') })
+      await borrowerOperations.openTrove(dec(1, 'ether'), dec(5, 19), F, F, false, { from: F })
+      await borrowerOperations.openTrove(dec(37, 'ether'), dec(3, 18), G, G, false, { from: G })
+      await borrowerOperations.openTrove(dec(5, 'ether'), dec(2, 20), H, H, false, { from: H })
+      await borrowerOperations.openTrove(dec(4, 'ether'), dec(17, 18), I, I, false, { from: I })
+      await borrowerOperations.openTrove(dec(1345, 'ether'), dec(5, 21), J, J, false, { from: J })
 
       const price_1 = await priceFeed.getPrice()
       
       // Check troves are ordered
       await assertSortedListIsOrdered(contracts)
 
-      await borrowerOperations.openTrove(th._100pct, dec(100, 18), defaulter_1, defaulter_1, { from: defaulter_1, value: dec(1, 'ether') })
+      await borrowerOperations.openTrove(dec(1, 'ether'), dec(100, 18), defaulter_1, defaulter_1, false, { from: defaulter_1 })
       assert.isTrue(await sortedTroves.contains(defaulter_1))
 
       // Price drops

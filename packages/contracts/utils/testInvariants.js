@@ -11,7 +11,8 @@ class TestInvariant {
     // so need to subtract from totalSupply
     const unprotectedSupply = await contracts.lusdToken.unprotectedSupply()
 
-    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate())
+    const debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(),
+        await contracts.troveManager.accumulatedShieldRate())
     const supply = (await contracts.lusdToken.totalSupply()).sub(unprotectedSupply)
 
     // system allows slightly more supply than debt due to rounding

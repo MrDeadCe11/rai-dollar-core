@@ -15,4 +15,16 @@ contract CollateralToken is ERC20 {
     function burn(address from, uint256 amount) external {
         _burn(from, amount);
     }
+
+    function batchMint(address[] memory to, uint256 amount) external {
+        for (uint i = 0; i < to.length; i++) {
+            _mint(to[i], amount);
+        }
+    }
+
+    function batchApprove(address spender, address[] memory approvers, uint256 amount) external {
+        for (uint i = 0; i < approvers.length; i++) {
+            _approve(approvers[i], spender, amount);
+        }
+    }
 }

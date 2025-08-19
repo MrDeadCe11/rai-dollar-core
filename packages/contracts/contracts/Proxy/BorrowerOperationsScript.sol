@@ -14,8 +14,8 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations = _borrowerOperations;
     }
 
-    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable {
-        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint);
+    function openTrove(uint256 _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external payable {
+        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint, _redemptionShield);
     }
 
     function addColl(uint256 _collateralToAdd, address _upperHint, address _lowerHint) external {
@@ -38,8 +38,8 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations.closeTrove();
     }
 
-    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external {
-        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, isDebtIncrease, _upperHint, _lowerHint);
+    function adjustTrove(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, bool toggleShield, address _upperHint, address _lowerHint) external {
+        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, isDebtIncrease, toggleShield, _upperHint, _lowerHint);
     }
 
     function claimCollateral() external {

@@ -28,7 +28,7 @@ contract ParControl is Ownable, CheckContract, IParControl {
     uint256 public constant PER_SECOND_INTEGRAL_LEAK = 999998853923969313944895488; // 7-day half-life [TWENTY_SEVEN_DECIMAL_NUMBER]
 
     // The maximum output value
-    int256 public constant OUTPUT_UPPER_BOUND = 115 * 10 ** 16; // $1.15 [TWENTY_SEVEN_DECIMAL_NUMBER]
+    int256 public constant OUTPUT_UPPER_BOUND = 125 * 10 ** 16; // $1.15 [TWENTY_SEVEN_DECIMAL_NUMBER]
 
     // The minimum output value
     int256 public constant OUTPUT_LOWER_BOUND = 85 * 10 ** 16; // $0.85 [TWENTY_SEVEN_DECIMAL_NUMBER]
@@ -53,6 +53,11 @@ contract ParControl is Ownable, CheckContract, IParControl {
 
     uint256 internal constant TWENTY_SEVEN_DECIMAL_NUMBER = 10 ** 27;
     uint256 internal constant EIGHTEEN_DECIMAL_NUMBER = 10 ** 18;
+
+    struct PiComponents {
+        int256 p;
+        int256 i;
+    }
 
     event RelayerAddressChanged(address _relayerAddress);
 
@@ -128,12 +133,13 @@ contract ParControl is Ownable, CheckContract, IParControl {
         boundedOutput = _piOutput;
         clampedIntegral = _errorIntegral;
 
-        /* ── compute the per-step Δ envelope ───────────────────────────── */
+        // compute output bounds for this update
+        // for first output, timeElapsed=0 -> maxDelta=0
         int256 maxDelta = int256(MAX_DELTA_PER_HOUR * _timeElapsed / 3600);
         int256 upperBound = int256(min(OUTPUT_UPPER_BOUND, lastOutput + maxDelta));
         int256 lowerBound = int256(max(OUTPUT_LOWER_BOUND, lastOutput - maxDelta));
 
-        /* ── apply bounds & optional integral clamp ────────────────────── */
+        // apply bounds and optional integral clamp
         if (_piOutput < lowerBound) {
             boundedOutput = lowerBound;
             if (_newArea < 0 && _errorIntegral < 0) {
@@ -150,19 +156,19 @@ contract ParControl is Ownable, CheckContract, IParControl {
     /*
     * @notice Compute a new error Integral
     * @param error The system error
+    * @param timeElapsed Time since last update
     */
-    function getNextErrorIntegral(int256 error, uint256 timeElapsed) public view returns (int256, int256) {
-        // One first update, don't accumulate error in integral
+    function getNextErrorIntegral(int256 _error, uint256 _timeElapsed) public view returns (int256, int256) {
+        // On first update, don't accumulate error in integral
         if (lastUpdateTime == 0) {
             return (0, 0);
         }
 
-        //int256 newTimeAdjustedError = riemannSum(error, lastError) * int256(timeElapsed);
-        int256 newTimeAdjustedError = (error + lastError) / 2 * int256(timeElapsed);
+        int256 newTimeAdjustedError = (_error + lastError) / 2 * int256(_timeElapsed);
 
         uint256 accumulatedLeak = (PER_SECOND_INTEGRAL_LEAK == 1e27)
             ? TWENTY_SEVEN_DECIMAL_NUMBER
-            : rpower(PER_SECOND_INTEGRAL_LEAK, timeElapsed, TWENTY_SEVEN_DECIMAL_NUMBER);
+            : rpower(PER_SECOND_INTEGRAL_LEAK, _timeElapsed, TWENTY_SEVEN_DECIMAL_NUMBER);
         int256 leakedErrorIntegral = int256(accumulatedLeak) * errorIntegral / int256(TWENTY_SEVEN_DECIMAL_NUMBER);
 
         return (leakedErrorIntegral + newTimeAdjustedError, newTimeAdjustedError);
@@ -172,74 +178,88 @@ contract ParControl is Ownable, CheckContract, IParControl {
     * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
     * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
     * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
-    * @return totalOutput, pOutput, iOutput TWENTY_SEVEN_DECIMAL_NUMBER
+    * @return pOutput, iOutput TWENTY_SEVEN_DECIMAL_NUMBER
     */
-    function getRawPiOutput(int256 error, int256 errorI) public pure returns (int256, int256) {
-        // output = P + I = Kp * error + Ki * errorI
-        int256 pOutput = error * int256(KP) / int256(EIGHTEEN_DECIMAL_NUMBER);
-        int256 iOutput = errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
-        return (pOutput, iOutput);
-    }
-
-    function _increaseOutput(int256 piOutput) internal pure returns (int256) {
-        // Strengthen par output in the negative direction
-        if (piOutput < 0) {
-            return piOutput * NEGATIVE_CONTROL_MULTIPLIER;
-        }
-
-        return piOutput;
+    function getRawPiOutput(int256 _error, int256 _errorI) external pure returns (int256, int256) {
+        PiComponents memory output = _getRawPiOutput(_error, _errorI);
+        return (output.p, output.i);
     }
 
     /*
-    * @notice Process a new error and return controller output
+    * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
+    * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
+    * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
+    * @return PiComponents TWENTY_SEVEN_DECIMAL_NUMBER
+    */
+    function _getRawPiOutput(int256 _error, int256 _errorI) internal pure returns (PiComponents memory) {
+        int256 pOutput = _error * int256(KP) / int256(EIGHTEEN_DECIMAL_NUMBER);
+        int256 iOutput = _errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
+        return PiComponents(pOutput, iOutput);
+    }
+
+    function _increaseOutput(int256 _piOutput) internal pure returns (int256) {
+        // Strengthen par output in the negative direction
+        if (_piOutput < 0) {
+            return _piOutput * NEGATIVE_CONTROL_MULTIPLIER;
+        }
+
+        return _piOutput;
+    }
+
+    /*
+    * @notice Process a new error and return controller output. First update will output the bias
     * @param error The system error EIGHTEEN_DECIMAL_NUMBER
     */
-    function update(int256 error) external returns (int256, int256, int256) {
+    function update(int256 _error) external returns (int256, int256, int256) {
         _requireCallerIsRelayer();
-        uint256 timeElapsed = (lastUpdateTime == 0) ? 0 : block.timestamp - lastUpdateTime;
-
         require(block.timestamp > lastUpdateTime, "ParControl/wait-longer");
 
-        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(error, timeElapsed);
-
-        (int256 pOutput, int256 iOutput) = getRawPiOutput(error, newErrorIntegral);
-
-        int256 piOutput = pOutput + iOutput;
-
-        piOutput = _increaseOutput(piOutput);
-
-        int256 boundedPiOutput;
-        (boundedPiOutput, errorIntegral) =
-            boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, timeElapsed);
+        (int256 boundedPiOutput, int256 newErrorIntegral, int256 pOutput, int256 iOutput) = getNextPiOutput(_error);
 
         lastUpdateTime = block.timestamp;
-        lastError = error;
+        lastError = _error;
         lastOutput = boundedPiOutput;
+        errorIntegral = newErrorIntegral;
 
         return (boundedPiOutput, pOutput, iOutput);
     }
     /*
     * @notice Compute and return the output given an error
     * @param error The system error
+    * @param timeElapsed Time since last update
     */
 
-    function getNextPiOutput(int256 error, uint256 timeElapsed) public view returns (int256, int256, int256) {
-        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(error, timeElapsed);
-        (int256 pOutput, int256 iOutput) = getRawPiOutput(error, newErrorIntegral);
-        int256 piOutput = pOutput + iOutput;
+    function getNextPiOutput(int256 _error, uint256 _timeElapsed)
+        public
+        view
+        returns (int256, int256, int256, int256)
+    {
+        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(_error, _timeElapsed);
+
+        PiComponents memory output = _getRawPiOutput(_error, newErrorIntegral);
+        int256 piOutput = output.p + output.i;
 
         piOutput = _increaseOutput(piOutput);
 
-        int256 boundedPiOutput;
-        (boundedPiOutput,) = boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, timeElapsed);
+        (int256 boundedPiOutput, int256 clampedErrorIntegral) =
+            boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, _timeElapsed);
 
-        return (boundedPiOutput, pOutput, iOutput);
+        return (boundedPiOutput, clampedErrorIntegral, output.p, output.i);
+    }
+
+    /*
+    * @notice Compute and return the output given an error
+    * @param error The system error
+    */
+
+    function getNextPiOutput(int256 _error) public view returns (int256, int256, int256, int256) {
+        return getNextPiOutput(_error, elapsed());
     }
 
     /*
     * @notice Returns the time elapsed since the last update call
     */
-    function elapsed() external view returns (uint256) {
+    function elapsed() public view returns (uint256) {
         return (lastUpdateTime == 0) ? 0 : block.timestamp - lastUpdateTime;
     }
 }

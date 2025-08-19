@@ -78,7 +78,7 @@ contract('Gas compensation tests', async accounts => {
     collateralToken = contracts.collateralToken
 
     // mint tokens
-    await th.mintCollateralTokens(contracts, [
+    await th.batchMintCollateralTokens(contracts, [
     owner, liquidator,
     alice, bob, carol, dennis, erin, flyn, graham, harriet, ida,
     defaulter_1, defaulter_2, defaulter_3, defaulter_4, whale] , dec(10, 24))

@@ -339,6 +339,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
       //
     const redemptionTx_1 = await th.redeemCollateralAndGetTxObject(B, contracts, dec(100, 18), gasPrice = GAS_PRICE)
     troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
+    lusdGain1 = toBN(th.getRawEventArgByName(redemptionTx_1, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
 
     const B_BalAfterRedemption = await lusdToken.balanceOf(B)
     assert.isTrue(B_BalAfterRedemption.lt(B_BalBeforeREdemption))
@@ -350,6 +351,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     const C_BalBeforeREdemption = await lusdToken.balanceOf(C)
     // C redeems
     const redemptionTx_2 = await th.redeemCollateralAndGetTxObject(C, contracts, dec(100, 18), gasPrice = GAS_PRICE)
+    lusdGain2 = toBN(th.getRawEventArgByName(redemptionTx_2, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
     
     const C_BalAfterRedemption = await lusdToken.balanceOf(C)
     assert.isTrue(C_BalAfterRedemption.lt(C_BalBeforeREdemption))
@@ -388,7 +390,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     const A_LUSDGain = A_LUSDBalance_After.sub(A_LUSDBalance_Before)
     console.log("A_LUSDGain", A_LUSDGain.toString())
 
-    expectedTotalLUSDGain = toBN('0')
+    expectedTotalLUSDGain = lusdGain1.add(lusdGain2)
     assert.isAtMost(th.getDifference(expectedTotalETHGain, A_ETHGain), 1000)
     assert.isAtMost(th.getDifference(expectedTotalLUSDGain, A_LUSDGain), 1000)
   })

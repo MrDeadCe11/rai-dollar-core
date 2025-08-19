@@ -23,8 +23,10 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     IERC20 public collateralToken;
     address public liquidationsAddress;
+    address public rewardsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
+    address public activeShieldedPoolAddress;
     uint256 internal CT;  // deposited Collateral Token tracker
     uint256 internal LUSDDebt;  // debt
 
@@ -36,24 +38,28 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     function setAddresses(
         address _liquidationsAddress,
+        address _rewardsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _collateralTokenAddress
     )
         external
         onlyOwner
     {
-        checkContract(_collateralTokenAddress);
         checkContract(_liquidationsAddress);
+        checkContract(_rewardsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
+        checkContract(_activeShieldedPoolAddress);
+        checkContract(_collateralTokenAddress);
 
-        collateralToken = IERC20(_collateralTokenAddress);
         liquidationsAddress = _liquidationsAddress;
+        rewardsAddress = _rewardsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
-
-        checkContract(address(collateralToken));
+        activeShieldedPoolAddress = _activeShieldedPoolAddress;
+        collateralToken = IERC20(_collateralTokenAddress);
 
         emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
@@ -79,19 +85,17 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     // --- Pool functionality ---
 
-    function sendCollateralToActivePool(uint _amount) external override {
-        _requireCallerIsTMorLiquidations();
-        if (_amount > 0) {
-        IActivePool activePool = IActivePool(activePoolAddress);
+    function sendCollateralToActivePool(IActivePool _activePool, uint _amount) external override {
+        _requireCallerIsRewards();
         CT = CT.sub(_amount);
+
         emit DefaultPoolCollateralBalanceUpdated(CT);
-        emit CollateralSent(activePoolAddress, _amount);
+        emit CollateralSent(address(_activePool), _amount);
         
         // transfer collateral to active pool
-        collateralToken.transfer(activePoolAddress, _amount);
+        collateralToken.transfer(address(_activePool), _amount);
         // process collateral increase
-        activePool.processCollateralIncrease(_amount);
-        }
+        _activePool.processCollateralIncrease(_amount);
     }
 
     function addCollateral(address _account, uint _amount) external override {
@@ -108,14 +112,13 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     }
 
     function increaseLUSDDebt(uint _amount) external override {
-        _requireCallerIsTroveManager();
+        _requireCallerIsRewards();
         LUSDDebt = LUSDDebt.add(_amount);
         emit DefaultPoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
-        //_requireCallerIsLiquidations();
-        _requireCallerIsTroveManager();
+        _requireCallerIsRewards();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit DefaultPoolLUSDDebtUpdated(LUSDDebt);
     }
@@ -130,6 +133,10 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
         require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
     }
 
+    function _requireCallerIsRewards() internal view {
+        require(msg.sender == rewardsAddress, "DefaultPool: Caller is not Rewards");
+    }
+
     function _requireCallerIsTMorLiquidations() internal view {
         require(msg.sender == troveManagerAddress || 
                msg.sender == liquidationsAddress,
@@ -139,8 +146,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
     function _requireCallerIsTroveMorActivePool() internal view {
         require(
             msg.sender == troveManagerAddress ||
-            msg.sender == activePoolAddress,
+            msg.sender == activePoolAddress ||
+            msg.sender == activeShieldedPoolAddress,
             "DefaultPool: Caller is neither TM nor ActivePool");
     }
-
 }

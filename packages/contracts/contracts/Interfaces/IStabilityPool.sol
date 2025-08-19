@@ -41,11 +41,14 @@ interface IStabilityPool {
     event StabilityPoolLUSDBalanceUpdated(uint _newBalance);
 
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
+    event LiquidationsAddressChanged(address _newLiquidationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
+    event ActiveShieldedPoolAddressChanged(address _newActiveShieldedPoolAddress);
     event DefaultPoolAddressChanged(address _newDefaultPoolAddress);
     event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
     event SortedTrovesAddressChanged(address _newSortedTrovesAddress);
+    event SortedShieldedTrovesAddressChanged(address _newSortedShieldedTrovesAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event CommunityIssuanceAddressChanged(address _newCommunityIssuanceAddress);
 
@@ -79,8 +82,10 @@ interface IStabilityPool {
         address _liquidationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
+        address _activeShieldedPoolAddress,
         address _lusdTokenAddress,
         address _sortedTrovesAddress,
+        address _sortedShieldedTrovesAddress,
         address _priceFeedAddress,
         address _communityIssuanceAddress,
         address _collateralToken
@@ -149,7 +154,7 @@ interface IStabilityPool {
      * and transfers the Trove's ETH collateral from ActivePool to StabilityPool.
      * Only called by liquidation functions in the TroveManager.
      */
-    function offset(uint _debt, uint _nDebt, uint _coll) external;
+    function offset(uint _baseDebt, uint _baseNDebt, uint _baseColl, uint _shieldedDebt, uint _shieldedNDebt, uint _shieldedColl) external;
 
     /*
      * Returns the total amount of ETH held by the pool, accounted in an internal variable instead of `balance`,

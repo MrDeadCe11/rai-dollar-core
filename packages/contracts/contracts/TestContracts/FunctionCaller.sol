@@ -15,7 +15,9 @@ contract FunctionCaller {
     address public troveManagerAddress;
 
     ISortedTroves sortedTroves;
+    ISortedTroves sortedShieldedTroves;
     address public sortedTrovesAddress;
+    address public sortedShieldedTrovesAddress;
 
     IPriceFeed priceFeed;
     address public priceFeedAddress;
@@ -28,8 +30,13 @@ contract FunctionCaller {
     }
     
     function setSortedTrovesAddress(address _sortedTrovesAddress) external {
-        troveManagerAddress = _sortedTrovesAddress;
+        sortedTrovesAddress = _sortedTrovesAddress;
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
+    }
+
+    function setSortedShieldedTrovesAddress(address _sortedShieldedTrovesAddress) external {
+        sortedShieldedTrovesAddress = _sortedShieldedTrovesAddress;
+        sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
     }
 
      function setPriceFeedAddress(address _priceFeedAddress) external {

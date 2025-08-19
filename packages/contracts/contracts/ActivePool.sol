@@ -24,6 +24,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     string constant public NAME = "ActivePool";
     IERC20 public override collateralToken;
     address public liquidationsAddress;
+    address public rewardsAddress;
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public stabilityPoolAddress;
@@ -43,6 +44,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     function setAddresses(
         address _liquidationsAddress,
+        address _rewardsAddress,
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _stabilityPoolAddress,
@@ -54,20 +56,22 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
         onlyOwner
     {
         checkContract(_liquidationsAddress);
+        checkContract(_rewardsAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_stabilityPoolAddress);
         checkContract(_defaultPoolAddress);
-        checkContract(_collateralTokenAddress);
         checkContract(_collSurplusPoolAddress);
+        checkContract(_collateralTokenAddress);
 
         liquidationsAddress = _liquidationsAddress;
+        rewardsAddress = _rewardsAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         stabilityPoolAddress = _stabilityPoolAddress;
         defaultPoolAddress = _defaultPoolAddress;
-        collateralToken = IERC20(_collateralTokenAddress);
         collSurplusPoolAddress = _collSurplusPoolAddress;
+        collateralToken = IERC20(_collateralTokenAddress);
 
         emit LiquidationsAddressChanged(_liquidationsAddress);
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
@@ -81,9 +85,9 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Getters for public variables. Required by IPool interface ---
 
     /*
-    * Returns the ETH state variable.
+    * Returns the CT state variable.
     *
-    *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
+    *Not necessarily equal to the the contract's raw collateral balance - collateral can be forcibly sent to contracts.
     */
     function getCollateral() external view override returns (uint) {
         return CT;
@@ -96,7 +100,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Pool functionality ---
 
     function sendCollateral(address _account, uint _amount) external override {
-        _requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorRewards();
         CT = CT.sub(_amount);
         emit ActivePoolCollateralBalanceUpdated(CT);
         emit CollateralSent(_account, _amount);
@@ -131,13 +135,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     }
 
     function increaseLUSDDebt(uint _amount) external override {
-        _requireCallerIsBOorTroveM();
+        //_requireCallerIsBOorTroveMorRewards();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt  = LUSDDebt.add(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
-        _requireCallerIsBOorTroveMorSP();
+        //_requireCallerIsBOorTroveMorSP();
+        _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
@@ -148,13 +154,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     // --- 'require' functions ---
 
-    function _requireCallerIsBorrowerOperationsOrDefaultPool() internal view {
-        require(
-            msg.sender == borrowerOperationsAddress ||
-            msg.sender == defaultPoolAddress,
-            "ActivePool: Caller is neither BO nor Default Pool");
-    }
-
     function _requireCallerIsBOorTroveMorSP() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
@@ -162,6 +161,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             msg.sender == troveManagerAddress ||
             msg.sender == stabilityPoolAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool");
+    }
+    function _requireCallerIsBOorTroveMorSPorRewards() internal view {
+        require(
+            msg.sender == borrowerOperationsAddress ||
+            msg.sender == liquidationsAddress ||
+            msg.sender == troveManagerAddress ||
+            msg.sender == rewardsAddress ||
+            msg.sender == stabilityPoolAddress,
+            "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Rewards");
     }
 
     function _requireCallerIsBOorTroveMorSPorDefaultPool() internal view {
@@ -181,11 +189,4 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager");
     }
 
-    // --- Fallback function ---
-
-    // receive() external payable {
-    //     _requireCallerIsBorrowerOperationsOrDefaultPool();
-    //     ETH = ETH.add(msg.value);
-    //     emit ActivePoolCollateralBalanceUpdated(ETH);
-    // }
 }

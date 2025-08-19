@@ -3,6 +3,7 @@
 pragma solidity 0.6.11;
 
 import "./IPool.sol";
+import "./IActivePool.sol";
 
 
 interface IDefaultPool is IPool {
@@ -13,5 +14,5 @@ interface IDefaultPool is IPool {
     event DefaultPoolCollateralBalanceUpdated(uint _COLLATERAL);
 
     // --- Functions ---
-    function sendCollateralToActivePool(uint _amount) external;
+    function sendCollateralToActivePool(IActivePool _activePool, uint _amount) external;
 }

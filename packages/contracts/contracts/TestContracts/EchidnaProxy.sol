@@ -50,16 +50,26 @@ contract EchidnaProxy {
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,
         address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
         uint _partialRedemptionHintNICR,
         uint _maxIterations,
         uint _maxFee
     ) external {
-        troveManager.redeemCollateral(_LUSDAmount, _firstRedemptionHint, _upperPartialRedemptionHint, _lowerPartialRedemptionHint, _partialRedemptionHintNICR, _maxIterations, _maxFee);
+        troveManager.redeemCollateral(_LUSDAmount,
+                                      _firstRedemptionHint,
+                                      _upperPartialRedemptionHint,
+                                      _lowerPartialRedemptionHint,
+                                      _upperShieldedPartialRedemptionHint,
+                                      _lowerShieldedPartialRedemptionHint,
+                                      _partialRedemptionHintNICR,
+                                      _maxIterations,
+                                      _maxFee);
     }
 
     // Borrower Operations
-    function openTrovePrx(uint _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint) external payable {
-        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint);
+    function openTrovePrx(uint _collateralToAdd, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external payable {
+        borrowerOperations.openTrove(_collateralToAdd, _LUSDAmount, _upperHint, _lowerHint, _redemptionShield);
     }
 
     function addCollPrx(uint _collateralToAdd, address _upperHint, address _lowerHint) external {
@@ -82,8 +92,8 @@ contract EchidnaProxy {
         borrowerOperations.closeTrove();
     }
 
-    function adjustTrovePrx(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, address _upperHint, address _lowerHint) external {
-        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, _isDebtIncrease, _upperHint, _lowerHint);
+    function adjustTrovePrx(uint256 _collateralToAdd, uint _collWithdrawal, uint _debtChange, bool _isDebtIncrease, bool _toggleShield, address _upperHint, address _lowerHint) external {
+        borrowerOperations.adjustTrove(_collateralToAdd, _collWithdrawal, _debtChange, _isDebtIncrease, _toggleShield, _upperHint, _lowerHint);
     }
 
     // Pool Manager

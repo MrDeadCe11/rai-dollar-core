@@ -17,4 +17,8 @@ interface IActivePool is IPool {
     // --- Functions ---
     function collateralToken() external view returns (IERC20);
     function sendCollateral(address _account, uint _amount) external;
+
+    //function increaseLUSDDebt(uint _amount) external;
+
+    //function decreaseLUSDDebt(uint _amount) external;
 }
