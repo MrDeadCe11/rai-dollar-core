@@ -16,7 +16,7 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-//import "./Dependencies/console.sol";
+import "./Dependencies/console.sol";
 
 /*
 library Str {
@@ -145,6 +145,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint totalShieldedLUSDToRedeem;
         uint totalBaseCollateralDrawn;
         uint totalShieldedCollateralDrawn;
+        uint totalCollateralFee;
         uint baseCollateralFee;
         uint shieldedCollateralFee;
         uint baseCollateralToSendToRedeemer;
@@ -279,7 +280,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint _price,
         uint _par,
         RedemptionHints memory hints,
-        bool _shielded
+        bool _shielded,
+        uint _redemptionRate
     )
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
@@ -291,6 +293,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
 
+        // get redemption fee
+        singleRedemption.collateralFee = singleRedemption.collateralLot * _redemptionRate / DECIMAL_PRECISION;
+        // subtract fee from collateralLot so fee remains in trove
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
+        console.log("singleRedemption.collateralFee in redeemCollateralFromTrove", singleRedemption.collateralFee);
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
         if (_actualDebt(locals.normDebt, _shielded) < _actualDebt(singleRedemption.LUSDLot, _shielded)) {
@@ -535,6 +542,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // --- seed cursors from hint or by scanning tails (base + shielded) ---
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
+        
+        uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
 
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
@@ -587,8 +596,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 locals.price,
                 locals.par,
                 hints,
-                !locals.pickBase
+                !locals.pickBase,
+                redemptionRate
             );
+            // add fee to total collateral fee
+            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
 
             if (singleRedemption.cancelledPartial) { break; }
 
@@ -642,16 +654,20 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         //return;
 
         // Fees
-        totals.baseCollateralFee = aggregator.getRedemptionFee(totals.totalBaseCollateralDrawn);
-        totals.shieldedCollateralFee = aggregator.getRedemptionFee(totals.totalShieldedCollateralDrawn);
+        // totals.baseCollateralFee = aggregator.getRedemptionFee(totals.totalBaseCollateralDrawn);
+        // totals.shieldedCollateralFee = aggregator.getRedemptionFee(totals.totalShieldedCollateralDrawn);
+        // console.log("totals.baseCollateralFee", totals.baseCollateralFee);
+        // console.log("totals.shieldedCollateralFee", totals.shieldedCollateralFee);
+        // console.log("totals.totalCollateralFee", totals.totalCollateralFee);
+        // require(totals.baseCollateralFee + totals.shieldedCollateralFee == totals.totalCollateralFee, "TM: calculated fee does not match total collateral fee");
 
-        locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
+        // locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
         _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
 
         // Distribute fees and collateral
-        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
-        contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
-        contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
+        // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
+        // contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
+        // contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
 
         totals.baseCollateralToSendToRedeemer = totals.totalBaseCollateralDrawn.sub(totals.baseCollateralFee);
         totals.shieldedCollateralToSendToRedeemer = totals.totalShieldedCollateralDrawn.sub(totals.shieldedCollateralFee);

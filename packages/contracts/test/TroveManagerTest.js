@@ -5425,15 +5425,20 @@ contract('TroveManager', async accounts => {
     const LUSDRedemption = dec(55000, 18)
 
     const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, LUSDRedemption, th._100pct)
+    // get redemption fee from emitted event
+    const redemptionFee = tx1.receipt.logs.filter(log => log.event === "Redemption")[0].args[3];
+    console.log("redemptionFee", redemptionFee.toString())
 
     // Check B, C closed and A remains active
     assert.isTrue(await sortedTroves.contains(A))
     assert.isFalse(await sortedTroves.contains(B))
     assert.isFalse(await sortedTroves.contains(C))
-
+    const par = await relayer.par()
     const expectedDebt = toBN(dec(4600, 18))//.mul(par).div(toBN(dec(1, 18)))
     // A's remaining debt = 29800 + 19800 + 9800 + 200 - 55000 = 4600
     const A_debt = await troveManager.getTroveDebt(A)
+    console.log("A_debt", A_debt.toString())
+    console.log("expectedDebt", expectedDebt.toString())
     th.assertIsApproximatelyEqual(A_debt, expectedDebt, 1000)
   })
 
