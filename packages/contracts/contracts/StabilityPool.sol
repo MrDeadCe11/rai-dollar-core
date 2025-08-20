@@ -562,7 +562,6 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
             uint LUSDLossPerUnitStaked) = _computeRewardsPerUnitStaked(totalCollToAdd, totalDebtToOffset, totalLUSD);
 
         _updateRewardSumAndProduct(collateralGainPerUnitStaked, LUSDLossPerUnitStaked);  // updates S and P
-
         _moveOffsetCollAndDebt(totalDebtToOffset, _baseCollToAdd,  _baseNDebtToOffset, 
                               _shieldedCollToAdd, _shieldedNDebtToOffset);
 

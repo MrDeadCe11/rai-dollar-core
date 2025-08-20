@@ -78,8 +78,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     uint internal constant DRIP_STALENESS_THRESHOLD = 1 hours;
 
-    //uint internal constant kappa = 15 * 10**17; // 1.5
-    uint internal constant kappa = 10**18; // 1.5
+    uint internal constant kappa = 15 * 10**17; // 1.5
+    //uint internal constant kappa = 10**18; // 1.5
 
     uint public constant stakeRevenueAllocation = 25*10**16; // 25%
 
