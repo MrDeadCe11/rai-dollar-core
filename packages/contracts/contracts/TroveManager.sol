@@ -16,7 +16,7 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-//import "./Dependencies/console.sol";
+import "./Dependencies/console.sol";
 
 /*
 library Str {
@@ -144,6 +144,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint totalShieldedLUSDToRedeem;
         uint totalBaseCollateralDrawn;
         uint totalShieldedCollateralDrawn;
+        uint totalCollateralFee;
         uint baseCollateralFee;
         uint shieldedCollateralFee;
         uint baseCollateralToSendToRedeemer;
@@ -280,7 +281,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint _par,
         RedemptionHints memory hints,
         bool _shielded,
-        uint256 _redemptionRate
+        uint _redemptionRate
     )
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
@@ -296,6 +297,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // subtract fee from collateral lot so fee stays in trove
         singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 
+        // get redemption fee
+        singleRedemption.collateralFee = singleRedemption.collateralLot * _redemptionRate / DECIMAL_PRECISION;
+        // subtract fee from collateralLot so fee remains in trove
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
+        console.log("singleRedemption.collateralFee in redeemCollateralFromTrove", singleRedemption.collateralFee);
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
         if (_actualDebt(locals.normDebt, _shielded) < _actualDebt(singleRedemption.LUSDLot, _shielded)) {
@@ -534,7 +540,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
-
+        
         uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
 
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
@@ -591,6 +597,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 !locals.pickBase,
                 redemptionRate
             );
+            // add fee to total collateral fee
+            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
 
             if (singleRedemption.cancelledPartial) { break; }
             
