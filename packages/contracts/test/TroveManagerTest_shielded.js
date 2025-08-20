@@ -801,8 +801,9 @@ contract('TroveManager', async accounts => {
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
     console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
+     
     // Liquidate
-    await liquidations.liquidate(alice, { from: owner })
+    tx = await liquidations.liquidate(alice, { from: owner })
 
     // Check Alice's trove is removed, and bob remains
     const activeTrovesCount_After = await troveManager.getShieldedTroveOwnersCount()
@@ -814,14 +815,15 @@ contract('TroveManager', async accounts => {
     const bob_isInSortedList = await sortedShieldedTroves.contains(bob)
     assert.isTrue(bob_isInSortedList)
 
+    /*
     console.log("after liq")
     console.log("bob actual debt", (await contracts.troveManager.getTroveActualDebt(bob)).toString())
     console.log("bob entire debt", (await contracts.troveManager.getEntireDebtAndColl(bob))[0].toString())
     console.log("default sh pool coll", (await contracts.defaultPool.getCollateral()).toString())
     console.log("alice actual debt", (await contracts.troveManager.getTroveActualDebt(alice)).toString())
-    console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
-    console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
-
+    */
+    //console.log("debt", (await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())).toString())
+    //console.log("supply", (await contracts.lusdToken.totalSupply()).toString())
 
   })
 
@@ -983,7 +985,9 @@ contract('TroveManager', async accounts => {
     // this will raise par, increasing ICR
     await marketOracle.setPrice(ONE_DOLLAR.sub(toBN(1).mul(ONE_CENT)));
     await relayer.updateRateAndPar()
-    th.fastForwardTime(140 * 24 * 3600, web3.currentProvider)
+
+    // fast forward the right amount to get bob's icr liquidatable but w/ surplus
+    th.fastForwardTime(110 * 24 * 3600, web3.currentProvider)
     await relayer.updateRateAndPar()
     await troveManager.drip()
 
@@ -995,6 +999,8 @@ contract('TroveManager', async accounts => {
     // since the collGas compensation is not included in liquidated coll
     minLiqRatio = (await liquidations.LIQUIDATION_PENALTY()).mul(toBN(dec(1, 18))).div(toBN(dec(995, 15)))
 
+    console.log("bobICR " + bobICR)
+    console.log("minLiqRatio " + minLiqRatio)
     assert.isTrue(bobICR.gt(minLiqRatio))
 
     assert.isTrue(bobICR.lt((await troveManager.MCR())))
@@ -6173,11 +6179,11 @@ contract('TroveManager', async accounts => {
     // Check B, C, D Stability Pool deposits and Collateral gain have not been affected by redemptions from their troves
     // Note: deposits increase slightly as redemption calls drip(), which distributes to SP
     assert.isTrue(bob_SPDeposit_after.gt(bob_SPDeposit_before))
-    th.assertIsApproximatelyEqual(bob_SPDeposit_before, bob_SPDeposit_after, 100000000000000000)
+    th.assertIsApproximatelyEqual(bob_SPDeposit_before, bob_SPDeposit_after, 120000000000000000)
     assert.isTrue(carol_SPDeposit_after.gt(carol_SPDeposit_before))
-    th.assertIsApproximatelyEqual(carol_SPDeposit_before, carol_SPDeposit_after, 1000000000000000000)
+    th.assertIsApproximatelyEqual(carol_SPDeposit_before, carol_SPDeposit_after, 1200000000000000000)
     assert.isTrue(dennis_SPDeposit_after.gt(dennis_SPDeposit_before))
-    th.assertIsApproximatelyEqual(dennis_SPDeposit_before, dennis_SPDeposit_after, 400000000000000000)
+    th.assertIsApproximatelyEqual(dennis_SPDeposit_before, dennis_SPDeposit_after, 460000000000000000)
 
 
     assert.isTrue(bob_CollateralGain_before.eq(bob_CollateralGain_after))

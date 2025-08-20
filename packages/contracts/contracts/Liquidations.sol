@@ -317,7 +317,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
     }
 
     function getCappedOffsetAndRedistributionVals(LiquidationOffsetInputs memory i)
-        internal
+        internal pure
         returns (uint debtToOffset, uint collToSendToSP, uint debtToRedistribute, uint collToRedistribute, uint collSurplus)
     {
         if (i.LUSDInSPForOffsets > 0) {
@@ -659,7 +659,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         // drip before getting accRate
         troveManager.drip();
         vars.accumulatedRate = troveManager.accumulatedRate();
-        vars.accumulatedShieldRate = troveManager.accumulatedRate();
+        vars.accumulatedShieldRate = troveManager.accumulatedShieldRate();
 
         vars.price = priceFeed.fetchPrice();
         vars.LUSDInSPForOffsets = stabilityPoolCached.getMaxAmountToOffset();
@@ -676,12 +676,14 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         emit Offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
                     totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
+        // offset from SP
         stabilityPoolCached.offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
                                    totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
         emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
         // batchLiquidate
+        // redistribute
         rewards.redistributeDebtAndColl(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute,
                                         vars.accumulatedRate, vars.accumulatedShieldRate);

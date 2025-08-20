@@ -418,7 +418,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         // Remove coll from active pool and send to default
         activePool.sendCollateral(address(defaultPool), _baseColl);
 
-
         // Remove debt from active shielded pool
         activeShieldedPool.decreaseLUSDDebt(_shieldedDebt);
 
