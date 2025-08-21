@@ -5780,7 +5780,9 @@ contract('TroveManager', async accounts => {
 
     // Expect only 17 worth of Collateral drawn
     const expectedTotalCollateralDrawn = fullfilledRedemptionAmount.sub(frontRunRedemption).div(toBN(100)) // redempted LUSD converted to Collateral, at Collateral:USD price 100
-    const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(CollateralFee)
+    const redemptionRate2 = await aggregator.getRedemptionRateWithDecay()
+    const fee2 = expectedTotalCollateralDrawn.mul(redemptionRate2).div(mv._1e18BN)
+    const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(fee2)
 
     th.assertIsApproximatelyEqual(expectedReceivedCollateral, receivedCollateral)
 
@@ -5836,8 +5838,9 @@ contract('TroveManager', async accounts => {
     // Calculate how much collateral should be redeemed for the given LUSD amount
     // CollateralAmount = (LUSDAmount * par) / price
     const expectedTotalCollateralDrawn = toBN(amount).mul(par).div(toBN(price))
-
-    const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(CollateralFee)
+    const redemptionRate3 = await aggregator.getRedemptionRateWithDecay()
+    const fee3 = expectedTotalCollateralDrawn.mul(redemptionRate3).div(mv._1e18BN)
+    const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(fee3)
 
     const receivedCollateral = carol_CollateralBalance_After.sub(carol_CollateralBalance_Before)
 

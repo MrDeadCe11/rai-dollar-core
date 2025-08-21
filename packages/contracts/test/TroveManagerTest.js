@@ -5020,7 +5020,7 @@ contract('TroveManager', async accounts => {
     // console.log("expectedTotalCollateralDrawn: " + expectedTotalCollateralDrawn)
     // console.log("recived  : " + receivedCollateral)
     // console.log("expected : " + expectedReceivedCollateral)
-    // console.log("wanted :   " + expectedReceivedCollateral.sub(toBN(GAS_PRICE)))
+    // console.log("wanted :   " + expectedReceivedCollateral)//.sub(toBN(GAS_PRICE)))
     // console.log("*********************************************************************************")
     // Check the redeemed fraction calculation
 
@@ -7020,6 +7020,8 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption that closes a trove leaves the trove's Collateral surplus (collateral - Collateral drawn) available for the trove owner to claim", async () => {
+    const redemptionRateAtStart = await aggregator.getRedemptionRateWithDecay();
+
     const {
       A_netDebt, A_coll,
       B_netDebt, B_coll,
@@ -7033,26 +7035,40 @@ contract('TroveManager', async accounts => {
     // CollSurplusPool endpoint cannot be called directly
     await assertRevert(collSurplusPool.claimColl(A), 'CollSurplusPool: Caller is not Borrower Operations')
 
-    const A_GAS = th.gasUsed(await borrowerOperations.claimCollateral({ from: A, gasPrice: GAS_PRICE  }))
-    const B_GAS = th.gasUsed(await borrowerOperations.claimCollateral({ from: B, gasPrice: GAS_PRICE  }))
-    const C_GAS = th.gasUsed(await borrowerOperations.claimCollateral({ from: C, gasPrice: GAS_PRICE  }))
+    await borrowerOperations.claimCollateral({ from: A, gasPrice: GAS_PRICE  })
+    await borrowerOperations.claimCollateral({ from: B, gasPrice: GAS_PRICE  })
+    await borrowerOperations.claimCollateral({ from: C, gasPrice: GAS_PRICE  })
 
-    const A_expectedBalance = A_balanceBefore//.sub(toBN(A_GAS * GAS_PRICE))
-    const B_expectedBalance = B_balanceBefore//.sub(toBN(B_GAS * GAS_PRICE))
-    const C_expectedBalance = C_balanceBefore//.sub(toBN(C_GAS * GAS_PRICE))
+    const price = toBN(await priceFeed.getPrice())
+    const A_gross = A_netDebt.mul(mv._1e18BN).div(price)
+    const A_fee = await th.calulateCollateralFee(A_gross, redemptionRateAtStart)
+    const A_ExpectedRedemptionAmount = A_gross.sub(A_fee)
+
+    const B_gross = B_netDebt.mul(mv._1e18BN).div(price)
+    const B_fee = await th.calulateCollateralFee(B_gross, redemptionRateAtStart)
+    const B_ExpectedRedemptionAmount = B_gross.sub(B_fee)
+
+    const C_gross = C_netDebt.mul(mv._1e18BN).div(price)
+    const C_fee = await th.calulateCollateralFee(C_gross, redemptionRateAtStart)
+    const C_ExpectedRedemptionAmount = C_gross.sub(C_fee)
+    
+    const A_expectedBalance = A_balanceBefore.add(A_coll.sub(A_ExpectedRedemptionAmount));
+    const B_expectedBalance = B_balanceBefore.add(B_coll.sub(B_ExpectedRedemptionAmount));
+    const C_expectedBalance = C_balanceBefore.add(C_coll.sub(C_ExpectedRedemptionAmount));
 
     const A_balanceAfter = toBN(await collateralToken.balanceOf(A))
     const B_balanceAfter = toBN(await collateralToken.balanceOf(B))
     const C_balanceAfter = toBN(await collateralToken.balanceOf(C))
 
-    const price = toBN(await priceFeed.getPrice())
 
-    th.assertIsApproximatelyEqual(A_balanceAfter, A_expectedBalance.add(A_coll.sub(A_netDebt.mul(mv._1e18BN).div(price))))
-    th.assertIsApproximatelyEqual(B_balanceAfter, B_expectedBalance.add(B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price))))
-    th.assertIsApproximatelyEqual(C_balanceAfter, C_expectedBalance.add(C_coll.sub(C_netDebt.mul(mv._1e18BN).div(price))))
+
+    th.assertIsApproximatelyEqual(A_balanceAfter, A_expectedBalance)
+    th.assertIsApproximatelyEqual(B_balanceAfter, B_expectedBalance)
+    th.assertIsApproximatelyEqual(C_balanceAfter, C_expectedBalance)
   })
 
   it("redeemCollateral(): a redemption that closes a trove leaves the trove's Collateral surplus (collateral - Collateral drawn) available for the trove owner after re-opening trove", async () => {
+    const redemptionRateAtStart = await aggregator.getRedemptionRateWithDecay();
     const {
       A_netDebt, A_coll: A_collBefore,
       B_netDebt, B_coll: B_collBefore,
@@ -7061,9 +7077,17 @@ contract('TroveManager', async accounts => {
 
     const price = await priceFeed.getPrice()
 
-    const A_surplus = A_collBefore.sub(A_netDebt.mul(mv._1e18BN).div(price))
-    const B_surplus = B_collBefore.sub(B_netDebt.mul(mv._1e18BN).div(price))
-    const C_surplus = C_collBefore.sub(C_netDebt.mul(mv._1e18BN).div(price))
+    const A_gross = A_netDebt.mul(mv._1e18BN).div(price)
+    const B_gross = B_netDebt.mul(mv._1e18BN).div(price)
+    const C_gross = C_netDebt.mul(mv._1e18BN).div(price)
+
+    const A_fee = await th.calulateCollateralFee(A_gross, redemptionRateAtStart)
+    const B_fee = await th.calulateCollateralFee(B_gross, redemptionRateAtStart)
+    const C_fee = await th.calulateCollateralFee(C_gross, redemptionRateAtStart)
+
+    const A_surplus = A_collBefore.sub(A_gross).add(A_fee)
+    const B_surplus = B_collBefore.sub(B_gross).add(B_fee)
+    const C_surplus = C_collBefore.sub(C_gross).add(C_fee)
 
     const { collateral: A_coll } = await openTrove({ ICR: toBN(dec(200, 16)), extraLUSDAmount: dec(100, 18), extraParams: { from: A } })
     const { collateral: B_coll } = await openTrove({ ICR: toBN(dec(190, 16)), extraLUSDAmount: dec(100, 18), extraParams: { from: B } })

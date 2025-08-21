@@ -502,6 +502,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
 
+        uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
+
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
             _maxIterations--;
@@ -594,26 +596,26 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
         _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
 
-        // Distribute fees and collateral
-        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
-        contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
-        contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
+        // // Distribute fees and collateral
+        // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
+        // contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
+        // contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
 
         totals.baseCollateralToSendToRedeemer = totals.totalBaseCollateralDrawn.sub(totals.baseCollateralFee);
         totals.shieldedCollateralToSendToRedeemer = totals.totalShieldedCollateralDrawn.sub(totals.shieldedCollateralFee);
 
         emit Redemption(_LUSDamount, locals.totalRedeemed,
-                        totals.baseCollateralToSendToRedeemer.add(totals.shieldedCollateralToSendToRedeemer), locals.totalCollateralFee);
+                        totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn), locals.totalCollateralFee);
 
         contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
 
         if (totals.totalBaseLUSDToRedeem > 0) {
             contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
-            contractsCache.activePool.sendCollateral(msg.sender, totals.baseCollateralToSendToRedeemer);
+            contractsCache.activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
         }
         if (totals.totalShieldedLUSDToRedeem > 0) {
             contractsCache.activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
-            contractsCache.activeShieldedPool.sendCollateral(msg.sender, totals.shieldedCollateralToSendToRedeemer);
+            contractsCache.activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
         }
 
         // Do these last to avoid conflict with off-chain partialNICRhint
