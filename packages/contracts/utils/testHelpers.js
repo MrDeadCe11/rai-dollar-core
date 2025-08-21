@@ -1628,6 +1628,11 @@ class TestHelper {
     return tx
   }
 
+  static async calulateCollateralFee(CollateralDrawn, redemptionRate) {
+    const fee = CollateralDrawn.mul(redemptionRate).div(MoneyValues._1e18BN)
+    return fee
+  }
+
   // --- Composite functions ---
 
   static async makeTrovesIncreasingICR(accounts, contracts) {
