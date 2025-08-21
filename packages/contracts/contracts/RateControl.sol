@@ -22,11 +22,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
     // Controller output bias
     int256 public CO_BIAS = 158153903837946259; // 0.5% annual, [TWENTY_SEVEN_DECIMAL_NUMBER]
 
-    //int256 public CO_BIAS = 0; // 0.5% annual, [TWENTY_SEVEN_DECIMAL_NUMBER]
-
-    // The per second leak applied to errorIntegral before the latest error is added
-    //uint256 public PER_SECOND_INTEGRAL_LEAK = 10 ** 18; // [TWENTY_SEVEN_DECIMAL_NUMBER]
-
     // The maximum output value
     int256 public OUTPUT_UPPER_BOUND = 12857214317438491659; // 50% annual [TWENTY_SEVEN_DECIMAL_NUMBER]
 
@@ -44,7 +39,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
     int256 public lastError; // [TWENTY_SEVEN_DECIMAL_NUMBER]
 
     // The last output
-    //int256 public lastOutput = 158153903837946259; // [TWENTY_SEVEN_DECIMAL_NUMBER]
     int256 public lastOutput = CO_BIAS; // [TWENTY_SEVEN_DECIMAL_NUMBER]
 
     // Timestamp of the last update
@@ -195,14 +189,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
         return (errorIntegral + newTimeAdjustedError, newTimeAdjustedError);
     }
     /*
-    function getRawPiOutput(int256 error, int256 errorI) public view returns (int256, int256) {
-        int256 pOutput = error * int256(KP) / int256(EIGHTEEN_DECIMAL_NUMBER);
-        int256 iOutput = errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
-        return (pOutput, iOutput);
-    }
-    */
-
-    /*
     * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
     * @param error The system error TWENTY_SEVEN_DECIMAL_NUMBER
     * @param errorIntegral The calculated error integral TWENTY_SEVEN_DECIMAL_NUMBER
@@ -212,6 +198,7 @@ contract RateControl is Ownable, CheckContract, IRateControl {
         PiComponents memory output = _getRawPiOutput(_error, _errorI);
         return (output.p, output.i);
     }
+    */
 
     /*
     * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
@@ -224,30 +211,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
         int256 iOutput = _errorI * int256(KI) / int256(EIGHTEEN_DECIMAL_NUMBER);
         return PiComponents(pOutput, iOutput);
     }
-
-    /*
-    function update(int256 error) external returns (int256, int256, int256) {
-        _requireCallerIsRelayer();
-        uint256 timeElapsed = (lastUpdateTime == 0) ? 0 : block.timestamp - lastUpdateTime;
-        //uint256 timeElapsed = block.timestamp - lastUpdateTime;
-
-        require(block.timestamp > lastUpdateTime, "RateControl/wait-longer");
-
-        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(error, timeElapsed);
-
-        (int256 pOutput, int256 iOutput) = getRawPiOutput(error, newErrorIntegral);
-
-        int256 boundedPiOutput;
-        (boundedPiOutput, errorIntegral) =
-            boundAndClampPiOutput(CO_BIAS + pOutput + iOutput, newErrorIntegral, newArea, timeElapsed);
-
-        lastUpdateTime = block.timestamp;
-        lastError = error;
-        lastOutput = boundedPiOutput;
-
-        return (boundedPiOutput, pOutput, iOutput);
-    }
-    */
 
     /*
     * @notice Process a new error and return controller output. First update will output the bias
@@ -266,15 +229,36 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
         return (boundedPiOutput, pOutput, iOutput);
     }
+
     /*
-    function getNextPiOutput(int256 error, uint256 timeElapsed) public view returns (int256, int256, int256) {
-        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(error, timeElapsed);
-        (int256 pOutput, int256 iOutput) = getRawPiOutput(error, newErrorIntegral);
+    * @notice Compute and return the output given an error 
+    * @param error The system error
+    * @param timeElapsed Time since last update
+    */
 
-        int256 boundedPiOutput;
-        (boundedPiOutput,) = boundAndClampPiOutput(CO_BIAS + pOutput + iOutput, newErrorIntegral, newArea, timeElapsed);
+    function getNextPiOutput(int256 _error, uint256 _timeElapsed)
+        public
+        view
+        returns (int256, int256, int256, int256)
+    {
+        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(_error, _timeElapsed);
 
-        return (boundedPiOutput, pOutput, iOutput);
+        PiComponents memory output = _getRawPiOutput(_error, newErrorIntegral);
+        int256 piOutput = output.p + output.i;
+
+        (int256 boundedPiOutput, int256 clampedErrorIntegral) =
+            boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, _timeElapsed);
+
+        return (boundedPiOutput, clampedErrorIntegral, output.p, output.i);
+    }
+
+    /*
+    * @notice Compute and return the output given an error
+    * @param error The system error
+    */
+
+    function getNextPiOutput(int256 _error) public view returns (int256, int256, int256, int256) {
+        return getNextPiOutput(_error, elapsed());
     }
     */
 

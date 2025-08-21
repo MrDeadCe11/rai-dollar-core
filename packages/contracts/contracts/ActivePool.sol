@@ -135,14 +135,12 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     }
 
     function increaseLUSDDebt(uint _amount) external override {
-        //_requireCallerIsBOorTroveMorRewards();
         _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt  = LUSDDebt.add(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
     }
 
     function decreaseLUSDDebt(uint _amount) external override {
-        //_requireCallerIsBOorTroveMorSP();
         _requireCallerIsBOorTroveMorSPorRewards();
         LUSDDebt = LUSDDebt.sub(_amount);
         emit ActivePoolLUSDDebtUpdated(LUSDDebt);
@@ -154,14 +152,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     // --- 'require' functions ---
 
-    function _requireCallerIsBOorTroveMorSP() internal view {
-        require(
-            msg.sender == borrowerOperationsAddress ||
-            msg.sender == liquidationsAddress ||
-            msg.sender == troveManagerAddress ||
-            msg.sender == stabilityPoolAddress,
-            "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool");
-    }
     function _requireCallerIsBOorTroveMorSPorRewards() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
@@ -179,14 +169,6 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
             msg.sender == stabilityPoolAddress ||
             msg.sender == defaultPoolAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager nor StabilityPool nor Default Pool");
-    }
-
-    function _requireCallerIsBOorTroveM() internal view {
-        require(
-            msg.sender == borrowerOperationsAddress ||
-            msg.sender == liquidationsAddress ||
-            msg.sender == troveManagerAddress,
-            "ActivePool: Caller is neither BorrowerOperations nor TroveManager");
     }
 
 }

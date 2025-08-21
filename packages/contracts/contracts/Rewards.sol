@@ -12,31 +12,6 @@ import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 //import "./Dependencies/console.sol";
 
-/*
-library Str {
-    function utoa(uint256 v) internal pure returns (string memory s) {
-        if (v == 0) return "0";
-        uint256 j=v; uint256 len;
-        while (j != 0) { len++; j/=10; }
-        bytes memory b = new bytes(len);
-        j = v;
-        while (v != 0) { b[--len] = bytes1(uint8(48 + v % 10)); v/=10; }
-        return string(b);
-    }
-    function addr(address a) internal pure returns (string memory) {
-        bytes32 b = bytes32(uint256(uint160(a)));
-        bytes memory hexChars = "0123456789abcdef";
-        bytes memory s = new bytes(2 + 40);
-        s[0] = '0'; s[1] = 'x';
-        for (uint i=0; i<20; i++) {
-            s[2+i*2]   = hexChars[uint8(b[i+12] >> 4)];
-            s[3+i*2]   = hexChars[uint8(b[i+12] & 0x0f)];
-        }
-        return string(s);
-    }
-}
-*/
-
 contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     string constant public NAME = "Rewards";
 
@@ -115,20 +90,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
         override
         onlyOwner
     {
-        /*
-        address _aggregatorAddress = addresses[0];
-        address _liquidationsAddress = addresses[1];
-        address _borrowerOperationsAddress = addresses[2];
-        address _activePoolAddress = addresses[3];
-        address _activeShieldedPoolAddress = addresses[4];
-        address _defaultPoolAddress = addresses[5];
-        address _defaultShieldedPoolAddress = addresses[6];
-        address _gasPoolAddress = addresses[8];
-        address _collSurplusPoolAddress = addresses[9];
-        address _priceFeedAddress = addresses[10];
-        address _collateralTokenAddress = addresses[17];
-        */
-
         checkContract(_troveManagerAddress);
         checkContract(_liquidationsAddress);
         checkContract(_borrowerOperationsAddress);
@@ -149,20 +110,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
 
         _renounceOwnership();
     }
-
-    // --- Getters ---
-
-    /*
-    // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pools to the Active Pools
-    function movePendingTroveRewardsToActivePools(IActivePool _activePool, IDefaultPool _defaultPool, 
-                                                 IActivePool _activeShieldedPool, IDefaultPool _defaultShieldedPool,
-                                                 uint _LUSD, uint _ETH,
-                                                 uint _shieldedLUSD, uint _shieldedETH) external override {
-        _requireCallerIsLiquidations();
-        _movePendingTroveRewardsToActivePool(_activePool, _defaultPool, _LUSD, _ETH);
-        _movePendingTroveRewardsToActivePool(_activeShieldedPool, _defaultShieldedPool, _shieldedLUSD, _shieldedETH);
-    }
-    */
 
     // Move a Trove's pending debt and collateral rewards from distributions, from the Default Pool to the Active Pool
     function movePendingTroveRewardsToActivePool(IActivePool _activePool, IDefaultPool _defaultPool,
@@ -233,76 +180,6 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
             );
         }
     }
-    /*
-    // Add the borrowers's coll and debt rewards earned from redistributions, to their Trove
-    function _applyPendingBaseRewards(address _borrower) internal {
-        if (hasPendingBaseRewards(_borrower)) {
-
-            // Compute and apply pending collateral rewards
-            uint pendingCollateralReward = getPendingBaseCollateralReward(_borrower);
-            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
-
-            // Compute pending base debt
-            uint pendingLUSDDebtReward = getPendingBaseLUSDDebtReward(_borrower);
-
-            // Apply pending base debt
-            troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
-
-            _updateTroveRewardSnapshots(_borrower);
-
-            // Transfer from DefaultPool to ActivePool
-            _movePendingTroveRewardsToActivePool(activePool, defaultPool, pendingLUSDDebtReward, pendingCollateralReward);
-
-            // TODO improve
-            (uint debt, uint coll) = troveManager.getTroveDebtAndColl(_borrower);
-            uint stake = troveManager.getTroveStake(_borrower);
-
-            emit TroveUpdated(
-                _borrower,
-                debt,
-                coll,
-                stake,
-                uint8(TroveManagerOperation.applyPendingRewards)
-            );
-        }
-    }
-    // Add the borrowers's coll and debt rewards earned from redistributions, to their Trove
-    function _applyPendingShieldedRewards(address _borrower, bool _shielded) internal {
-        if (hasPendingShieldedRewards(_borrower)) {
-
-            // Compute and apply pending rewards
-            uint pendingCollateralReward = getPendingShieldedCollateralReward(_borrower);
-            troveManager.increaseTroveColl(_borrower, pendingCollateralReward);
-
-            // Compute pending shielded debt
-            uint pendingLUSDDebtReward = getPendingShieldedLUSDDebtReward(_borrower);
-
-            // Apply pending shielded debt.  Convert if needed
-            if (!_shielded) {
-                troveManager.increaseTroveDebt(_borrower, _convertShieldedToBaseDebt(pendingLUSDDebtReward));
-            } else {
-                troveManager.increaseTroveDebt(_borrower, pendingLUSDDebtReward);
-            }
-
-            _updateTroveRewardSnapshots(_borrower);
-
-            // Transfer from DefaultPool to ActivePool
-            _movePendingTroveRewardsToActivePool(activeShieldedPool, defaultShieldedPool, pendingLUSDDebtReward, pendingCollateralReward);
-
-            // TODO improve
-            (uint debt, uint coll) = troveManager.getTroveDebtAndColl(_borrower);
-            uint stake = troveManager.getTroveStake(_borrower);
-
-            emit TroveUpdated(
-                _borrower,
-                debt,
-                coll,
-                stake,
-                uint8(TroveManagerOperation.applyPendingRewards)
-            );
-        }
-    }
-    */
 
     // Update borrower's snapshots of L_Coll and L_LUSDDebt to reflect the current values
     function updateTroveRewardSnapshots(address _borrower) external override {
@@ -519,6 +396,4 @@ contract Rewards is LiquityBase, Ownable, CheckContract, IRewards {
     function _requireTroveIsActive(address _borrower) internal view {
         require(troveManager.getTroveStatus(_borrower) == uint(Status.active), "Rewards: Trove does not exist or is closed");
     }
-
-
 }

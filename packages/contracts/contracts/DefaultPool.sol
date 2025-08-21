@@ -125,22 +125,8 @@ contract DefaultPool is Ownable, CheckContract, IDefaultPool {
 
     // --- 'require' functions ---
 
-    function _requireCallerIsActivePool() internal view {
-        require(msg.sender == activePoolAddress, "DefaultPool: Caller is not the ActivePool");
-    }
-
-    function _requireCallerIsTroveManager() internal view {
-        require(msg.sender == troveManagerAddress, "DefaultPool: Caller is not the TroveManager");
-    }
-
     function _requireCallerIsRewards() internal view {
         require(msg.sender == rewardsAddress, "DefaultPool: Caller is not Rewards");
-    }
-
-    function _requireCallerIsTMorLiquidations() internal view {
-        require(msg.sender == troveManagerAddress || 
-               msg.sender == liquidationsAddress,
-                "DefaultPool: Caller is not TM or Liquidations");
     }
 
     function _requireCallerIsTroveMorActivePool() internal view {

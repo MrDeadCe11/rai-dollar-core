@@ -252,14 +252,12 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // Shield Trove
     function shieldTrove(address _upperHint, address _lowerHint) external override {
         // TODO add drip() here. It will break tests
-        //troveManager.shieldTrove(_borrower);
         require(!troveManager.shielded(msg.sender), "Trove is already shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }
     // un-Shield Trove
     function unShieldTrove(address _upperHint, address _lowerHint) external override {
         // TODO add drip() here. It will break tests
-        //troveManager.shieldTrove(_borrower);
         require(troveManager.shielded(msg.sender), "Trove is already un-shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }

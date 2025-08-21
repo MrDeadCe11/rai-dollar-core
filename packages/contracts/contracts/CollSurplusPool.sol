@@ -86,7 +86,6 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
     // --- Pool functionality ---
 
     function accountSurplus(address _account, uint _amount) external override {
-        //_requireCallerIsTroveManager();
         _requireCallerIsTroveManagerOrLiq();
 
         uint newAmount = balances[_account].add(_amount);
@@ -139,7 +138,6 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
             msg.sender == activeShieldedPoolAddress,
             "CollSurplusPool: Caller is not an Active Pool");
     }
-    
 
     function processCollateralIncrease(uint _amount) external override {
         _requireCallerIsAnActivePool();

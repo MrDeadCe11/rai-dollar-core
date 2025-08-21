@@ -18,32 +18,24 @@ import "../Dependencies/console.sol";
 contract LiquityBase is BaseMath, ILiquityBase {
     using SafeMath for uint;
 
-    //uint constant public _100pct = 1000000000000000000; // 1e18 == 100%
-
-    // Minimum collateral ratio for unshielded individual troves
+    // Minimum collateral ratio for all individual troves, shielded and unshielded
     uint constant public MCR = 110 * 10**16; // 110%
 
-    // Critical system collateral ratio. If the system's total collateral ratio (TCR) falls below the CCR, Recovery Mode is triggered.
+    // Critical system collateral ratio.
+    // If the system's total collateral ratio (TCR) falls below the CCR, some borrow ops are constrained
     uint constant public CCR = 150 * 10**16; // 150%
 
-    // Minimum collateral ratio for shieled troves
-    // Shielded troves are still liquidated at MCR, but troves under HCR can be redeemed against
-    //uint constant public SHIELDED_MULTIPLIER = 12 * 10**17; //1.2
-    //uint constant public HCR = SHIELDED_MULTIPLIER * MCR / DECIMAL_PRECISION; // 1.7 * MCR
-
+    // Shield collateral ratio
+    // Shielded troves under HCR can be redeemed against but are still only liquidated when ICR < MCR
     uint constant public HCR = 130 * 10**16; //130%
-    //uint constant public HCR = MCR; //130%
 
     // Amount of LUSD to be locked in gas pool on opening troves
     uint constant public LUSD_GAS_COMPENSATION = 200e18;
 
     // Minimum amount of net LUSD debt a trove must have
     uint constant public MIN_NET_DEBT = 1800e18;
-    // uint constant public MIN_NET_DEBT = 0; 
 
     uint constant public PERCENT_DIVISOR = 200; // dividing by 200 yields 0.5%
-
-    //uint constant public BORROWING_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
     IActivePool public override activePool;
 
@@ -79,11 +71,6 @@ contract LiquityBase is BaseMath, ILiquityBase {
         uint baseDebt = activePool.getLUSDDebt().mul(accumulatedRate).div(RATE_PRECISION);
         uint shieldedDebt = activeShieldedPool.getLUSDDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
         return baseDebt + shieldedDebt + defaultPool.getLUSDDebt();
-    }
-
-    /*
-    function updatePar() public returns (uint) {
-        return relayer.updatePar();
     }
     */
 
