@@ -558,7 +558,8 @@ class DeploymentHelper {
       contracts.sortedShieldedTroves.address,
       contracts.troveManager.address,
       contracts.rewards.address,
-      contracts.relayer.address
+      contracts.relayer.address,
+      contracts.aggregator.address
     )
       
     await contracts.relayer.setAddresses(

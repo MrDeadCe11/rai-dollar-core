@@ -5,6 +5,7 @@ pragma solidity 0.6.11;
 import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/IRewards.sol";
 import "./Interfaces/ISortedTroves.sol";
+import "./Interfaces/IAggregator.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
@@ -17,6 +18,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     ISortedTroves public sortedShieldedTroves;
     ITroveManager public troveManager;
     IRewards public rewards;
+    IAggregator public aggregator;
 
     // --- Events ---
 
@@ -51,7 +53,8 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         address _sortedShieldedTrovesAddress,
         address _troveManagerAddress,
         address _rewardsAddress,
-        address _relayerAddress
+        address _relayerAddress,
+        address _aggregatorAddress
     )
         external
         onlyOwner
@@ -61,12 +64,14 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         checkContract(_troveManagerAddress);
         checkContract(_rewardsAddress);
         checkContract(_relayerAddress);
+        checkContract(_aggregatorAddress);
 
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
         troveManager = ITroveManager(_troveManagerAddress);
         rewards = IRewards(_rewardsAddress);
         relayer = IRelayer(_relayerAddress);
+        aggregator = IAggregator(_aggregatorAddress);
 
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit SortedShieldedTrovesAddressChanged(_sortedShieldedTrovesAddress);
@@ -178,7 +183,14 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     vars.coll = troveManager.getTroveColl(who)
                         .add(rewards.getPendingCollateralReward(who));
 
-                    vars.newColl = vars.coll.sub(vars.maxRedeemableLUSD.mul(vars.parUsed).div(_price));
+                    // Compute gross collateral equivalent for this redemption lot
+                    uint collateralGross = vars.maxRedeemableLUSD.mul(vars.parUsed).div(_price);
+                    // Apply redemption fee so that the fee remains in the trove, matching TroveManager logic
+                    uint redemptionRate = aggregator.getRedemptionRateWithDecay();
+                    uint collateralFee = redemptionRate.mul(collateralGross).div(DECIMAL_PRECISION);
+                    uint collateralNet = collateralGross.sub(collateralFee);
+
+                    vars.newColl = vars.coll.sub(collateralNet);
                     vars.newDebt = netLUSDDebt.sub(vars.maxRedeemableLUSD);
                     vars.compositeDebt = _getCompositeDebt(vars.newDebt);
 
