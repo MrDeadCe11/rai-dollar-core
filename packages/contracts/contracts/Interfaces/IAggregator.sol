@@ -44,4 +44,6 @@ interface IAggregator is ILiquityBase {
     function getRedemptionFee(uint _ETHDrawn) external view returns (uint);
     function getRedemptionFeeWithDecay(uint _ETHDrawn) external view returns (uint);
 
+    function calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) external view returns (uint);
+
 }

@@ -262,6 +262,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
+        // calculate fee for redeemed collateral
+        singleRedemption.collateralFee = aggregator.calcRedemptionFee(_redemptionRate, singleRedemption.collateralLot);
+        // subtract fee from collateral lot so fee stays in trove
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
@@ -503,6 +507,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
 
         uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
+        console.log("redemptionRate", redemptionRate);
 
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
@@ -595,7 +600,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
         _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
-
+        console.log("locals.totalCollateralFee", locals.totalCollateralFee);
+        console.log("locals.totalCollateralDrawn", locals.totalCollateralDrawn);
         // // Distribute fees and collateral
         // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
         // contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);

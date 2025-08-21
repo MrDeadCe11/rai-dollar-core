@@ -129,14 +129,14 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     }
 
     function getRedemptionFee(uint _ETHDrawn) public view override returns (uint) {
-        return _calcRedemptionFee(getRedemptionRate(), _ETHDrawn);
+        return calcRedemptionFee(getRedemptionRate(), _ETHDrawn);
     }
 
     function getRedemptionFeeWithDecay(uint _ETHDrawn) external view override returns (uint) {
-        return _calcRedemptionFee(getRedemptionRateWithDecay(), _ETHDrawn);
+        return calcRedemptionFee(getRedemptionRateWithDecay(), _ETHDrawn);
     }
 
-    function _calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) internal pure returns (uint) {
+    function calcRedemptionFee(uint _redemptionRate, uint _ETHDrawn) public view override returns (uint) {
         if (_ETHDrawn == 0) return 0;
         uint redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
         require(redemptionFee < _ETHDrawn, "TroveManager: Fee would eat up all returned collateral");
