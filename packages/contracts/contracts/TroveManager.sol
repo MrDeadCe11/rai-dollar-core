@@ -592,9 +592,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 redemptionRate
             );
 
-            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
-
             if (singleRedemption.cancelledPartial) { break; }
+            
+            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
 
