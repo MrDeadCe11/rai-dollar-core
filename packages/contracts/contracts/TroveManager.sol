@@ -279,7 +279,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint _price,
         uint _par,
         RedemptionHints memory hints,
-        bool _shielded
+        bool _shielded,
+        uint256 _redemptionRate
     )
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
@@ -290,6 +291,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
+        // calculate fee for redeemed collateral
+        singleRedemption.collateralFee = singleRedemption.collateralLot.mul(_redemptionRate).div(DECIMAL_PRECISION);
+        // subtract fee from collateral lot so fee stays in trove
+        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
@@ -530,6 +535,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
 
+        uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
+
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
             _maxIterations--;
@@ -581,8 +588,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 locals.price,
                 locals.par,
                 hints,
-                !locals.pickBase
+                !locals.pickBase,
+                redemptionRate
             );
+
+            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
 
             if (singleRedemption.cancelledPartial) { break; }
 
@@ -613,20 +623,20 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             locals.totalCollateralDrawn, locals.price, locals.par, locals.totalLUSDSupplyAtStart
         );
 
-        // Fees
-        totals.baseCollateralFee = aggregator.getRedemptionFee(totals.totalBaseCollateralDrawn);
-        totals.shieldedCollateralFee = aggregator.getRedemptionFee(totals.totalShieldedCollateralDrawn);
+        // // Fees
+        // totals.baseCollateralFee = aggregator.getRedemptionFee(totals.totalBaseCollateralDrawn);
+        // totals.shieldedCollateralFee = aggregator.getRedemptionFee(totals.totalShieldedCollateralDrawn);
 
-        locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
+        // locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
         _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
 
-        // Distribute fees and collateral
-        contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
-        contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
-        contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
+        // // Distribute fees and collateral
+        // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
+        // contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
+        // contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
 
-        totals.baseCollateralToSendToRedeemer = totals.totalBaseCollateralDrawn.sub(totals.baseCollateralFee);
-        totals.shieldedCollateralToSendToRedeemer = totals.totalShieldedCollateralDrawn.sub(totals.shieldedCollateralFee);
+        // totals.baseCollateralToSendToRedeemer = totals.totalBaseCollateralDrawn.sub(totals.baseCollateralFee);
+        // totals.shieldedCollateralToSendToRedeemer = totals.totalShieldedCollateralDrawn.sub(totals.shieldedCollateralFee);
 
         emit Redemption(_LUSDamount, locals.totalRedeemed,
                         totals.baseCollateralToSendToRedeemer.add(totals.shieldedCollateralToSendToRedeemer), locals.totalCollateralFee);
