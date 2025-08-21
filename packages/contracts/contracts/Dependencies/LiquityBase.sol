@@ -72,7 +72,6 @@ contract LiquityBase is BaseMath, ILiquityBase {
         uint shieldedDebt = activeShieldedPool.getLUSDDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
         return baseDebt + shieldedDebt + defaultPool.getLUSDDebt();
     }
-    */
 
     // Returns the normalized debt from actual debt
     function _normalizedDebt(uint256 debt, uint256 rate) internal pure returns (uint256 normDebt) {

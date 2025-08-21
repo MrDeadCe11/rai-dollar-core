@@ -198,7 +198,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
         PiComponents memory output = _getRawPiOutput(_error, _errorI);
         return (output.p, output.i);
     }
-    */
 
     /*
     * @notice Apply Kp to the error and Ki to the error integral(by multiplication) and then sum P and I
@@ -229,38 +228,6 @@ contract RateControl is Ownable, CheckContract, IRateControl {
 
         return (boundedPiOutput, pOutput, iOutput);
     }
-
-    /*
-    * @notice Compute and return the output given an error 
-    * @param error The system error
-    * @param timeElapsed Time since last update
-    */
-
-    function getNextPiOutput(int256 _error, uint256 _timeElapsed)
-        public
-        view
-        returns (int256, int256, int256, int256)
-    {
-        (int256 newErrorIntegral, int256 newArea) = getNextErrorIntegral(_error, _timeElapsed);
-
-        PiComponents memory output = _getRawPiOutput(_error, newErrorIntegral);
-        int256 piOutput = output.p + output.i;
-
-        (int256 boundedPiOutput, int256 clampedErrorIntegral) =
-            boundAndClampPiOutput(CO_BIAS + piOutput, newErrorIntegral, newArea, _timeElapsed);
-
-        return (boundedPiOutput, clampedErrorIntegral, output.p, output.i);
-    }
-
-    /*
-    * @notice Compute and return the output given an error
-    * @param error The system error
-    */
-
-    function getNextPiOutput(int256 _error) public view returns (int256, int256, int256, int256) {
-        return getNextPiOutput(_error, elapsed());
-    }
-    */
 
     /*
     * @notice Compute and return the output given an error 
