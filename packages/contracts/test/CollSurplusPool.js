@@ -52,6 +52,7 @@ contract('CollSurplusPool', async accounts => {
   })
 
   it("CollSurplusPool::getCollateral(): Returns the Collateral Token balance of the CollSurplusPool after redemption", async () => {
+    const redemptionRateAtStart = await aggregator.getRedemptionRateWithDecay();
     const COLL_1 = await collSurplusPool.getCollateral()
     assert.equal(COLL_1, '0')
 
@@ -68,7 +69,12 @@ contract('CollSurplusPool', async accounts => {
     await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=10)
 
     const COLL_2 = await collSurplusPool.getCollateral()
-    th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    // calculate fee
+
+    const B_gross = B_netDebt.mul(mv._1e18BN).div(price)
+    const B_fee = await th.calulateCollateralFee(B_gross, redemptionRateAtStart)
+    const B_ExpectedRedemptionAmount = B_gross.sub(B_fee)
+    th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_ExpectedRedemptionAmount))
   })
 
   it("CollSurplusPool: claimColl(): Reverts if caller is not Borrower Operations", async () => {
