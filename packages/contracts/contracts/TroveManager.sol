@@ -149,6 +149,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     struct SingleRedemptionValues {
         uint LUSDLot;
         uint collateralLot;
+        uint collateralFee;
         bool cancelledPartial;
     }
 
