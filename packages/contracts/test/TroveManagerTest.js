@@ -5441,7 +5441,7 @@ contract('TroveManager', async accounts => {
     assert.isTrue(await sortedTroves.contains(A))
     assert.isFalse(await sortedTroves.contains(B))
     assert.isFalse(await sortedTroves.contains(C))
-
+    const par = await relayer.par()
     const expectedDebt = toBN(dec(4600, 18))//.mul(par).div(toBN(dec(1, 18)))
     // A's remaining debt = 29800 + 19800 + 9800 + 200 - 55000 = 4600
     const A_debt = await troveManager.getTroveDebt(A)
@@ -7711,5 +7711,3 @@ contract('TroveManager', async accounts => {
 })
 
 contract('Reset chain state', async accounts => { })
-
-
