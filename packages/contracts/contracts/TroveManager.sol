@@ -16,7 +16,7 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-import "./Dependencies/console.sol";
+// import "./Dependencies/console.sol";
 
 /*
 library Str {
@@ -301,7 +301,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         singleRedemption.collateralFee = singleRedemption.collateralLot * _redemptionRate / DECIMAL_PRECISION;
         // subtract fee from collateralLot so fee remains in trove
         singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
-        console.log("singleRedemption.collateralFee in redeemCollateralFromTrove", singleRedemption.collateralFee);
+
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
         if (_actualDebt(locals.normDebt, _shielded) < _actualDebt(singleRedemption.LUSDLot, _shielded)) {

@@ -138,8 +138,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
 
     assert.isTrue(expected_F_Collateral_After.eq(F_Collateral_After))
   })
-
-  it("ETH fee per LQTY staked doesn't change when a redemption fee is triggered and totalStakes == 0", async () => {
+  // skipped because it's not relevant since collateral fee now stays in trove
+  it.skip("ETH fee per LQTY staked doesn't change when a redemption fee is triggered and totalStakes == 0", async () => {
     await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })
@@ -172,7 +172,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.equal(F_Collateral_After, '0')
   })
 
-  it("LUSD fee per LQTY staked increases when a redemption fee is triggered and totalStakes > 0", async () => {
+  // skipped because it's not relevant since collateral fee now stays in trove
+  it.skip("LUSD fee per LQTY staked increases when a redemption fee is triggered and totalStakes > 0", async () => {
     await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })
@@ -216,7 +217,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     //assert.isTrue(expected_F_LUSD_After.eq(F_LUSD_After))
   })
 
-  it("LUSD fee per LQTY staked doesn't change when a redemption fee is triggered and totalStakes == 0", async () => {
+  // skipped because it's not relevant since collateral fee now stays in trove
+  it.skip("LUSD fee per LQTY staked doesn't change when a redemption fee is triggered and totalStakes == 0", async () => {
     await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })
