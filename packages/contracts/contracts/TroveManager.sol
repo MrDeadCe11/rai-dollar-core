@@ -297,11 +297,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // subtract fee from collateral lot so fee stays in trove
         singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 
-        // get redemption fee
-        singleRedemption.collateralFee = singleRedemption.collateralLot * _redemptionRate / DECIMAL_PRECISION;
-        // subtract fee from collateralLot so fee remains in trove
-        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
-
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
         if (_actualDebt(locals.normDebt, _shielded) < _actualDebt(singleRedemption.LUSDLot, _shielded)) {
@@ -597,11 +592,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 !locals.pickBase,
                 redemptionRate
             );
-            // add fee to total collateral fee
-            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
+
 
             if (singleRedemption.cancelledPartial) { break; }
             
+            // add fee to total collateral fee            
             locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
 
             totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
