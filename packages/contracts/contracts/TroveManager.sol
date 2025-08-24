@@ -623,20 +623,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             locals.totalCollateralDrawn, locals.price, locals.par, locals.totalLUSDSupplyAtStart
         );
 
-        // // Fees
-        // totals.baseCollateralFee = aggregator.getRedemptionFee(totals.totalBaseCollateralDrawn);
-        // totals.shieldedCollateralFee = aggregator.getRedemptionFee(totals.totalShieldedCollateralDrawn);
-
-        // locals.totalCollateralFee = totals.baseCollateralFee.add(totals.shieldedCollateralFee);
+        // Fees
+        // fee stays in trove
         _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
-
-        // // Distribute fees and collateral
-        // contractsCache.activePool.sendCollateral(address(contractsCache.lqtyStaking), totals.baseCollateralFee);
-        // contractsCache.activeShieldedPool.sendCollateral(address(contractsCache.lqtyStaking), totals.shieldedCollateralFee);
-        // contractsCache.lqtyStaking.increaseF_Collateral(locals.totalCollateralFee);
-
-        // totals.baseCollateralToSendToRedeemer = totals.totalBaseCollateralDrawn.sub(totals.baseCollateralFee);
-        // totals.shieldedCollateralToSendToRedeemer = totals.totalShieldedCollateralDrawn.sub(totals.shieldedCollateralFee);
 
         emit Redemption(_LUSDamount, locals.totalRedeemed,
                         totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn), locals.totalCollateralFee);

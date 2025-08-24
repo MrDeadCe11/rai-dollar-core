@@ -65,10 +65,12 @@ contract('CollSurplusPool', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus
-    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=10)
+    const tx = await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt, gasPrice=10)
+    // get redemption fee from tx logs
+    const redemptionFee = tx.logs.find(log => log.event === 'Redemption').args[3]
 
     const COLL_2 = await collSurplusPool.getCollateral()
-    th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    th.assertIsApproximatelyEqual(COLL_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price).sub(redemptionFee)))
   })
 
   it("CollSurplusPool: claimColl(): Reverts if caller is not Borrower Operations", async () => {
