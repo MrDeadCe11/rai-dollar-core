@@ -29,7 +29,7 @@ const GAS_PRICE = 10000000
  * the parameter BETA in the TroveManager, which is still TBD based on economic modelling.
  * 
  */ 
-contract('TroveManager', async accounts => {
+contract('TroveManager - Shielded', async accounts => {
 
   const _18_zeros = '000000000000000000'
   const ZERO_ADDRESS = th.ZERO_ADDRESS

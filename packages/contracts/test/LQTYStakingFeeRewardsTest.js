@@ -521,7 +521,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.isAtMost(th.getDifference(expectedTotalETHGain, A_ETHGain), 1000)
   })
 
-  it("getPendingLUSDGain(): Returns the staker's correct pending LUSD gain", async () => { 
+  // skipped because it's not relevant since collateral fee now stays in trove
+  it.skip("getPendingLUSDGain(): Returns the staker's correct pending LUSD gain", async () => { 
     await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })
