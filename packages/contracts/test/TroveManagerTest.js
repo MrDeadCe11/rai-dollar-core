@@ -5012,17 +5012,17 @@ contract('TroveManager', async accounts => {
     const expectedTotalCollateralDrawn = redemptionAmount.mul(par).div(price) // convert redemptionAmount * par / collateral price, at Collateral:USD price 200
     const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(toBN(CollateralFee))// gas is not removed from erc20 collateral // .sub(toBN(th.gasUsed(redemptionTx) * GAS_PRICE)) // substract gas used for troveManager.redeemCollateral from expected received Collateral
 
-    console.log("*********************************************************************************")
-    console.log("CollateralFee: " + CollateralFee)
-    console.log("dennis_CollateralBalance_Before: " + dennis_CollateralBalance_Before)
-    console.log("GAS_USED: " + th.gasUsed(redemptionTx))
-    console.log("dennis_CollateralBalance_After: " + dennis_CollateralBalance_After)
-    console.log("expectedTotalCollateralDrawn: " + expectedTotalCollateralDrawn)
-    console.log("par: " + par)
-    console.log("recived  : " + receivedCollateral)
-    console.log("expected : " + expectedReceivedCollateral)
-    console.log("wanted :   " + expectedReceivedCollateral)//.sub(toBN(GAS_PRICE)))
-    console.log("*********************************************************************************")
+    // console.log("*********************************************************************************")
+    // console.log("CollateralFee: " + CollateralFee)
+    // console.log("dennis_CollateralBalance_Before: " + dennis_CollateralBalance_Before)
+    // console.log("GAS_USED: " + th.gasUsed(redemptionTx))
+    // console.log("dennis_CollateralBalance_After: " + dennis_CollateralBalance_After)
+    // console.log("expectedTotalCollateralDrawn: " + expectedTotalCollateralDrawn)
+    // console.log("par: " + par)
+    // console.log("recived  : " + receivedCollateral)
+    // console.log("expected : " + expectedReceivedCollateral)
+    // console.log("wanted :   " + expectedReceivedCollateral)//.sub(toBN(GAS_PRICE)))
+    // console.log("*********************************************************************************")
     // Check the redeemed fraction calculation
 
     th.assertIsApproximatelyEqual(expectedReceivedCollateral, receivedCollateral)
