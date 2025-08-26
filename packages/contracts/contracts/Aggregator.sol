@@ -94,13 +94,8 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         _requireCallerIsTroveManager();
         uint decayedBaseRate = _calcDecayedBaseRate();
 
-        /* Convert the drawn ETH back to LUSD at face value rate (1 LUSD:1 USD), in order to get
-        * the fraction of total supply that was redeemed at face value. */
-        uint redeemedLUSDFraction = _ETHDrawn.mul(_price).mul(DECIMAL_PRECISION).div(_totalLUSDSupply.mul(_par));
+        uint newBaseRate = calcNewBaseRate(_ETHDrawn, decayedBaseRate, _price, _par, _totalLUSDSupply);
 
-        uint newBaseRate = decayedBaseRate.add(redeemedLUSDFraction.div(BETA));
-        newBaseRate = LiquityMath._min(newBaseRate, DECIMAL_PRECISION); // cap baseRate at a maximum of 100%
-        //assert(newBaseRate <= DECIMAL_PRECISION); // This is already enforced in the line above
         assert(newBaseRate > 0); // Base rate is always non-zero after redemption
 
         // Update the baseRate state variable
@@ -111,6 +106,27 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         _updateLastFeeOpTime();
 
         return newBaseRate;
+    }
+
+    function calcNewBaseRate(uint _ETHDrawn, uint _baseRate, uint _price, uint _par, uint _totalLUSDSupply) public pure override returns (uint) {
+        /* Convert the drawn ETH back to LUSD at face value rate (1 LUSD:1 USD), in order to get
+        * the fraction of total supply that will be redeemed at face value. */
+        uint redeemedLUSDFraction = _ETHDrawn.mul(_price).mul(DECIMAL_PRECISION).div(_totalLUSDSupply.mul(_par));
+        
+        uint256 newBaseRate = _baseRate.add(redeemedLUSDFraction.div(BETA));
+
+        newBaseRate = LiquityMath._min(newBaseRate, DECIMAL_PRECISION); // cap baseRate at a maximum of 100%
+
+        return newBaseRate;
+    }
+
+    function calcBaseRateForRedemption(uint _LUSDAmount, uint _baseRate, uint _price, uint _par, uint _totalLUSDSupply) public pure override returns (uint) {
+        uint256 requestedCollateral = calcRedemptionAmount(_LUSDAmount, _price, _par);
+        return calcNewBaseRate(requestedCollateral, _baseRate, _price, _par, _totalLUSDSupply);
+    }
+
+    function calcRedemptionAmount(uint _LUSDAmount, uint _price, uint _par) public pure override returns (uint) {
+        return _LUSDAmount.mul(_par).div(_price);
     }
 
     function getRedemptionRate() public view override returns (uint) {
