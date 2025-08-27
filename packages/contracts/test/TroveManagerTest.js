@@ -6988,7 +6988,6 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
     
-    const rate = await troveManager.accumulatedRate()
     const par = await relayer.par()
     const price = await priceFeed.getPrice()
     const totalSystemDebt = await th.getEntireSystemDebt(contracts)

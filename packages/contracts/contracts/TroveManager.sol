@@ -629,11 +629,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         );
 
         // Fees
-        // fee stays in trove
         _requireUserAcceptsFee(locals.totalCollateralFee, grossCollateralDrawn, _maxFeePercentage);
 
         emit Redemption(_LUSDamount, locals.totalRedeemed,
-                        totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn), locals.totalCollateralFee);
+                        locals.totalCollateralDrawn, locals.totalCollateralFee);
 
         contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
 

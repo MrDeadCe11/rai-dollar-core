@@ -102,7 +102,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         // Update the baseRate state variable
         baseRate = newBaseRate;
         emit BaseRateUpdated(newBaseRate);
-        //emit BaseRateUpdated(_totalLUSDSupply);
         
         _updateLastFeeOpTime();
 
@@ -110,10 +109,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     }
 
     function calcNewBaseRate(uint _LUSDAmount, uint _baseRate, uint _totalLUSDSupply) public view override returns (uint) {
-        /* Convert the drawn ETH back to LUSD at face value rate (1 LUSD:1 USD), in order to get
-        * the fraction of total supply that will be redeemed at face value. */
-        // uint redeemedLUSDFraction = _ETHDrawn.mul(_price).mul(DECIMAL_PRECISION).div(_totalLUSDSupply.mul(_par));
-        
         uint redeemedLUSDFraction = _LUSDAmount.mul(DECIMAL_PRECISION).div(_totalLUSDSupply);
 
         uint256 newBaseRate = _baseRate.add(redeemedLUSDFraction.div(BETA));
@@ -124,7 +119,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     }
 
     function calcRateForRedemption(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
-        // uint256 requestedCollateral = calcRedemptionAmount(_LUSDAmount, _price, _par);
         uint256 newBaseRate = calcNewBaseRate(_LUSDAmount, baseRate, _totalLUSDSupply);
         return _calcRedemptionRate(newBaseRate);
     }
