@@ -44,6 +44,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         uint parUsed;
         uint accRateUsed;
         uint accShieldRateUsed;
+        uint totalLUSDSupplyAtStart;
     }
 
     // --- Dependency setters ---
@@ -115,6 +116,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         )
     {
         HintLocals memory vars;
+        vars.totalLUSDSupplyAtStart = troveManager.getEntireSystemDebt(troveManager.accumulatedRate(), troveManager.accumulatedShieldRate());
         vars.remainingLUSD = _LUSDamount;
         if (_maxIterations == 0) { _maxIterations = type(uint).max; }
 
@@ -186,8 +188,11 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     // Compute gross collateral equivalent for this redemption lot
                     uint collateralGross = vars.maxRedeemableLUSD.mul(vars.parUsed).div(_price);
                     // Apply redemption fee so that the fee remains in the trove, matching TroveManager logic
-                    uint redemptionRate = aggregator.getRedemptionRateWithDecay();
-                    uint collateralFee = redemptionRate.mul(collateralGross).div(DECIMAL_PRECISION);
+                    uint projectedRedemptionRate = aggregator.calcBaseRateForRedemption(_LUSDamount, _price, vars.parUsed, vars.totalLUSDSupplyAtStart);
+                    // Cap at 100%
+                    projectedRedemptionRate = LiquityMath._min(projectedRedemptionRate, DECIMAL_PRECISION);
+                    
+                    uint collateralFee = projectedRedemptionRate.mul(collateralGross).div(DECIMAL_PRECISION);
                     uint collateralNet = collateralGross.sub(collateralFee);
 
                     vars.newColl = vars.coll.sub(collateralNet);

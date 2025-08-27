@@ -128,6 +128,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     struct ContractsCache {
         IActivePool activePool;
         IActivePool activeShieldedPool;
+        IAggregator aggregator;
         IDefaultPool defaultPool;
         ILUSDToken lusdToken;
         ILQTYStaking lqtyStaking;
@@ -503,6 +504,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         ContractsCache memory contractsCache = ContractsCache(
             activePool,
             activeShieldedPool,
+            aggregator,
             defaultPool,
             lusdToken,
             lqtyStaking,
@@ -536,7 +538,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
         
-        uint256 redemptionRate = aggregator.getRedemptionRateWithDecay();
+        uint256 redemptionRate = contractsCache.aggregator.calcBaseRateForRedemption(totals.remainingLUSD, locals.price, locals.par, locals.totalLUSDSupplyAtStart);
 
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {

@@ -1628,9 +1628,24 @@ class TestHelper {
     return tx
   }
 
-  static async calulateCollateralFee(CollateralDrawn, redemptionRate) {
-    const fee = CollateralDrawn.mul(redemptionRate).div(MoneyValues._1e18BN)
+  static async calculateCollateralFee(contracts, CollateralDrawn) {
+    // Get the current redemption rate from the aggregator (includes base rate + 0.5% floor)
+    const redemptionRate = await contracts.aggregator.getRedemptionRateWithDecay()
+    const fee = await contracts.aggregator.calcRedemptionFee(redemptionRate, CollateralDrawn)
     return fee
+  }
+
+  static calculateNormalizedDebt(amount, rate) {
+    // normalize (integer division)
+    let norm = amount.mul(MoneyValues._1e18BN).div(rate)
+    
+    // denormalize to check rounding
+    let actualFromNorm = norm.mul(rate).div(MoneyValues._1e18BN)
+    if (actualFromNorm.lt(amount)) {
+      norm = norm.add(toBN(1))
+      actualFromNorm = norm.mul(rate).div(MoneyValues._1e18BN)
+    }
+    return actualFromNorm
   }
 
   // --- Composite functions ---

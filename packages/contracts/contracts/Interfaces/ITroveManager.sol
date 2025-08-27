@@ -120,7 +120,7 @@ interface ITroveManager is ILiquityBase {
         uint pendingLUSDDebtReward, 
         uint pendingCollateralReward
     );
-
+    
     function drip() external;
 
     function closeTrove(address _borrower) external;

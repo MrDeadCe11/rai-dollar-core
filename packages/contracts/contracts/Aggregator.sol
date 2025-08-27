@@ -120,9 +120,9 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return newBaseRate;
     }
 
-    function calcBaseRateForRedemption(uint _LUSDAmount, uint _baseRate, uint _price, uint _par, uint _totalLUSDSupply) public pure override returns (uint) {
+    function calcBaseRateForRedemption(uint _LUSDAmount, uint _price, uint _par, uint _totalLUSDSupply) public view override returns (uint) {
         uint256 requestedCollateral = calcRedemptionAmount(_LUSDAmount, _price, _par);
-        return calcNewBaseRate(requestedCollateral, _baseRate, _price, _par, _totalLUSDSupply);
+        return calcNewBaseRate(requestedCollateral, baseRate, _price, _par, _totalLUSDSupply);
     }
 
     function calcRedemptionAmount(uint _LUSDAmount, uint _price, uint _par) public pure override returns (uint) {

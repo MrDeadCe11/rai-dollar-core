@@ -8,4 +8,7 @@ import "./IActivePool.sol";
 interface ILiquityBase {
     function activePool() external view returns (IActivePool);
     function priceFeed() external view returns (IPriceFeed);
+
+    function getEntireSystemDebt(uint accumulatedRate, uint accumulatedShieldRate) external view returns (uint);
+
 }
