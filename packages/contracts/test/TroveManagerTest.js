@@ -4833,7 +4833,8 @@ contract('TroveManager', async accounts => {
     // Drop the price
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price);
-
+    const par = await relayer.par()
+    const totalSystemDebt = await th.getEntireSystemDebt(contracts)
     // --- TEST ---
     const redemptionAmount = C_debt.add(B_debt).add(partialRedemptionAmount)
     const {
@@ -4844,8 +4845,8 @@ contract('TroveManager', async accounts => {
     assert.equal(firstRedemptionHint, carol)
     
     // Calculate expected ICR after partial redemption, accounting for fee staying in trove
-    const par = await relayer.par()
-    const redemptionRate = await aggregator.getRedemptionRateWithDecay()
+
+    const redemptionRate = await aggregator.calcRateForRedemption(redemptionAmount, totalSystemDebt)
     const grossCollateralDrawn = partialRedemptionAmount.mul(par).div(price)
     const fee = grossCollateralDrawn.mul(redemptionRate).div(toBN(dec(1, 18)))
     const netCollateralRemoved = grossCollateralDrawn.sub(fee)
@@ -6910,7 +6911,13 @@ contract('TroveManager', async accounts => {
     // Confirm baseRate before redemption is 0
     const baseRate = await aggregator.baseRate()
     assert.equal(baseRate, '0')
-
+    
+    // snapshot redemption values
+    const price = await priceFeed.getPrice()
+    const par = await relayer.par()
+    const totalSystemDebt = await th.getEntireSystemDebt(contracts)
+    const expectedRedemptionRate = await aggregator.calcRateForRedemption(redemptionAmount, totalSystemDebt)
+    
     // whale redeems LUSD.  Expect this to fully redeem A, B, C, and partially redeem D.
     await th.redeemCollateral(whale, contracts, redemptionAmount, GAS_PRICE)
 
@@ -6963,6 +6970,7 @@ contract('TroveManager', async accounts => {
       A_netDebt, A_coll,
       B_netDebt, B_coll,
       C_netDebt, C_coll,
+      expectedRedemptionRate,
     }
   }
 
@@ -6980,11 +6988,11 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
     
-    const RATE_PRECISION = mv._1e18BN
     const rate = await troveManager.accumulatedRate()
     const par = await relayer.par()
     const price = await priceFeed.getPrice()
-    const redemptionRateAtStart = await aggregator.getRedemptionRateWithDecay()
+    const totalSystemDebt = await th.getEntireSystemDebt(contracts)
+    const expectedRedemptionRate = await aggregator.calcRateForRedemption(redemptionAmount, totalSystemDebt)
 
     // whale redeems LUSD.  Expect this to fully redeem A, B, C, and partially redeem 15 LUSD from D.
     const redemptionTx = await th.redeemCollateralAndGetTxObject(whale, contracts, redemptionAmount, GAS_PRICE, th._100pct)
@@ -7015,23 +7023,12 @@ contract('TroveManager', async accounts => {
 
     // /* Expect D to have lost 15 debt and (at Collateral price of 200) 15/200 = 0.075 Collateral. 
     // So, expect remaining debt = (85 - 15) = 70, and remaining Collateral = 1 - 15/200 = 0.925 remaining. */
-    // const price = await priceFeed.getPrice()
-    // const par = await relayer.par()
 
-    // // Calculate gross collateral drawn for the partial redemption
-    // const grossCollateralDrawn = partialAmount.mul(par).div(price)
-    // const fee = await th.calculateCollateralFee(contracts, grossCollateralDrawn)
-    
     const redeemedDebtForD = toBN(D_totalDebt).sub(toBN(D_emittedDebt)) // actual redeemed debt (post-rounding)
 
-    // 1) Redeemed debt with contract’s rounding
-    let actualFromNorm = th.calculateNormalizedDebt(redeemedDebtForD, rate)
+    const gross = redeemedDebtForD.mul(par).div(price)
+    const fee = th.calculateCollateralFee(gross, expectedRedemptionRate)
 
-    // 2) Collateral drawn and fee based on actualFromNorm
-    const gross = actualFromNorm.mul(par).div(price)
-    const fee = await th.calculateCollateralFee(contracts, gross)
-    
-    // 3) Expectations
     th.assertIsApproximatelyEqual(D_emittedDebt, D_totalDebt.sub(redeemedDebtForD))
     // D loses the gross collateral drawn, but keeps the fee (so net collateral loss = gross - fee)
     th.assertIsApproximatelyEqual(D_emittedColl, D_coll.sub(gross.sub(fee)))
@@ -7040,13 +7037,14 @@ contract('TroveManager', async accounts => {
 
 
   it("redeemCollateral(): a redemption that closes a trove leaves the trove's Collateral surplus (collateral - Collateral drawn) available for the trove owner to claim", async () => {
-    
+
     const {
       A_netDebt, A_coll,
       B_netDebt, B_coll,
       C_netDebt, C_coll,
+      expectedRedemptionRate,
     } = await redeemCollateral3Full1Partial()
-
+    
     const A_balanceBefore = toBN(await collateralToken.balanceOf(A))
     const B_balanceBefore = toBN(await collateralToken.balanceOf(B))
     const C_balanceBefore = toBN(await collateralToken.balanceOf(C))
@@ -7062,15 +7060,15 @@ contract('TroveManager', async accounts => {
     const par = await relayer.par()
 
     const A_gross = A_netDebt.mul(par).div(price)
-    const A_fee = await th.calculateCollateralFee(contracts, A_gross)
+    const A_fee = th.calculateCollateralFee(A_gross, expectedRedemptionRate)
     const A_ExpectedRedemptionAmount = A_gross.sub(A_fee)
 
     const B_gross = B_netDebt.mul(par).div(price)
-    const B_fee = await th.calculateCollateralFee(contracts, B_gross)
+    const B_fee = th.calculateCollateralFee(B_gross, expectedRedemptionRate)
     const B_ExpectedRedemptionAmount = B_gross.sub(B_fee)
 
     const C_gross = C_netDebt.mul(par).div(price)
-    const C_fee = await th.calculateCollateralFee(contracts, C_gross)
+    const C_fee = th.calculateCollateralFee(C_gross, expectedRedemptionRate)
     const C_ExpectedRedemptionAmount = C_gross.sub(C_fee)
     
     const A_expectedBalance = A_balanceBefore.add(A_coll.sub(A_ExpectedRedemptionAmount));
@@ -7089,22 +7087,24 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption that closes a trove leaves the trove's Collateral surplus (collateral - Collateral drawn) available for the trove owner after re-opening trove", async () => {
-
     const {
       A_netDebt, A_coll: A_collBefore,
       B_netDebt, B_coll: B_collBefore,
       C_netDebt, C_coll: C_collBefore,
+      expectedRedemptionRate,
     } = await redeemCollateral3Full1Partial()
+    
 
     const price = await priceFeed.getPrice()
     const par = await relayer.par()
+
     const A_gross = A_netDebt.mul(par).div(price)
     const B_gross = B_netDebt.mul(par).div(price)
     const C_gross = C_netDebt.mul(par).div(price)
 
-    const A_fee = await th.calculateCollateralFee(contracts, A_gross)
-    const B_fee = await th.calculateCollateralFee(contracts, B_gross)
-    const C_fee = await th.calculateCollateralFee(contracts, C_gross)
+    const A_fee = th.calculateCollateralFee(A_gross, expectedRedemptionRate)
+    const B_fee = th.calculateCollateralFee(B_gross, expectedRedemptionRate)
+    const C_fee = th.calculateCollateralFee(C_gross, expectedRedemptionRate)
 
     const A_surplus = A_collBefore.sub(A_gross).add(A_fee)
     const B_surplus = B_collBefore.sub(B_gross).add(B_fee)

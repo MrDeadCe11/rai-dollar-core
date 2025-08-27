@@ -183,7 +183,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     }
 
     // --- Events ---
-    event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint _stake, TroveManagerOperation _operation);
+    event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint _stake,TroveManagerOperation _operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, TroveManagerOperation _operation);
     event Drip(uint256 _stakeInterest, uint256 _spInterest);
     event Value(uint256 value);
@@ -538,7 +538,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
         
-        uint256 redemptionRate = contractsCache.aggregator.calcBaseRateForRedemption(totals.remainingLUSD, locals.price, locals.par, locals.totalLUSDSupplyAtStart);
+        uint256 redemptionRate = contractsCache.aggregator.calcRateForRedemption(totals.remainingLUSD, locals.totalLUSDSupplyAtStart);
 
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
@@ -622,15 +622,15 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         locals.totalRedeemed = totals.totalBaseLUSDToRedeem.add(totals.totalShieldedLUSDToRedeem);
         locals.totalCollateralDrawn = totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn);
-
+        uint256 grossCollateralDrawn = locals.totalCollateralDrawn.add(locals.totalCollateralFee);
         // Base rate update
         aggregator.updateBaseRateFromRedemption(
-            locals.totalCollateralDrawn, locals.price, locals.par, locals.totalLUSDSupplyAtStart
+            locals.totalRedeemed, locals.totalLUSDSupplyAtStart
         );
 
         // Fees
         // fee stays in trove
-        _requireUserAcceptsFee(locals.totalCollateralFee, locals.totalCollateralDrawn, _maxFeePercentage);
+        _requireUserAcceptsFee(locals.totalCollateralFee, grossCollateralDrawn, _maxFeePercentage);
 
         emit Redemption(_LUSDamount, locals.totalRedeemed,
                         totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn), locals.totalCollateralFee);

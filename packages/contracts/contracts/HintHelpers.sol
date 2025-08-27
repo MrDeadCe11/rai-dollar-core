@@ -188,7 +188,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
                     // Compute gross collateral equivalent for this redemption lot
                     uint collateralGross = vars.maxRedeemableLUSD.mul(vars.parUsed).div(_price);
                     // Apply redemption fee so that the fee remains in the trove, matching TroveManager logic
-                    uint projectedRedemptionRate = aggregator.calcBaseRateForRedemption(_LUSDamount, _price, vars.parUsed, vars.totalLUSDSupplyAtStart);
+                    uint projectedRedemptionRate = aggregator.calcRateForRedemption(_LUSDamount, vars.totalLUSDSupplyAtStart);
                     // Cap at 100%
                     projectedRedemptionRate = LiquityMath._min(projectedRedemptionRate, DECIMAL_PRECISION);
                     
