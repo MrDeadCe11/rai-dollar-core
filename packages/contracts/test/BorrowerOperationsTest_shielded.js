@@ -2065,7 +2065,8 @@ contract('BorrowerOperations', async accounts => {
       await openShieldedTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: bob } })
 
       // Alice coll and debt increase(+1 Collateral, +50LUSD)
-      collateralToken.approve(activeShieldedPool.address, dec(1, 'ether'), { from: alice })
+      // Alice adjusts trove - coll increase and debt decrease
+      await collateralToken.approve(activeShieldedPool.address, dec(1, 'ether'), { from: alice })
       await borrowerOperations.adjustTrove(dec(1, 'ether'), 0, dec(50, 18), true, false, alice, alice, { from: alice })
 
       try {

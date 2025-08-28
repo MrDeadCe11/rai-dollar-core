@@ -873,7 +873,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     function createTrove(address _borrower, uint _nicr, address _upperHint, address _lowerHint, bool _redemptionShield) external override {
         _requireCallerIsBorrowerOperations();
-        require(Troves[_borrower].status != Status.active, "Trove is not active");
+        require(Troves[_borrower].status != Status.active, "Trove is already active");
         shielded[_borrower] = _redemptionShield;
 
         if (_redemptionShield) {

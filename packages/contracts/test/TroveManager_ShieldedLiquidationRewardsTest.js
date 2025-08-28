@@ -106,7 +106,7 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
 
     // L2: D Liquidated
     const txD = await liquidations.liquidate(dennis)
-    assert.isTrue(txB.receipt.status)
+    assert.isTrue(txD.receipt.status)
     assert.isFalse(await sortedShieldedTroves.contains(dennis))
 
 
