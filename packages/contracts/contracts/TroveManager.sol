@@ -294,7 +294,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         // Get the collateralLot of equivalent value in USD
         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
         // calculate fee for redeemed collateral
-        singleRedemption.collateralFee = aggregator.calcRedemptionFee(_redemptionRate, singleRedemption.collateralLot);
+        singleRedemption.collateralFee =  _redemptionRate.mul(singleRedemption.collateralLot).div(DECIMAL_PRECISION);
         // subtract fee from collateral lot so fee stays in trove
         singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
 

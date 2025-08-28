@@ -9,6 +9,7 @@ import "./Interfaces/IAggregator.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
+import "./Interfaces/ILUSDToken.sol";
 // import "./Dependencies/console.sol";
 
 contract HintHelpers is LiquityBase, Ownable, CheckContract {
@@ -19,7 +20,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     ITroveManager public troveManager;
     IRewards public rewards;
     IAggregator public aggregator;
-
+    ILUSDToken public lusdToken;
     // --- Events ---
 
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
@@ -55,7 +56,8 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         address _troveManagerAddress,
         address _rewardsAddress,
         address _relayerAddress,
-        address _aggregatorAddress
+        address _aggregatorAddress,
+        address _lusdTokenAddress
     )
         external
         onlyOwner
@@ -66,14 +68,14 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         checkContract(_rewardsAddress);
         checkContract(_relayerAddress);
         checkContract(_aggregatorAddress);
-
+        checkContract(_lusdTokenAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
         troveManager = ITroveManager(_troveManagerAddress);
         rewards = IRewards(_rewardsAddress);
         relayer = IRelayer(_relayerAddress);
         aggregator = IAggregator(_aggregatorAddress);
-
+        lusdToken = ILUSDToken(_lusdTokenAddress);
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit SortedShieldedTrovesAddressChanged(_sortedShieldedTrovesAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
@@ -116,7 +118,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         )
     {
         HintLocals memory vars;
-        vars.totalLUSDSupplyAtStart = troveManager.getEntireSystemDebt(troveManager.accumulatedRate(), troveManager.accumulatedShieldRate());
+        vars.totalLUSDSupplyAtStart = lusdToken.totalSupply();
         vars.remainingLUSD = _LUSDamount;
         if (_maxIterations == 0) { _maxIterations = type(uint).max; }
 

@@ -42,7 +42,6 @@ interface IAggregator is ILiquityBase {
     function getRedemptionRateWithDecay() external view returns (uint);
 
     function calcRateForRedemption(uint _LUSDAmount, uint _totalLUSDSupply) external view returns (uint);
-    function calcRedemptionAmount(uint _LUSDAmount, uint _price, uint _par) external pure returns (uint);
     function calcNewBaseRate(uint _LUSDAmount, uint _baseRate, uint _totalLUSDSupply) external view returns (uint);
 
     function getRedemptionFee(uint _ETHDrawn) external view returns (uint);

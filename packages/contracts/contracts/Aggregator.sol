@@ -123,10 +123,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return _calcRedemptionRate(newBaseRate);
     }
 
-    function calcRedemptionAmount(uint _LUSDAmount, uint _price, uint _par) public pure override returns (uint) {
-        return _LUSDAmount.mul(_par).div(_price);
-    }
-
     function getRedemptionRate() public view override returns (uint) {
         return _calcRedemptionRate(baseRate);
     }
