@@ -1637,18 +1637,6 @@ class TestHelper {
     return fee
   }
 
-  static getActualDebtFromNormalizedDebt(amount, rate) {
-    // normalize (integer division)
-    let norm = amount.mul(MoneyValues._1e18BN).div(rate)
-    
-    // denormalize to check rounding
-    let actualFromNorm = norm.mul(rate).div(MoneyValues._1e18BN)
-    if (actualFromNorm.lt(amount)) {
-      norm = norm.add(toBN(1))
-      actualFromNorm = norm.mul(rate).div(MoneyValues._1e18BN)
-    }
-    return actualFromNorm
-  }
 
   // --- Composite functions ---
 
