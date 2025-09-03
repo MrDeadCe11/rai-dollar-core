@@ -2272,8 +2272,24 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       assert.isAtMost(th.getDifference(SPLUSDBalance_3, dec(1, 18)), 1)
 
       // Attempt withdrawals
-      await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: E }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
-      await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: F }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: E }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: F }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+
+      balanceBefore = await lusdToken.balanceOf(E)
+      await stabilityPool.withdrawFromSP(dec(1000, 18), { from: E })
+      balanceAfter = await lusdToken.balanceOf(E)
+
+      balanceDiff = balanceAfter.sub(balanceBefore)
+      assert.isTrue(balanceDiff.eq(toBN('0')))
+
+      balanceBefore = await lusdToken.balanceOf(F)
+      await stabilityPool.withdrawFromSP(dec(1000, 18), { from: F })
+      balanceAfter = await lusdToken.balanceOf(F)
+
+      balanceDiff = balanceAfter.sub(balanceBefore)
+      assert.isTrue(balanceDiff.eq(toBN('0')))
+
+
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
       const txE = await stabilityPool.withdrawFromSP(dec(1000, 18), { from: E })

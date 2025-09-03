@@ -2349,6 +2349,7 @@ contract('TroveManager', async accounts => {
 
     // carol does not have surplus collateral
     carolSurplus = await th.getCollateralFromCollSurplusPool(contracts, carol)
+    console.log("carolSurplus " + carolSurplus)
     assert.isTrue(carolSurplus.eq(toBN('0')))
 
     // verift total gas comp
@@ -3385,7 +3386,13 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_HOUR, web3.currentProvider)
 
     // B tries to fully withdraw
-    await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+    //await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+    balanceBefore = await lusdToken.balanceOf(B)
+    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    balanceAfter = await lusdToken.balanceOf(B)
+
+    balanceDiff = balanceAfter.sub(balanceBefore)
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))
@@ -4122,7 +4129,14 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_HOUR, web3.currentProvider)
 
     // B tries to fully withdraw
-    await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+    //await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //
+    balanceBefore = await lusdToken.balanceOf(B)
+    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    balanceAfter = await lusdToken.balanceOf(B)
+
+    balanceDiff = balanceAfter.sub(balanceBefore)
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))
@@ -4824,10 +4838,20 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_HOUR, web3.currentProvider)
 
     // B tries to fully withdraw
-    await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+    //await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //
+      //
+    // Change from V1: withdraw over available doesn't revert, just rounds down to amount available
+    balanceBefore = await lusdToken.balanceOf(B)
+    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    balanceAfter = await lusdToken.balanceOf(B)
+
+    balanceDiff = balanceAfter.sub(balanceBefore)
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))
+
   })
 
   // --- redemptions ---

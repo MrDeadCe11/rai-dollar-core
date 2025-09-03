@@ -2135,12 +2135,11 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
 
       // There is 1 wei difference due to rounding down of totalActualDebtToOffset in liquidations.batchLiquidate()
       // when converting norm debt to actual
-      //assert.equal(LUSDinSP_1, dec(1, 18))
-      assert.isTrue(LUSDinSP_1.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.equal(LUSDinSP_1, dec(1, 18))
 
       // Check SP LUSD balance is 1
       const SPLUSDBalance_1 = await lusdToken.balanceOf(stabilityPool.address)
-      assert.isTrue(SPLUSDBalance_1.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.isTrue(SPLUSDBalance_1.eq(toBN(dec(1, 18))))
 
       // Attempt withdrawals
       // whale deposits LUSD so all can exit
@@ -2192,14 +2191,12 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       // Check SP tracker is 1
       const LUSDinSP_2 = await stabilityPool.getTotalLUSDDeposits()
       //// console.log(`LUSDinSP_2: ${LUSDinSP_2}`)
-      //assert.equal(LUSDinSP_2, dec(1, 18))
-      assert.isTrue(LUSDinSP_2.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.equal(LUSDinSP_2, dec(1, 18))
 
       // Check SP LUSD balance is 1
       const SPLUSDBalance_2 = await lusdToken.balanceOf(stabilityPool.address)
       //// console.log(`SPLUSDBalance_2: ${SPLUSDBalance_2}`)
-      //assert.equal(SPLUSDBalance_2, dec(1, 18))
-      assert.isTrue(SPLUSDBalance_2.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.equal(SPLUSDBalance_2, dec(1, 18))
 
       // Attempt withdrawals
       // whale deposits LUSD so all can exit
@@ -2259,17 +2256,32 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
 
       // Check SP tracker is 1
       const LUSDinSP_3 = await stabilityPool.getTotalLUSDDeposits()
-      //assert.equal(LUSDinSP_3, dec(1, 18))
-      assert.isTrue(LUSDinSP_3.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.equal(LUSDinSP_3, dec(1, 18))
 
       // Check SP LUSD balance is 1
       const SPLUSDBalance_3 = await lusdToken.balanceOf(stabilityPool.address)
-      //assert.equal(SPLUSDBalance_3, dec(1, 18))
-      assert.isTrue(SPLUSDBalance_3.eq(toBN(dec(1, 18)).add(toBN('1'))))
+      assert.equal(SPLUSDBalance_3, dec(1, 18))
 
       // Attempt withdrawals
-      await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: E }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
-      await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: F }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: E }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: F }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+
+
+      // E withdraws
+      balanceBeforeE = await lusdToken.balanceOf(E)
+      await stabilityPool.withdrawFromSP(dec(1000, 18), { from: E })
+      balanceAfter = await lusdToken.balanceOf(E)
+
+      balanceDiff = balanceAfter.sub(balanceBeforeE)
+      assert.isTrue(balanceDiff.eq(toBN('0')))
+
+      // F withdraws
+      balanceBeforeF = await lusdToken.balanceOf(F)
+      await stabilityPool.withdrawFromSP(dec(1000, 18), { from: F })
+      balanceAfter = await lusdToken.balanceOf(F)
+
+      balanceDiff = balanceAfter.sub(balanceBeforeF)
+      assert.isTrue(balanceDiff.eq(toBN('0')))
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -2277,6 +2289,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const txF = await stabilityPool.withdrawFromSP(dec(1000, 18), { from: F })
       assert.isTrue(txE.receipt.status)
       assert.isTrue(txF.receipt.status)
+
+      assert.isTrue((await lusdToken.balanceOf(E)).gt(balanceBeforeE))
+      assert.isTrue((await lusdToken.balanceOf(F)).gt(balanceBeforeF))
     })
 
     it("withdrawFromSP(): Depositor's ETH gain stops increasing after two scale changes", async () => {

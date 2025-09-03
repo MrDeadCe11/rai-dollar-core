@@ -664,7 +664,7 @@ contract('StabilityPool', async accounts => {
       assert.isTrue(G_After.gt(G_Before))
     })
 
-    it("withdraFromSP(): cannot empty SP", async () => {
+    it("withdrawFromSP(): cannot empty SP", async () => {
       await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: whale, value: dec(50, 'ether') } })
 
       // A, B, C open troves and make Stability Pool deposits
@@ -678,7 +678,13 @@ contract('StabilityPool', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_HOUR, web3.currentProvider)
 
       // A tries to fully withdraw
-      await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: A }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      //await assertRevert(stabilityPool.withdrawFromSP(dec(1000, 18), { from: A }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
+      balanceBefore = await lusdToken.balanceOf(A)
+      await stabilityPool.withdrawFromSP(dec(1000, 18), { from: A })
+      balanceAfter = await lusdToken.balanceOf(A)
+
+      balanceDiff = balanceAfter.sub(balanceBefore)
+      assert.isTrue(balanceDiff.eq(toBN(dec(999,18))))
 
       // Check SP is not empty
       assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))

@@ -128,6 +128,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         uint collSurplus;
         uint baseCollSurplus;
         uint shieldedCollSurplus;
+        uint actualBaseDebtToOffset;
+        uint actualShieldedDebtToOffset;
     }
 
     struct LiquidationTotals {
@@ -191,6 +193,10 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                        uint256 actualDebt, uint256 totalNormLUSD);
     event Offset(uint actualBaseDebt, uint baseDebt, uint baseColl, uint actualShieldedDebt, uint shieldedDebt, uint shieldedColl);
     event Value(uint value);
+    event MaxAmountToOffset(uint value);
+    event TotalDeposits(uint value);
+    event RemainingLUSD(uint value);
+    event ActualDebtOffset(uint value);
     event ValueBool(bool value);
     event Redistribute(uint baseDebt, uint baseColl, uint sDebt, uint sColl);
 
@@ -294,29 +300,40 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
     function getCappedOffsetAndRedistributionVals(LiquidationOffsetInputs memory i)
         internal pure
-        returns (uint debtToOffset, uint collToSendToSP, uint debtToRedistribute, uint collToRedistribute, uint collSurplus)
+        returns (uint debtToOffset, uint actualDebtToOffset, uint collToSendToSP, uint debtToRedistribute, uint collToRedistribute, uint collSurplus)
     {
         if (i.LUSDInSPForOffsets > 0) {
-            debtToOffset = LiquityMath._min(i.entireTroveDebt, i.LUSDInSPForOffsets);
-            uint actualDebtToOffset = debtToOffset.mul(i.troveRate) / RATE_PRECISION;
-            collToSendToSP = i.coll.mul(debtToOffset) / i.entireTroveDebt;
+            // only offset up to SP available
+            actualDebtToOffset = LiquityMath._min(i.actualTroveDebt, i.LUSDInSPForOffsets);
 
+            // convert to norm debt to
+            debtToOffset = actualDebtToOffset.mul(RATE_PRECISION) / i.troveRate;
+
+            // how much collateral to offset
+            collToSendToSP = i.coll.mul(actualDebtToOffset) / i.actualTroveDebt;
+
+            // limit collateral offset to max penalty
             uint maxToSP = _maxPenaltyColl(actualDebtToOffset, i.par, i.liqPenalty, i.price);
             if (collToSendToSP > maxToSP) collToSendToSP = maxToSP;
 
+            // SP has hit minimum, redistribute remaining
             if (actualDebtToOffset < i.actualTroveDebt) {
-                uint remDebt = i.actualTroveDebt - actualDebtToOffset;
-                collToRedistribute = _maxPenaltyColl(remDebt, i.par, i.liqPenaltyRedist, i.price);
+                uint remActualDebt = i.actualTroveDebt - actualDebtToOffset;
+                collToRedistribute = _maxPenaltyColl(remActualDebt, i.par, i.liqPenaltyRedist, i.price);
                 uint remColl = i.coll - collToSendToSP;
                 if (collToRedistribute > remColl) collToRedistribute = remColl;
+
                 debtToRedistribute = i.entireTroveDebt - debtToOffset;
             }
         } else {
+            // redistribute all debt
             debtToRedistribute = i.entireTroveDebt;
+            // limit collateral to redistribute
             collToRedistribute = _maxPenaltyColl(i.actualTroveDebt, i.par, i.liqPenaltyRedist, i.price);
             if (collToRedistribute > i.coll) collToRedistribute = i.coll;
         }
 
+        // leftover collateral
         collSurplus = i.coll - collToSendToSP - collToRedistribute;
     }
 
@@ -331,11 +348,11 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         vars.pendingDebtReward, // actual
         vars.pendingCollReward) = troveManager.getEntireDebtAndColl(_i.borrower);
 
-        uint actualTroveDebt = _actualDebt(singleLiquidation.entireTroveDebt, _i.troveRate);
-
         rewards.movePendingTroveRewardsToActivePool(_i.currentActivePool, _i.defaultPool,
                                                     _normalizedDebt(vars.pendingDebtReward, _i.troveRate),
                                                     vars.pendingDebtReward, vars.pendingCollReward);
+
+        uint actualTroveDebt = _actualDebt(singleLiquidation.entireTroveDebt, _i.troveRate);
 
         rewards.removeStake(_i.borrower);
 
@@ -355,12 +372,13 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
 
         (singleLiquidation.debtToOffset,
+        singleLiquidation.actualDebtToOffset,
         singleLiquidation.collToSendToSP,
         singleLiquidation.debtToRedistribute,
         singleLiquidation.collToRedistribute,
         singleLiquidation.collSurplus) = getCappedOffsetAndRedistributionVals(offsetInputs);
 
-        singleLiquidation.actualDebtToOffset = _actualDebt(singleLiquidation.debtToOffset, _i.troveRate);
+        emit Value(singleLiquidation.actualDebtToOffset);
 
         uint collToLiquidate = singleLiquidation.entireTroveColl.sub(singleLiquidation.collGasCompensation);
 
@@ -419,14 +437,14 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
  
         // Move liquidated collateral and LUSD to the appropriate pools
 
-        uint totalActualBaseDebtToOffset = totals.totalBaseDebtToOffset.mul(vars.accumulatedRate).div(RATE_PRECISION);
-        uint totalActualShieldedDebtToOffset = totals.totalShieldedDebtToOffset.mul(vars.accumulatedShieldRate).div(RATE_PRECISION);
+        //uint totalActualBaseDebtToOffset = totals.totalBaseDebtToOffset.mul(vars.accumulatedRate).div(RATE_PRECISION);
+        //uint totalActualShieldedDebtToOffset = totals.totalShieldedDebtToOffset.mul(vars.accumulatedShieldRate).div(RATE_PRECISION);
 
-        emit Offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
-                    totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
+        emit Offset(totals.totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
+                    totals.totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
-        stabilityPoolCached.offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
-                                   totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
+        stabilityPoolCached.offset(totals.totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
+                                   totals.totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
         emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
@@ -555,16 +573,18 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
             liquidateInputs.defaultPool = _defaultPool;
 
             // how much debt can be offset, normalized
-            vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
+            //vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
 
             liquidateInputs.borrower = vars.user;
-            liquidateInputs.LUSDInSPForOffsets = vars.availableLUSDNorm;
+            //liquidateInputs.LUSDInSPForOffsets = vars.availableLUSDNorm;
+            liquidateInputs.LUSDInSPForOffsets = vars.remainingLUSDInSPForOffsets;
             liquidateInputs.troveRate = vars.troveRate;
 
             singleLiquidation = _liquidate(liquidateInputs);
 
             // inner _liquidate() has no knowledge of shielding so we store its output correctly
             if (vars.shielded) {
+                singleLiquidation.actualShieldedDebtToOffset = singleLiquidation.actualDebtToOffset;
                 singleLiquidation.shieldedDebtToOffset = singleLiquidation.debtToOffset;
                 singleLiquidation.shieldedDebtToRedistribute = singleLiquidation.debtToRedistribute;
                 singleLiquidation.shieldedCollToRedistribute = singleLiquidation.collToRedistribute;
@@ -574,6 +594,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                 singleLiquidation.shieldedCollSurplus = singleLiquidation.collSurplus;
                 singleLiquidation.entireTroveShieldedDebt = singleLiquidation.entireTroveDebt;
              } else {
+                singleLiquidation.actualBaseDebtToOffset = singleLiquidation.actualDebtToOffset;
                 singleLiquidation.baseDebtToOffset = singleLiquidation.debtToOffset;
                 singleLiquidation.baseDebtToRedistribute = singleLiquidation.debtToRedistribute;
                 singleLiquidation.baseCollToRedistribute = singleLiquidation.collToRedistribute;
@@ -623,6 +644,8 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         vars.price = priceFeed.fetchPrice();
         vars.LUSDInSPForOffsets = stabilityPoolCached.getMaxAmountToOffset();
+        emit MaxAmountToOffset(vars.LUSDInSPForOffsets);
+        emit TotalDeposits(stabilityPoolCached.getTotalLUSDDeposits());
 
         // all normalized
         totals = _getTotalsFromBatchLiquidate(activePoolCached, defaultPoolCached, activeShieldedPoolCached, vars.price, vars.LUSDInSPForOffsets,
@@ -630,17 +653,17 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         require(totals.totalBaseDebtInSequence > 0 || totals.totalShieldedDebtInSequence > 0, "Liquidations: nothing to liquidate");
 
-        uint totalActualBaseDebtToOffset = totals.totalBaseDebtToOffset.mul(vars.accumulatedRate).div(RATE_PRECISION);
-        uint totalActualShieldedDebtToOffset = totals.totalShieldedDebtToOffset.mul(vars.accumulatedShieldRate).div(RATE_PRECISION);
+        //uint totalActualBaseDebtToOffset = totals.totalBaseDebtToOffset.mul(vars.accumulatedRate).div(RATE_PRECISION);
+        //uint totalActualShieldedDebtToOffset = totals.totalShieldedDebtToOffset.mul(vars.accumulatedShieldRate).div(RATE_PRECISION);
 
-        emit Offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
-                    totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
+        emit Offset(totals.totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
+                    totals.totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
         uint maxNow = stabilityPool.getMaxAmountToOffset();
-        emit Value(maxNow);
+
         // offset from SP
-        stabilityPoolCached.offset(totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
-                                   totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
+        stabilityPoolCached.offset(totals.totalActualBaseDebtToOffset, totals.totalBaseDebtToOffset, totals.totalBaseCollToSendToSP,
+                                   totals.totalActualShieldedDebtToOffset, totals.totalShieldedDebtToOffset, totals.totalShieldedCollToSendToSP);
 
         emit Redistribute(totals.totalBaseDebtToRedistribute, totals.totalBaseCollToRedistribute,
                                         totals.totalShieldedDebtToRedistribute, totals.totalShieldedCollToRedistribute);
@@ -656,7 +679,6 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         if (totals.totalShieldedCollSurplus > 0) {
             activeShieldedPoolCached.sendCollateral(address(collSurplusPool), totals.totalShieldedCollSurplus);
         }
-
 
         // Update system snapshots
         rewards.updateSystemSnapshots_excludeCollRemainder(activePoolCached, activeShieldedPoolCached, defaultPoolCached,
@@ -706,19 +728,20 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
                 vars.troveRate = vars.shielded ? _accumulatedShieldRate : _accumulatedRate;
 
-                vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
+                //vars.availableLUSDNorm = vars.remainingLUSDInSPForOffsets.mul(RATE_PRECISION) / vars.troveRate;
 
                 liquidateInputs.currentActivePool = vars.shielded ? _activeShieldedPool : _activePool;
                 liquidateInputs.defaultPool = _defaultPool;
 
                 liquidateInputs.borrower = vars.user;
-                liquidateInputs.LUSDInSPForOffsets = vars.availableLUSDNorm;
+                liquidateInputs.LUSDInSPForOffsets = vars.remainingLUSDInSPForOffsets;
                 liquidateInputs.troveRate = vars.troveRate;
 
                 singleLiquidation = _liquidate(liquidateInputs);
 
                 // inner _liquidate() has no knowledge of shielding so we store its output correctly
                 if (vars.shielded) {
+                    singleLiquidation.actualShieldedDebtToOffset = singleLiquidation.actualDebtToOffset;
                     singleLiquidation.shieldedDebtToOffset = singleLiquidation.debtToOffset;
                     singleLiquidation.shieldedDebtToRedistribute = singleLiquidation.debtToRedistribute;
                     singleLiquidation.shieldedCollToRedistribute = singleLiquidation.collToRedistribute;
@@ -728,6 +751,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                     singleLiquidation.shieldedCollSurplus = singleLiquidation.collSurplus;
                     singleLiquidation.entireTroveShieldedDebt = singleLiquidation.entireTroveDebt;
                  } else {
+                    singleLiquidation.actualBaseDebtToOffset = singleLiquidation.actualDebtToOffset;
                     singleLiquidation.baseDebtToOffset = singleLiquidation.debtToOffset;
                     singleLiquidation.baseDebtToRedistribute = singleLiquidation.debtToRedistribute;
                     singleLiquidation.baseCollToRedistribute = singleLiquidation.collToRedistribute;
@@ -738,7 +762,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
                     singleLiquidation.entireTroveBaseDebt = singleLiquidation.entireTroveDebt;
                  }
 
+                emit RemainingLUSD(vars.remainingLUSDInSPForOffsets);
                 vars.remainingLUSDInSPForOffsets = vars.remainingLUSDInSPForOffsets.sub(singleLiquidation.actualDebtToOffset);
+                emit ActualDebtOffset(singleLiquidation.actualDebtToOffset);
 
                 // Add liquidation values to their respective running totals
                 totals = _addLiquidationValuesToTotals(totals, singleLiquidation);
@@ -780,6 +806,9 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
 
         newTotals.totalBaseCollSurplus = oldTotals.totalBaseCollSurplus.add(singleLiquidation.baseCollSurplus);
         newTotals.totalShieldedCollSurplus = oldTotals.totalShieldedCollSurplus.add(singleLiquidation.shieldedCollSurplus);
+
+        newTotals.totalActualBaseDebtToOffset = oldTotals.totalActualBaseDebtToOffset.add(singleLiquidation.actualBaseDebtToOffset);
+        newTotals.totalActualShieldedDebtToOffset = oldTotals.totalActualShieldedDebtToOffset.add(singleLiquidation.actualShieldedDebtToOffset);
 
         return newTotals;
     }

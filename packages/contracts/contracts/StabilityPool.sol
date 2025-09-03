@@ -420,14 +420,11 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         uint depositorCollateralGain = getDepositorCollateralGain(msg.sender);
 
         uint compoundedLUSDDeposit = getCompoundedLUSDDeposit(msg.sender);
-        uint LUSDtoWithdraw = LiquityMath._min(_amount, compoundedLUSDDeposit);
 
-        /*
         uint total = totalLUSDDeposits;
         uint available = total > MIN_LUSD_IN_SP ? total.sub(MIN_LUSD_IN_SP) : 0;
 
-        LUSDtoWithdraw = LiquityMath._min(LiquityMath._min(LUSDtoWithdraw, available), compoundedLUSDDeposit);
-        */
+        uint LUSDtoWithdraw = LiquityMath._min(LiquityMath._min(_amount, available), compoundedLUSDDeposit);
 
         int LUSDLoss = LiquityMath.safeSignedSub(initialDeposit, compoundedLUSDDeposit); // Needed only for event log
 
