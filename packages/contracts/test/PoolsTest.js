@@ -28,7 +28,7 @@ contract('StabilityPool', async accounts => {
     await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, dumbContractAddress,
                                      mockActivePoolAddress, dumbContractAddress, dumbContractAddress,
                                      dumbContractAddress, dumbContractAddress, dumbContractAddress,
-                                     dumbContractAddress, collateralToken.address)
+                                     dumbContractAddress, collateralToken.address, dumbContractAddress)
   })
 
   it('getCollateral(): gets the recorded ETH balance', async () => {

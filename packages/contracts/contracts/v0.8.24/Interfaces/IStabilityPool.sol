@@ -84,6 +84,7 @@ interface IStabilityPool {
         address _communityIssuanceAddress
     ) external;
 
+    function distributeFees(uint _amount) external;
     /*
      * Initial checks:
      * - Frontend is registered or zero address

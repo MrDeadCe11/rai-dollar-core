@@ -124,7 +124,10 @@ class TestHelper {
     const accountLast2bytes = account.slice((account.length - 4), account.length)
     return accountLast2bytes
   }
-
+  static randNumber(min, max) {
+    const amount = Math.random() * (max - min) + min;
+    return Math.floor(amount)
+  }
   static randDecayFactor(min, max) {
     const amount = Math.random() * (max - min) + min;
     const amountInWei = web3.utils.toWei(amount.toFixed(18), 'ether')
@@ -461,23 +464,26 @@ class TestHelper {
     }
     throw ("The transaction logs do not contain a redemption event")
   }
-  static getEmittedDripValuesOld(tx) {
-    for (let i = 0; i < tx.logs.length; i++) {
-      if (tx.logs[i].event === "Drip") {
 
-        const stakePayment = tx.logs[i].args[0]
-        const spPayment = tx.logs[i].args[1]
-
-        return [stakePayment, spPayment]
-      }
-    }
-    throw ("The transaction logs do not contain a drip event")
-  }
   static async getEmittedDripValues(contracts, tx) {
-    const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
-    const spPayment = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
-    const stakePayment = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_stakeInterest"))
-    return [stakePayment, spPayment]
+    const feeRouterInterface = (await ethers.getContractAt("FeeRouter", contracts.feeRouter.address)).interface;
+
+    var spPayment;
+    try {
+      spPayment = this.toBN(await this.getRawEventArgByName(tx, feeRouterInterface, contracts.feeRouter.address, "Drip", "_spInterest"))
+    } catch (e) {
+      throw ("The transaction logs do not contain a Drip event")
+    }
+
+    var remaining;
+    try {
+      remaining = this.toBN(await this.getRawEventArgByName(tx, feeRouterInterface, contracts.feeRouter.address, "Drip", "_remaining"))
+    } catch (e) {
+      remaining = this.toBN("0");
+      throw ("The transaction logs do not contain a Drip event")
+    }
+
+    return [remaining, spPayment]
   }
 
   static getEmittedEtherSentValues(tx) {
@@ -799,9 +805,6 @@ class TestHelper {
       var collToAdd = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "collToAdd"))
       var debtToOffset = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
-      // Sometimes sum of deposits is not exactly equaling deposits, possibly exacerbated with increasing scales
-      // In this case, allow totalDeposits to be passed in and not derived from individual deposits
-      //
       if (totalDeposits == null) {
           totalDeposits = web3.utils.toBN('0');
           startDeposits.forEach( num => {
@@ -820,15 +823,58 @@ class TestHelper {
 
       const totalDepositsWithDrip = totalDeposits.add(drip)
 
-      // Logic from SP.getMaxAmountToOffset()
-      // TODO: is this needed? Offset event above is after SP.getMaxAmountToOffset() check in troveManager
-      /*
-      const amountToLeave = totalDepositsWithDrip < this.toBN(this.dec(1,18)) ? totalDepositsWithDrip: this.toBN(this.dec(1,18));
-      const available = totalDepositsWithDrip.sub(amountToLeave)
-      if (debtToOffset.gte(available)) {
-          debtToOffset = available
+      // distribute collateral
+      const finalGains = []
+      const finalDeposits = []
+      for (const dep of drippedDeposits) {
+
+          // depositor loss from liquidation
+          const depositorGain = collToAdd.mul(dep).div(totalDepositsWithDrip.add(this.toBN('1')))
+          const depositorLoss = debtToOffset.mul(dep).div(totalDepositsWithDrip).add(this.toBN('1'))
+
+          // depositor deposit remaining after drip and loss from liquidation offset
+          const finalDeposit = dep.sub(depositorLoss)
+
+          finalGains.push(depositorGain)
+          finalDeposits.push(finalDeposit)
       }
-      */
+
+      return finalGains.concat(finalDeposits)
+  }
+  static async depositorValuesAfterLiquidationNew(contracts, tx, startDeposits, lastLUSDError, lastLUSDGainError) {
+      // retursn eth *gains* concatenated with SP deposits
+      // does *not* return final eth balance, ie sp.getDepositorGain()
+      const [stakeDrip, drip] = await this.getEmittedDripValues(contracts, tx)
+      const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
+      var collToAdd = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "collToAdd"))
+      var debtToOffset = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
+
+      var totalDeposits = web3.utils.toBN('0');
+      startDeposits.forEach( num => {
+          totalDeposits = totalDeposits.add(num);
+      })
+
+      let lusdGainPerUnitStaked = (drip.mul(this.toBN(this.dec(1,18))).add(this.toBN(lastLUSDGainError))).div(totalDeposits)
+
+      // distribute drip gain
+      const drippedDeposits = []
+      for (const dep of startDeposits) {
+          // how much depositor gets from drip
+          //const depositorDrip = drip.mul(dep).div(totalDeposits)
+          //const dripDeposit = dep.add(depositorDrip)
+          const dripDeposit = dep.mul(this.toBN(this.dec(1,18)).add(lusdGainPerUnitStaked)).div(this.toBN(this.dec(1,18)))
+          drippedDeposits.push(dripDeposit)
+      }
+
+      const totalDepositsWithDrip = totalDeposits.add(drip)
+
+      const lastCollateralError = await contracts.stabilityPool.lastCollateralError_Offset()
+      
+      let lusdLossPerUnitStaked = ((debtToOffset.mul(this.toBN(this.dec(1,18))).sub(lastLUSDError)).div(totalDepositsWithDrip)).add(this.toBN('1'))
+
+      if (debtToOffset.mul(this.toBN(this.dec(1,18))).lt(lastLUSDError)) {
+          lusdLossPerUnitStaked = this.toBN('1')
+      }
 
       // distribute collateral
       const finalGains = []
@@ -837,10 +883,9 @@ class TestHelper {
 
           // depositor loss from liquidation
           const depositorGain = collToAdd.mul(dep).div(totalDepositsWithDrip.add(this.toBN('1')))
-          const depositorLoss = debtToOffset.mul(dep).div(totalDepositsWithDrip)
 
           // depositor deposit remaining after drip and loss from liquidation offset
-          const finalDeposit = dep.sub(depositorLoss)
+          const finalDeposit = dep.mul(this.toBN(this.dec(1,18)).sub(lusdLossPerUnitStaked)).div(this.toBN(this.dec(1,18)))
 
           finalGains.push(depositorGain)
           finalDeposits.push(finalDeposit)
@@ -1079,8 +1124,8 @@ class TestHelper {
       // first for drip, then for offset
       
       //const [,drip] = await this.getEmittedDripValues(tx)
-      const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
-      const drip = this.toBN(await this.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
+      const feeRouterInterface = (await ethers.getContractAt("FeeRouter", contracts.feeRouter.address)).interface;
+      const drip = this.toBN(await this.getRawEventArgByName(tx, feeRouterInterface, contracts.feeRouter.address, "Drip", "_spInterest"))
       const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var offsetDebt = this.toBN(await this.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
@@ -1637,6 +1682,19 @@ class TestHelper {
     return fee
   }
 
+  // --- Use for testing SP utilization, no actual deposits happen -- //
+  static async fakeIncreaseSPDeposits(contracts, amount) {
+      await contracts.stabilityPool.increaseTotalLUSDDeposits(amount)
+      await contracts.lusdToken.unprotectedMint(contracts.stabilityPool.address, amount)
+  }
+  static async fakeDecreaseSPDeposits(contracts, amount) {
+      await contracts.stabilityPool.decreaseTotalLUSDDeposits(amount)
+      await contracts.lusdToken.unprotectedBurn(contracts.stabilityPool.address, amount)
+  }
+  static async fakeResetSPDeposits(contracts) {
+      await contracts.lusdToken.unprotectedBurn(contracts.stabilityPool.address, (await contracts.stabilityPool.getTotalLUSDDeposits()).sub((await contracts.stabilityPool.pendingLUSDDeposits())));
+      await contracts.stabilityPool.resetTotalLUSDDeposits()
+  }
 
   // --- Composite functions ---
 
@@ -1745,7 +1803,7 @@ class TestHelper {
       id: 0,
       jsonrpc: '2.0',
       method: 'evm_increaseTime',
-      params: [seconds]
+      params: [Number(seconds)]
     },
       (err) => { if (err) console.log(err) })
 

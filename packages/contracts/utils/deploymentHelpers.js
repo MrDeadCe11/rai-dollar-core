@@ -18,6 +18,9 @@ const ParControl = artifacts.require("./ParControl.sol")
 const RateControl = artifacts.require("./RateControl.sol")
 const Relayer = artifacts.require("./Relayer.sol")
 const Rewards = artifacts.require("./Rewards.sol")
+const FeeRouter = artifacts.require("./FeeRouter.sol")
+const LPStaking = artifacts.require("./LPStaking.sol")
+const GlobalFeeRouter = artifacts.require("./GlobalFeeRouter.sol")
 const MarketOracleTestnet = artifacts.require("../TestContracts/MarketOracleTestnet.sol")
 
 const LQTYStaking = artifacts.require("./LQTYStaking.sol")
@@ -39,6 +42,7 @@ const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
+const FeeRouterTester = artifacts.require("./FeeRouterTester.sol")
 
 // Proxy scripts
 const BorrowerOperationsScript = artifacts.require('BorrowerOperationsScript')
@@ -107,6 +111,9 @@ class DeploymentHelper {
     const sortedShieldedTroves = await SortedTroves.new()
     const troveManager = await TroveManager.new()
     const rewards = await Rewards.new()
+    const feeRouter = await FeeRouter.new()
+    const lpStaking = await LPStaking.new()
+    const globalFeeRouter = await GlobalFeeRouter.new()
     const liquidations = await Liquidations.new()
     const activePool = await ActivePool.new()
     const activeShieldedPool = await ActiveShieldedPool.new()
@@ -121,7 +128,8 @@ class DeploymentHelper {
       troveManager.address,
       liquidations.address,
       stabilityPool.address,
-      borrowerOperations.address
+      borrowerOperations.address,
+      globalFeeRouter.address
     )
 
     const relayer = await Relayer.new()
@@ -139,6 +147,9 @@ class DeploymentHelper {
     Aggregator.setAsDeployed(aggregator)
     TroveManager.setAsDeployed(troveManager)
     Rewards.setAsDeployed(rewards)
+    FeeRouter.setAsDeployed(feeRouter)
+    LPStaking.setAsDeployed(lpStaking)
+    GlobalFeeRouter.setAsDeployed(globalFeeRouter)
     Liquidations.setAsDeployed(liquidations)
     ActivePool.setAsDeployed(activePool)
     ActiveShieldedPool.setAsDeployed(activeShieldedPool)
@@ -162,6 +173,9 @@ class DeploymentHelper {
       aggregator,
       troveManager,
       rewards,
+      feeRouter,
+      lpStaking,
+      globalFeeRouter,
       liquidations,
       activePool,
       activeShieldedPool,
@@ -201,6 +215,9 @@ class DeploymentHelper {
     testerContracts.math = await LiquityMathTester.new()
     testerContracts.borrowerOperations = await BorrowerOperationsTester.new()
     testerContracts.troveManager = await TroveManagerTester.new()
+    testerContracts.feeRouter = await FeeRouter.new()
+    testerContracts.globalFeeRouter = await GlobalFeeRouter.new()
+    testerContracts.lpStaking = await LPStaking.new()
     testerContracts.liquidations = await LiquidationsTester.new()
     testerContracts.functionCaller = await FunctionCaller.new()
     testerContracts.hintHelpers = await HintHelpers.new()
@@ -208,7 +225,8 @@ class DeploymentHelper {
       testerContracts.troveManager.address,
       testerContracts.liquidations.address,
       testerContracts.stabilityPool.address,
-      testerContracts.borrowerOperations.address
+      testerContracts.borrowerOperations.address,
+      testerContracts.globalFeeRouter.address
     )
 
     testerContracts.relayer = await Relayer.new()
@@ -297,8 +315,10 @@ class DeploymentHelper {
     const hintHelpers = await HintHelpers.new()
     const lusdToken = await LUSDToken.new(
       troveManager.address,
+      contracts.liquidations.address,
       stabilityPool.address,
-      borrowerOperations.address
+      borrowerOperations.address,
+      feeRouter.address
     )
     const collateralToken = await CollateralToken.new("Hardhat Collateral Token", "HCT")
 
@@ -354,7 +374,8 @@ class DeploymentHelper {
       contracts.troveManager.address,
       contracts.liquidations.address,
       contracts.stabilityPool.address,
-      contracts.borrowerOperations.address
+      contracts.borrowerOperations.address,
+      contracts.globalFeeRouter.address
     )
     return contracts
   }
@@ -364,7 +385,8 @@ class DeploymentHelper {
       contracts.troveManager.address,
       contracts.liquidations.address,
       contracts.stabilityPool.address,
-      contracts.borrowerOperations.address
+      contracts.borrowerOperations.address,
+      contracts.globalFeeRouter.address
     )
     return contracts
   }
@@ -484,8 +506,11 @@ class DeploymentHelper {
       LQTYContracts.lqtyStaking.address,
       contracts.relayer.address,
       contracts.collateralToken.address,
-      contracts.rewards.address]
+      contracts.rewards.address,
+      contracts.feeRouter.address,
+      contracts.globalFeeRouter.address]
     )
+    // set contracts in Rewards
     await contracts.rewards.setAddresses(
       contracts.troveManager.address,
       contracts.liquidations.address,
@@ -493,6 +518,28 @@ class DeploymentHelper {
       contracts.activePool.address,
       contracts.activeShieldedPool.address,
       contracts.defaultPool.address,
+    )
+    // set contracts in FeeRouter
+    await contracts.feeRouter.setAddresses(
+      contracts.troveManager.address,
+      contracts.stabilityPool.address,
+      contracts.lusdToken.address,
+      contracts.globalFeeRouter.address,
+    )
+
+    // set contracts in the Aggregator
+    await contracts.aggregator.setAddresses(
+      contracts.troveManager.address,
+      contracts.lusdToken.address,
+    )
+
+    // set contracts in GlobalFeeRouter
+    await contracts.globalFeeRouter.setAddresses(
+      contracts.aggregator.address,
+      contracts.lpStaking.address,
+      LQTYContracts.lqtyStaking.address,
+      contracts.marketOracleTestnet.address,
+      contracts.lusdToken.address,
     )
 
     // set contracts in the Liquidations
@@ -513,11 +560,6 @@ class DeploymentHelper {
       contracts.relayer.address
     )
 
-    // set contracts in the Aggregator
-    await contracts.aggregator.setAddresses(
-      contracts.troveManager.address,
-      contracts.lusdToken.address,
-    )
 
     // set contracts in the Pools
     await contracts.stabilityPool.setAddresses(
@@ -531,7 +573,8 @@ class DeploymentHelper {
       contracts.sortedShieldedTroves.address,
       contracts.priceFeedTestnet.address,
       LQTYContracts.communityIssuance.address,
-      contracts.collateralToken.address
+      contracts.collateralToken.address,
+      contracts.feeRouter.address
     )
 
     await contracts.defaultPool.setAddresses(
@@ -593,6 +636,7 @@ class DeploymentHelper {
       coreContracts.troveManager.address, 
       coreContracts.borrowerOperations.address,
       coreContracts.activePool.address,
+      coreContracts.globalFeeRouter.address,
       coreContracts.collateralToken.address
     )
   

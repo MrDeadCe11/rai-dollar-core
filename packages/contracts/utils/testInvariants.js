@@ -24,11 +24,12 @@ class TestInvariant {
   static async SpBalanceEqualsErc20Balance(contracts) {
     //ERC20 balance  ==  totalLUSDDeposits · P / 1e18   ± 1 wei
     const totalDeposits = await contracts.stabilityPool.getTotalLUSDDeposits()
-    const balance = await contracts.lusdToken.balanceOf(contracts.stabilityPool.address)
+    const pendingDeposits = await contracts.stabilityPool.pendingLUSDDeposits()
+    const balance = (await contracts.lusdToken.balanceOf(contracts.stabilityPool.address)).add(pendingDeposits)
     if (totalDeposits > balance) {
-        return (totalDeposits - balance).eq(1)
+        return (totalDeposits.sub(balance)).eq(1)
     } else if (totalDeposits < balance) {
-        return (balance - totalDeposits).eq(1)
+        return (balance.sub(totalDeposits)).eq(1)
     }
     return true
   }

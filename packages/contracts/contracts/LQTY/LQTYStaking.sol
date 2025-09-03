@@ -39,6 +39,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     address public troveManagerAddress;
     address public borrowerOperationsAddress;
     address public activePoolAddress;
+    address public globalFeeRouterAddress;
 
     // --- Events ---
 
@@ -47,6 +48,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     event TroveManagerAddressSet(address _troveManager);
     event BorrowerOperationsAddressSet(address _borrowerOperationsAddress);
     event ActivePoolAddressSet(address _activePoolAddress);
+    event GlobalFeeRouterAddressSet(address _globalFeeRouterAddress);
 
     event StakeChanged(address indexed staker, uint newStake);
     event StakingGainsWithdrawn(address indexed staker, uint LUSDGain, uint ETHGain);
@@ -65,6 +67,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         address _troveManagerAddress, 
         address _borrowerOperationsAddress,
         address _activePoolAddress,
+        address _globalFeeRouterAddress,
         address _collateralTokenAddress
     ) 
         external 
@@ -76,6 +79,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         checkContract(_troveManagerAddress);
         checkContract(_borrowerOperationsAddress);
         checkContract(_activePoolAddress);
+        checkContract(_globalFeeRouterAddress);
         checkContract(_collateralTokenAddress);
 
         lqtyToken = ILQTYToken(_lqtyTokenAddress);
@@ -83,6 +87,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         troveManagerAddress = _troveManagerAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
         activePoolAddress = _activePoolAddress;
+        globalFeeRouterAddress = _globalFeeRouterAddress;
         collateralToken = IERC20(_collateralTokenAddress);
 
         emit LQTYTokenAddressSet(_lqtyTokenAddress);
@@ -90,6 +95,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         emit TroveManagerAddressSet(_troveManagerAddress);
         emit BorrowerOperationsAddressSet(_borrowerOperationsAddress);
         emit ActivePoolAddressSet(_activePoolAddress);
+        emit GlobalFeeRouterAddressSet(_globalFeeRouterAddress);
 
         _renounceOwnership();
     }
@@ -178,7 +184,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     }
 
     function increaseF_LUSD(uint _LUSDFee) external override {
-        _requireCallerIsBorrowerOperationsOrTroveManager();
+        _requireCallerIsBorrowerOperationsOrTroveManagerOrGFR();
         uint LUSDFeePerLQTYStaked;
         
         if (totalLQTYStaked > 0) {LUSDFeePerLQTYStaked = _LUSDFee.mul(DECIMAL_PRECISION).div(totalLQTYStaked);}
@@ -234,9 +240,10 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
         require(msg.sender == borrowerOperationsAddress, "LQTYStaking: caller is not BorrowerOps");
     }
 
-    function _requireCallerIsBorrowerOperationsOrTroveManager() internal view {
+    function _requireCallerIsBorrowerOperationsOrTroveManagerOrGFR() internal view {
         require(msg.sender == borrowerOperationsAddress ||
-                msg.sender == troveManagerAddress, "LQTYStaking: caller is not BorrowerOps or TroveManager");
+                msg.sender == globalFeeRouterAddress ||
+                msg.sender == troveManagerAddress, "LQTYStaking: caller is not BorrowerOps or TroveManager or GFR");
     }
 
      function _requireCallerIsActivePool() internal view {

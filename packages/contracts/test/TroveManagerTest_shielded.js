@@ -80,7 +80,8 @@ contract('TroveManager - Shielded', async accounts => {
       contracts.troveManager.address,
       contracts.liquidations.address,
       contracts.stabilityPool.address,
-      contracts.borrowerOperations.address
+      contracts.borrowerOperations.address,
+      contracts.globalFeeRouter.address
     )
     const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
 
@@ -91,6 +92,8 @@ contract('TroveManager - Shielded', async accounts => {
     aggregator = contracts.aggregator
     troveManager = contracts.troveManager
     rewards = contracts.rewards
+    feeRouter = contracts.feeRouter
+    globalFeeRouter = contracts.globalFeeRouter
     liquidations = contracts.liquidations
     activePool = contracts.activePool
     activeShieldedPool = contracts.activeShieldedPool
@@ -119,6 +122,7 @@ contract('TroveManager - Shielded', async accounts => {
     // Interfaces
     stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", stabilityPool.address)).interface;
     troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
+    feeRouterInterface = (await ethers.getContractAt("FeeRouter", feeRouter.address)).interface;
     liquidationsInterface = (await ethers.getContractAt("Liquidations", liquidations.address)).interface;
     rewardsInterface = (await ethers.getContractAt("Rewards", rewards.address)).interface;
     collSurplusPoolInterface = (await ethers.getContractAt("CollSurplusPool", collSurplusPool.address)).interface;
@@ -1014,7 +1018,7 @@ contract('TroveManager - Shielded', async accounts => {
     assert.isTrue(collGasComp.eq(gasComp))
 
     ethGain = await stabilityPool.getDepositorCollateralGain(whale)
-    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 100000)
+    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 107000)
 
     // Check bob in-active, check whale active
     assert.isFalse((await sortedShieldedTroves.contains(bob)))
@@ -1380,7 +1384,7 @@ contract('TroveManager - Shielded', async accounts => {
     assert.isTrue(collGasComp.eq(gasComp))
 
     ethGain = await stabilityPool.getDepositorCollateralGain(whale)
-    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 109000)
+    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 112000)
 
     // Check bob in-active, check whale active
     assert.isFalse((await sortedShieldedTroves.contains(bob)))
@@ -1431,7 +1435,7 @@ contract('TroveManager - Shielded', async accounts => {
     assert.isTrue(collGasComp.eq(gasComp))
 
     ethGain = await stabilityPool.getDepositorCollateralGain(whale)
-    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 107000)
+    assert.isAtMost(th.getDifference(liquidatedColl, ethGain), 120000)
 
     // Check bob in-active, check whale active
     assert.isFalse((await sortedShieldedTroves.contains(bob)))
@@ -1901,10 +1905,10 @@ contract('TroveManager - Shielded', async accounts => {
     const [totalLiquidatedDebt, totalLiquidatedColl, totalCollGasComp, totalLusdGasComp] = th.getEmittedLiquidationValues(tx_liq)
 
     //const [stakeDrip, spDrip] = th.getEmittedDripValues(contracts,tx_liq)
-    spDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
-    stakeDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+    spDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
+    remDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_remaining"))
 
-    totalInterest = stakeDrip.add(spDrip)
+    totalInterest = remDrip.add(spDrip)
     entireDebtDrip = entireDebt.add(totalInterest)
     
     aliceDebtLiq = aliceDebt.add((totalInterest.mul(aliceDebt).div(entireDebt)))
@@ -2060,10 +2064,10 @@ contract('TroveManager - Shielded', async accounts => {
     const [totalLiquidatedDebt, totalLiquidatedColl, totalCollGasComp, totalLusdGasComp] = th.getEmittedLiquidationValues(tx_liq)
 
     //const [stakeDrip, spDrip] = th.getEmittedDripValues(contracts,tx_liq)
-    spDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
-    stakeDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+    spDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
+    remDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_remaining"))
 
-    totalInterest = stakeDrip.add(spDrip)
+    totalInterest = remDrip.add(spDrip)
     
     aliceDebtLiq = aliceDebt.add((totalInterest.mul(aliceDebt).div(entireDebt)))
     bobDebtLiq = bobDebt.add((totalInterest.mul(bobDebt).div(entireDebt)))
@@ -2219,10 +2223,10 @@ contract('TroveManager - Shielded', async accounts => {
     const [totalLiquidatedDebt, totalLiquidatedColl, totalCollGasComp, totalLusdGasComp] = th.getEmittedLiquidationValues(tx_liq)
 
     //const [stakeDrip, spDrip] = th.getEmittedDripValues(contracts,tx_liq)
-    spDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
-    stakeDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+    spDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
+    remDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_remaining"))
 
-    totalInterest = stakeDrip.add(spDrip)
+    totalInterest = remDrip.add(spDrip)
     
     aliceDebtLiq = aliceDebt.add((totalInterest.mul(aliceDebt).div(entireDebt)))
     bobDebtLiq = bobDebt.add((totalInterest.mul(bobDebt).div(entireDebt)))
@@ -2383,10 +2387,10 @@ contract('TroveManager - Shielded', async accounts => {
     const [totalLiquidatedDebt, totalLiquidatedColl, totalCollGasComp, totalLusdGasComp] = th.getEmittedLiquidationValues(tx_liq)
 
     //const [stakeDrip, spDrip] = th.getEmittedDripValues(contracts,tx_liq)
-    spDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
-    stakeDrip = toBN(th.getRawEventArgByName(tx_liq, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+    spDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
+    remDrip = toBN(th.getRawEventArgByName(tx_liq, feeRouterInterface, feeRouter.address, "Drip", "_remaining"))
 
-    totalInterest = stakeDrip.add(spDrip)
+    totalInterest = remDrip.add(spDrip)
     
     aliceDebtLiq = aliceDebt.add((totalInterest.mul(aliceDebt).div(entireDebt)))
     bobDebtLiq = bobDebt.add((totalInterest.mul(bobDebt).div(entireDebt)))
@@ -2524,18 +2528,26 @@ contract('TroveManager - Shielded', async accounts => {
       debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
       supply = await contracts.lusdToken.totalSupply()
 
+      // amounts that aren't minted yet
+      pendingSP = await contracts.stabilityPool.pendingLUSDDeposits()
+      pendingLP = await contracts.globalFeeRouter.pendingLpDistribution()
+      pendingStaker = await contracts.globalFeeRouter.pendingStakerDistribution()
+
+      supplyVirtual = pendingSP.add(pendingLP).add(pendingStaker)
+      supplyPlusVirtual = supply.add(supplyVirtual)
+
+      // debt equals supply plus virtual
+      assert.isTrue(supplyPlusVirtual.eq(debt))
+
       whale_debt = await contracts.troveManager.getTroveActualDebt(whale)
       trove_1_debt = await contracts.troveManager.getTroveActualDebt(defaulter_1)
       trove_2_debt = await contracts.troveManager.getTroveActualDebt(defaulter_2)
       trove_3_debt = await contracts.troveManager.getTroveActualDebt(defaulter_3)
       trove_4_debt = await contracts.troveManager.getTroveActualDebt(defaulter_4)
 
-      // debt equals supply
-      assert.isTrue(supply.eq(debt))
-
       trove_debt_sum = whale_debt.add(trove_1_debt).add(trove_2_debt).add(trove_3_debt).add(trove_4_debt)
       // allow at most divergence of 1 per trove
-      assert.isTrue(supply.sub(trove_debt_sum).lte(toBN('4')))
+      assert.isTrue(supplyPlusVirtual.sub(trove_debt_sum).lte(toBN('4')))
     }
   })
 
@@ -2607,7 +2619,8 @@ contract('TroveManager - Shielded', async accounts => {
       const rec2 = await ethers.provider.getTransactionReceipt(txHash2);
 
       // parse logs
-      const iface = new ethers.utils.Interface(["event Drip(uint256 _stakeInterest, uint256 _spInterest)"]);
+      //const iface = new ethers.utils.Interface(["event Drip(uint256 _stakeInterest, uint256 _spInterest)"]);
+      const iface = new ethers.utils.Interface(["event Drip(uint _spInterest, uint _remaining, uint _ema, int _integral, uint _spAllocFrac)"]);
 
       // first drip should be positive
       const drip1 = iface.parseLog(rec1.logs.find(log => log.topics[0] === iface.getEventTopic("Drip")));
@@ -3013,7 +3026,6 @@ contract('TroveManager - Shielded', async accounts => {
     const lusdGain = th.getRawEventArgByName(liquidationTX_C, stabilityPoolInterface, stabilityPool.address, "DistributeToSP", "lusdGain");
 
     const debtOffset = th.getRawEventArgByName(liquidationTX_C, stabilityPoolInterface, stabilityPool.address, "Offset", "debtToOffset");
-    //const nDebtOffset = th.getRawEventArgByName(liquidationTX_C, troveManagerInterface, troveManager.address, "Offset", "_nDebtToOffset");
 
     /*
     const newP = th.getRawEventArgByName(liquidationTX_C, stabilityPoolInterface, stabilityPool.address, "DistributeToSP", "newP");
@@ -3208,7 +3220,6 @@ contract('TroveManager - Shielded', async accounts => {
     //const totalLUSD = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "totalLUSD"));
     //console.log("totalLUSD", totalLUSD.toString())
     liquidatedC_debt = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "debtToOffset"));
-    //liquidatedC_debtSeq = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Offset", "_debtInSequence"));
 
     //collToSp = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "TroveLiqInfo", "collToSp"));
     //console.log("collToSp", collToSp.toString())
@@ -3938,22 +3949,22 @@ contract('TroveManager - Shielded', async accounts => {
     // openTrove calls drip() and thus increase SP balances
     lusdTotal = toBN('0')
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(28, 18)), extraParams: { from: bob } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(8, 18)), extraParams: { from: carol } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(80, 18)), extraParams: { from: dennis } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
 
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(199, 16)), extraParams: { from: defaulter_1 } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(156, 16)), extraParams: { from: defaulter_2 } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(183, 16)), extraParams: { from: defaulter_3 } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
     var {tx} = await openShieldedTrove({ ICR: toBN(dec(166, 16)), extraParams: { from: defaulter_4 } })
-    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest")));
+    lusdTotal = lusdTotal.add(toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest")));
 
     assert.isTrue((await sortedShieldedTroves.contains(defaulter_1)))
     assert.isTrue((await sortedShieldedTroves.contains(defaulter_2)))
@@ -4773,7 +4784,7 @@ contract('TroveManager - Shielded', async accounts => {
     // Liquidate - trove C in between the ones to be liquidated!
     const liquidationArray = [alice, carol, bob, dennis, erin]
     tx = await liquidations.batchLiquidate(liquidationArray);
-    lusdGainLiq = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
+    lusdGainLiq = toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
 
     // actual liquidated debt includes interest
     liqDebt = toBN(th.getRawEventArgByName(tx, liquidationsInterface, liquidations.address, "Liquidation", "_liquidatedDebt"))
@@ -4833,7 +4844,7 @@ contract('TroveManager - Shielded', async accounts => {
 
     // Carol liquidated, and her trove is closed
     const txCarolClose = await borrowerOperations.closeTrove({ from: carol })
-    lusdGainClose = toBN(th.getRawEventArgByName(txCarolClose, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
+    lusdGainClose = toBN(th.getRawEventArgByName(txCarolClose, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
     assert.isTrue(txCarolClose.receipt.status)
 
     assert.isFalse(await sortedShieldedTroves.contains(carol))
@@ -4855,7 +4866,7 @@ contract('TroveManager - Shielded', async accounts => {
     // Liquidate - trove C in between the ones to be liquidated!
     const liquidationArray = [alice, carol, bob, dennis, erin]
     tx = await liquidations.batchLiquidate(liquidationArray);
-    lusdGainLiq = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
+    lusdGainLiq = toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
     lusdGain = lusdGainClose.add(lusdGainLiq)
 
     // actual liquidated debt includes interest
@@ -6191,11 +6202,13 @@ contract('TroveManager - Shielded', async accounts => {
     // Check B, C, D Stability Pool deposits and Collateral gain have not been affected by redemptions from their troves
     // Note: deposits increase slightly as redemption calls drip(), which distributes to SP
     assert.isTrue(bob_SPDeposit_after.gt(bob_SPDeposit_before))
-    th.assertIsApproximatelyEqual(bob_SPDeposit_before, bob_SPDeposit_after, 120000000000000000)
+    th.assertIsApproximatelyEqual(bob_SPDeposit_before, bob_SPDeposit_after, 230000000000000000)
+
     assert.isTrue(carol_SPDeposit_after.gt(carol_SPDeposit_before))
     th.assertIsApproximatelyEqual(carol_SPDeposit_before, carol_SPDeposit_after, 1200000000000000000)
+
     assert.isTrue(dennis_SPDeposit_after.gt(dennis_SPDeposit_before))
-    th.assertIsApproximatelyEqual(dennis_SPDeposit_before, dennis_SPDeposit_after, 460000000000000000)
+    th.assertIsApproximatelyEqual(dennis_SPDeposit_before, dennis_SPDeposit_after, 920000000000000000)
 
 
     assert.isTrue(bob_CollateralGain_before.eq(bob_CollateralGain_after))

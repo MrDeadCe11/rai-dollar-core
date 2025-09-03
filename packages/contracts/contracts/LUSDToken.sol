@@ -59,19 +59,22 @@ contract LUSDToken is CheckContract, ILUSDToken {
     address public immutable liquidationsAddress;
     address public immutable stabilityPoolAddress;
     address public immutable borrowerOperationsAddress;
+    address public immutable globalFeeRouterAddress;
     
     // --- Events ---
     event TroveManagerAddressChanged(address _troveManagerAddress);
     event LiquidationsAddressChanged(address _liquidationsAddress);
     event StabilityPoolAddressChanged(address _newStabilityPoolAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
+    event GlobalFeeRouterAddressChanged(address _newGlobalFeeRouterAddress);
 
     constructor
     ( 
         address _troveManagerAddress,
         address _liquidationsAddress,
         address _stabilityPoolAddress,
-        address _borrowerOperationsAddress
+        address _borrowerOperationsAddress,
+        address _globalFeeRouterAddress
     ) 
         public 
     {  
@@ -79,6 +82,7 @@ contract LUSDToken is CheckContract, ILUSDToken {
         checkContract(_liquidationsAddress);
         checkContract(_stabilityPoolAddress);
         checkContract(_borrowerOperationsAddress);
+        checkContract(_globalFeeRouterAddress);
 
         troveManagerAddress = _troveManagerAddress;
         emit TroveManagerAddressChanged(_troveManagerAddress);
@@ -91,6 +95,9 @@ contract LUSDToken is CheckContract, ILUSDToken {
 
         borrowerOperationsAddress = _borrowerOperationsAddress;        
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
+
+        globalFeeRouterAddress = _globalFeeRouterAddress;        
+        emit GlobalFeeRouterAddressChanged(_globalFeeRouterAddress);
         
         bytes32 hashedName = keccak256(bytes(_NAME));
         bytes32 hashedVersion = keccak256(bytes(_VERSION));
@@ -104,7 +111,7 @@ contract LUSDToken is CheckContract, ILUSDToken {
     // --- Functions for intra-Liquity calls ---
 
     function mint(address _account, uint256 _amount) external override {
-        _requireCallerIsBOorTroveM();
+        _requireCallerIsBOorSPorGFR();
         _mint(_account, _amount);
     }
 
@@ -291,11 +298,12 @@ contract LUSDToken is CheckContract, ILUSDToken {
             "LUSD: Caller is neither TroveManager nor StabilityPool");
     }
 
-    function _requireCallerIsBOorTroveM() internal view {
+    function _requireCallerIsBOorSPorGFR() internal view {
         require(
             msg.sender == borrowerOperationsAddress ||
-            msg.sender == troveManagerAddress,
-            "LUSD: Caller is neither BorrowerOperations nor TroveManager"
+            msg.sender == stabilityPoolAddress ||
+            msg.sender == globalFeeRouterAddress,
+            "LUSD: Caller is neither BorrowerOperations nor SP nor GFR"
         );
     }
 

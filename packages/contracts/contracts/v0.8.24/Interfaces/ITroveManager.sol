@@ -7,6 +7,7 @@ import "./IStabilityPool.sol";
 import "./ILUSDToken.sol";
 import "./ILQTYToken.sol";
 import "./ILQTYStaking.sol";
+import "./IFeeRouter.sol";
 
 
 // Common interface for the Trove Manager.
@@ -58,6 +59,7 @@ interface ITroveManager is ILiquityBase {
     function lusdToken() external view returns (ILUSDToken);
     function lqtyToken() external view returns (ILQTYToken);
     function lqtyStaking() external view returns (ILQTYStaking);
+    function feeRouter() external view returns (IFeeRouter);
 
     function getTroveOwnersCount() external view returns (uint);
 
@@ -103,6 +105,8 @@ interface ITroveManager is ILiquityBase {
         uint pendingLUSDDebtReward, 
         uint pendingETHReward
     );
+
+    function getEntireSystemDebt() external view returns (uint);
 
     function drip() external;
 

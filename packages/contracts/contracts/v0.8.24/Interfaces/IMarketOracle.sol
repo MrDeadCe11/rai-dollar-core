@@ -9,5 +9,8 @@ interface IMarketOracle {
     // --- Function ---
     function price() external view returns (uint256);
 
+    function rdLiquidity() external view returns (uint256);
+
     function setPrice(int256 newPrice) external returns (int256);
+
 }

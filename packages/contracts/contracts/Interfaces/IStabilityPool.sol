@@ -51,6 +51,7 @@ interface IStabilityPool {
     event SortedShieldedTrovesAddressChanged(address _newSortedShieldedTrovesAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event CommunityIssuanceAddressChanged(address _newCommunityIssuanceAddress);
+    event FeeRouterAddressChanged(address _newFeeRouterAddress);
 
     event P_Updated(uint _P);
     event S_Updated(uint _S, uint _scale);
@@ -88,10 +89,12 @@ interface IStabilityPool {
         address _sortedShieldedTrovesAddress,
         address _priceFeedAddress,
         address _communityIssuanceAddress,
-        address _collateralToken
+        address _collateralToken,
+        address _feeRouter
     ) external;
 
-    function distributeToSP(uint _amount) external;
+    function pendingLUSDDeposits() external returns (uint);
+    function distributeFees(uint _amount) external;
     /*
      * Initial checks:
      * - Frontend is registered or zero address

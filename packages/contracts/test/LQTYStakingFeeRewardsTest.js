@@ -39,6 +39,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
   let lusdToken
   let sortedTroves
   let troveManager
+  let feeRouter
+  let globalFeeRouter
   let activePool
   let stabilityPool
   let defaultPool
@@ -69,6 +71,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     sortedTroves = contracts.sortedTroves
     aggregator = contracts.aggregator
     troveManager = contracts.troveManager
+    feeRouter = contracts.feeRouter
+    globalFeeRouter = contracts.globalFeeRouter
     activePool = contracts.activePool
     stabilityPool = contracts.stabilityPool
     defaultPool = contracts.defaultPool
@@ -80,6 +84,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     lqtyStaking = LQTYContracts.lqtyStaking
 
     await th.mintCollateralTokensAndApproveActivePool(contracts, [owner, A, B, C, D, E, F, G, whale], web3.utils.toWei('15000', 'ether'))
+    globalFeeRouterInterface = (await ethers.getContractAt("GlobalFeeRouter", globalFeeRouter.address)).interface;
+
   })
 
   it('stake(): reverts if amount is zero', async () => {
@@ -260,25 +266,19 @@ contract('LQTYStaking revenue share tests', async accounts => {
     */
   })
 
-  // skipped because it's not relevant since collateral fee now stays in trove
-  it.skip("LQTY Staking: A single staker earns all ETH and LQTY fees that occur", async () => {
+  it("LQTY Staking: A single staker earns all LQTY fees that go to staking", async () => {
     await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(10, 18)), extraParams: { from: whale } })
     await openTrove({ extraLUSDAmount: toBN(dec(20000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: A } })
     await openTrove({ extraLUSDAmount: toBN(dec(30000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: B } })
     await openTrove({ extraLUSDAmount: toBN(dec(40000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: C } })
     await openTrove({ extraLUSDAmount: toBN(dec(50000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: D } })
 
+    await stabilityPool.provideToSP(dec(1,18), ZERO_ADDRESS, {from : D})
     whaleNICR = await contracts.troveManager.getNominalICR(whale)
     ANICR = await contracts.troveManager.getNominalICR(A)
     BNICR = await contracts.troveManager.getNominalICR(B)
     CNICR = await contracts.troveManager.getNominalICR(C)
     DNICR = await contracts.troveManager.getNominalICR(D)
-    console.log("whaleNICR", whaleNICR.toString())
-    console.log("A", ANICR.toString())
-    console.log("B", BNICR.toString())
-    console.log("C", CNICR.toString())
-    console.log("D", DNICR.toString())
-
 
     trove1 = await contracts.sortedTroves.getFirst()
     trove2 = await contracts.sortedTroves.getNext(trove1)
@@ -286,13 +286,6 @@ contract('LQTYStaking revenue share tests', async accounts => {
     trove4 = await contracts.sortedTroves.getNext(trove3)
     trove5 = await contracts.sortedTroves.getNext(trove4)
     trove6 = await contracts.sortedTroves.getNext(trove5)
-
-    console.log("trove1", trove1.toString())
-    console.log("trove2", trove2.toString())
-    console.log("trove3", trove3.toString())
-    console.log("trove4", trove4.toString())
-    console.log("trove5", trove5.toString())
-    console.log("trove6", trove6.toString())
 
     // Give E a least 200
     await openTrove({ extraLUSDAmount: toBN(200), ICR: toBN(dec(2, 18)), extraParams: { from: E } })
@@ -312,24 +305,11 @@ contract('LQTYStaking revenue share tests', async accounts => {
     trove5 = await contracts.sortedTroves.getNext(trove4)
     trove6 = await contracts.sortedTroves.getNext(trove5)
 
-    console.log("after time travel and drip")
-    console.log("trove1", trove1.toString())
-    console.log("trove2", trove2.toString())
-    console.log("trove3", trove3.toString())
-    console.log("trove4", trove4.toString())
-    console.log("trove5", trove5.toString())
-    console.log("trove6", trove6.toString())
-
     whaleNICR = await contracts.troveManager.getNominalICR(whale)
     ANICR = await contracts.troveManager.getNominalICR(A)
     BNICR = await contracts.troveManager.getNominalICR(B)
     CNICR = await contracts.troveManager.getNominalICR(C)
     DNICR = await contracts.troveManager.getNominalICR(D)
-    console.log("whaleNICR", whaleNICR.toString())
-    console.log("A", ANICR.toString())
-    console.log("B", BNICR.toString())
-    console.log("C", CNICR.toString())
-    console.log("D", DNICR.toString())
 
     // multisig transfers LQTY to staker A
     await lqtyToken.transfer(A, dec(100, 18), {from: multisig})
@@ -339,11 +319,17 @@ contract('LQTYStaking revenue share tests', async accounts => {
     await lqtyStaking.stake(dec(100, 18), {from: A})
 
     const B_BalBeforeREdemption = await lusdToken.balanceOf(B)
+
+    freq  = await globalFeeRouter.distributionFreq()
+
+    // fast forward so GlobalDrip distributes fee
+    await th.fastForwardTime(freq,  web3.currentProvider)
+
     // B redeems
-      //
     const redemptionTx_1 = await th.redeemCollateralAndGetTxObject(B, contracts, dec(100, 18), gasPrice = GAS_PRICE)
-    troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
-    lusdGain1 = toBN(th.getRawEventArgByName(redemptionTx_1, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+
+    lusdGain1 = th.getRawEventArgByName(redemptionTx_1, globalFeeRouterInterface, globalFeeRouter.address, "GlobalDrip", "_toStaking")
+    console.log("lusdGain1 " + toBN(lusdGain1))
 
     const B_BalAfterRedemption = await lusdToken.balanceOf(B)
     assert.isTrue(B_BalAfterRedemption.lt(B_BalBeforeREdemption))
@@ -353,9 +339,12 @@ contract('LQTYStaking revenue share tests', async accounts => {
     assert.isTrue(emittedCollateralFee_1.gt(toBN('0')))
 
     const C_BalBeforeREdemption = await lusdToken.balanceOf(C)
+
+    // fast forward so GlobalDrip distributes fee
+    await th.fastForwardTime(freq,  web3.currentProvider)
     // C redeems
     const redemptionTx_2 = await th.redeemCollateralAndGetTxObject(C, contracts, dec(100, 18), gasPrice = GAS_PRICE)
-    lusdGain2 = toBN(th.getRawEventArgByName(redemptionTx_2, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest"))
+    lusdGain2 = th.getRawEventArgByName(redemptionTx_2, globalFeeRouterInterface, globalFeeRouter.address, "GlobalDrip", "_toStaking")
     
     const C_BalAfterRedemption = await lusdToken.balanceOf(C)
     assert.isTrue(C_BalAfterRedemption.lt(C_BalBeforeREdemption))
@@ -378,7 +367,8 @@ contract('LQTYStaking revenue share tests', async accounts => {
     //const emittedLUSDFee_2 = toBN(th.getLUSDFeeFromLUSDBorrowingEvent(borrowingTx_2))
     //assert.isTrue(emittedLUSDFee_2.gt(toBN('0')))
 
-    const expectedTotalETHGain = emittedCollateralFee_1.add(emittedCollateralFee_2)
+    //const expectedTotalETHGain = emittedCollateralFee_1.add(emittedCollateralFee_2)
+    const expectedTotalETHGain = toBN(0)
     //const expectedTotalLUSDGain = emittedLUSDFee_1.add(emittedLUSDFee_2)
 
     const A_ETHBalance_Before = toBN(await collateralToken.balanceOf(A))
@@ -395,6 +385,7 @@ contract('LQTYStaking revenue share tests', async accounts => {
     console.log("A_LUSDGain", A_LUSDGain.toString())
 
     expectedTotalLUSDGain = lusdGain1.add(lusdGain2)
+    console.log("expectedTotalLUSDGain " + expectedTotalLUSDGain)
     assert.isAtMost(th.getDifference(expectedTotalETHGain, A_ETHGain), 1000)
     assert.isAtMost(th.getDifference(expectedTotalLUSDGain, A_LUSDGain), 1000)
   })

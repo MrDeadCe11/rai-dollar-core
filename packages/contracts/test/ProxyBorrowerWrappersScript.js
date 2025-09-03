@@ -102,7 +102,7 @@ contract('BorrowerWrappers', async accounts => {
     lqtyToken = LQTYContracts.lqtyToken
     communityIssuance = LQTYContracts.communityIssuance
       
-    troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
+    feeRouterInterface = (await ethers.getContractAt("FeeRouter", feeRouter.address)).interface;
     stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", stabilityPool.address)).interface;
 
     LUSD_GAS_COMPENSATION = await borrowerOperations.LUSD_GAS_COMPENSATION()
@@ -290,7 +290,7 @@ contract('BorrowerWrappers', async accounts => {
 
     // Defaulter Trove opened
     const { lusdAmount, netDebt, collateral, tx } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
-    const stakeLUSDGain = th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest");
+    const remLUSDGain = th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_remaining");
     const spLUSDGain = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest"));
 
     // get alice's portion of dripped interest
@@ -645,15 +645,13 @@ contract('BorrowerWrappers', async accounts => {
     // Defaulter Trove opened
     const { lusdAmount, netDebt, collateral, tx } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
     const borrowingFee = netDebt.sub(lusdAmount)
-    const stakeLUSDGain = th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_stakeInterest");
+    const remainLUSDGain = th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_remaining");
     const spLUSDGain = th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest");
-    console.log("stakeLUSDGain", stakeLUSDGain.toString())
-    console.log("spLUSDGain", spLUSDGain.toString())
 
     // Alice LUSD gain is ((150/2000) * borrowingFee)
     //const expectedLUSDGain_A = borrowingFee.mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18)))
     // Alice LUSD gain is now her proportion of stakeInterest plus entire SP gain(she's the only SP depositor)
-    const expectedStakeLUSDGain_A = toBN(stakeLUSDGain).mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18)))
+    const expectedStakeLUSDGain_A = toBN(remLUSDGain).mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18)))
     const expectedLUSDGain_A = toBN(spLUSDGain).add(expectedStakeLUSDGain_A)
     console.log("expectedLUSDGain_A", expectedLUSDGain_A.toString())
 

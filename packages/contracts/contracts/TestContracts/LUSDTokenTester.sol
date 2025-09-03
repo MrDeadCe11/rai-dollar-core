@@ -14,11 +14,13 @@ contract LUSDTokenTester is LUSDToken {
         address _troveManagerAddress,
         address _liquidationsAddress,
         address _stabilityPoolAddress,
-        address _borrowerOperationsAddress
+        address _borrowerOperationsAddress,
+        address _feeRouterAddress
     ) public LUSDToken(_troveManagerAddress,
                       _liquidationsAddress,
                       _stabilityPoolAddress,
-                      _borrowerOperationsAddress) {}
+                      _borrowerOperationsAddress,
+                      _feeRouterAddress) {}
     
     function unprotectedMint(address _account, uint256 _amount) external {
         // No check on caller here

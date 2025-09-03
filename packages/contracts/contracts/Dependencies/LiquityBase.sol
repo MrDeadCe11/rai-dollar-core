@@ -67,9 +67,9 @@ contract LiquityBase is BaseMath, ILiquityBase {
         return activePool.getCollateral().add(activeShieldedPool.getCollateral()).add(defaultPool.getCollateral());
     }
 
-    function getEntireSystemDebt(uint accumulatedRate, uint accumulatedShieldRate) public view override returns (uint) {
-        uint baseDebt = activePool.getLUSDDebt().mul(accumulatedRate).div(RATE_PRECISION);
-        uint shieldedDebt = activeShieldedPool.getLUSDDebt().mul(accumulatedShieldRate).div(RATE_PRECISION);
+    function getEntireSystemDebt(uint _accumulatedRate, uint _accumulatedShieldRate) public view override returns (uint) {
+        uint baseDebt = activePool.getLUSDDebt().mul(_accumulatedRate).div(RATE_PRECISION);
+        uint shieldedDebt = activeShieldedPool.getLUSDDebt().mul(_accumulatedShieldRate).div(RATE_PRECISION);
         return baseDebt + shieldedDebt + defaultPool.getLUSDDebt();
     }
 

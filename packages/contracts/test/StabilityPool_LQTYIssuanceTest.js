@@ -34,6 +34,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
   let activePool
   let sortedTroves
   let troveManager
+  let feeRouter
   let borrowerOperations
   let lqtyToken
   let communityIssuanceTester
@@ -63,7 +64,8 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         contracts.troveManager.address,
         contracts.liquidations.address,
         contracts.stabilityPool.address,
-        contracts.borrowerOperations.address
+        contracts.borrowerOperations.address,
+        contracts.globalFeeRouter.address
       )
       const LQTYContracts = await deploymentHelper.deployLQTYTesterContractsHardhat(bountyAddress, lpRewardsAddress, multisig)
 
@@ -74,6 +76,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       sortedTroves = contracts.sortedTroves
       liquidations = contracts.liquidations
       troveManager = contracts.troveManager
+      feeRouter = contracts.feeRouter
       stabilityPool = contracts.stabilityPool
       borrowerOperations = contracts.borrowerOperations
       collateralToken = contracts.collateralToken
@@ -85,6 +88,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
         defaulter_1, defaulter_2, defaulter_3, defaulter_4, defaulter_5, defaulter_6,
         frontEnd_1, frontEnd_2, frontEnd_3
       ], dec(100, 24))
+
       lqtyToken = LQTYContracts.lqtyToken
       communityIssuanceTester = LQTYContracts.communityIssuance
 
@@ -97,7 +101,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
       await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
 
-      troveManagerInterface = (await ethers.getContractAt("TroveManager", troveManager.address)).interface;
+      feeRouterInterface = (await ethers.getContractAt("FeeRouter", feeRouter.address)).interface;
 
       // Check community issuance starts with 32 million LQTY
       communityLQTYSupply = toBN(await lqtyToken.balanceOf(communityIssuanceTester.address))
@@ -448,7 +452,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       assert.isFalse(await sortedTroves.contains(defaulter_1))
 
       //const [,drip] = await th.getEmittedDripValues(contracts,tx)
-      drip = toBN(th.getRawEventArgByName(tx, troveManagerInterface, troveManager.address, "Drip", "_spInterest"))
+      drip = toBN(th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
       //const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
       var offsetDebt = toBN(await th.getRawEventArgByName(tx, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
@@ -850,7 +854,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
     expect A, B, C, D each withdraw ~1 month's worth of LQTY */
     it("withdrawFromSP(): Several deposits of 100k LUSD span one scale factor change. Depositors withdraw correct LQTY gains", async () => {
 
-      // reduce the per-second rate to P can be reduced enough during liquidates(which also drip)
+      // reduce the per-second rate so P can be reduced enough during liquidates(which also drip)
       // to increase P scale
       await rateControl.setCoBias(20000000000)
       // Whale opens Trove with 100 ETH
@@ -1029,6 +1033,7 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       /* All depositors withdraw fully from SP.  Withdraw in reverse order, so that the largest remaining
       deposit (F) withdraws first, and does not get extra LQTY gains from the periods between withdrawals */
       for (depositor of [F, E, D, C, B, A]) {
+      //for (depositor of [A, B, C, D, E, F]) {
         await stabilityPool.withdrawFromSP(dec(100000, 18), { from: depositor })
       }
 
@@ -1051,13 +1056,18 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       const expectedGainC = issuance_M3.add(issuance_M4.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
       const expectedGainD = issuance_M4.add(issuance_M5.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
       const expectedGainE = issuance_M5.add(issuance_M6.div(toBN('100000'))).mul(toBN('99999')).div(toBN('100000'))
-      const expectedGainF = issuance_M6.mul(toBN('99999')).div(toBN('100000'))
+
+      // The above issuance calcs don't consider how drip changes totalDeposits, but they fall within the below tolerances anyways
+      // To calculate F's expected gain, Use liqdeposits, the last totalDeposits before L6
+      //const expectedGainF = issuance_M6.mul(toBN('99999')).div(toBN('100000'))
+      FDeposit = toBN('99999').mul(toBN(dec(1,18)))
+      FProp = FDeposit.mul(toBN(dec(1,18))).div(liqDeposits)
+      const expectedGainF = issuance_M6.mul(FProp).div(toBN(dec(1,18)))
 
       assert.isAtMost(getDifference(expectedGainA, LQTYGain_A), 1e15)
       assert.isAtMost(getDifference(expectedGainB, LQTYGain_B), 1e15)
       assert.isAtMost(getDifference(expectedGainC, LQTYGain_C), 1e15)
       assert.isAtMost(getDifference(expectedGainD, LQTYGain_D), 1e15)
-
       assert.isAtMost(getDifference(expectedGainE, LQTYGain_E), 1e15)
       assert.isAtMost(getDifference(expectedGainF, LQTYGain_F), 1e15)
     })
@@ -1644,24 +1654,18 @@ contract('StabilityPool - LQTY Rewards', async accounts => {
       await stabilityPool.provideToSP(dec(5000, 18), frontEnd_1, { from: A })
 
       total = await stabilityPool.getTotalLUSDDeposits()
-     // console.log("total", total.toString())
 
       tx = await borrowerOperations.openTrove(dec(200, 'ether'), dec(5000, 18), B, B, false, { from: B })
 
       total = await stabilityPool.getTotalLUSDDeposits()
-     // console.log("total", total.toString())
 
       P0 = await stabilityPool.P()
-     // console.log("P0", P0.toString())
 
       await stabilityPool.provideToSP(dec(5000, 18), frontEnd_1, { from: B })
       P0 = await stabilityPool.P()
-     // console.log("P0", P0.toString())
 
-      //console.log(tx.logs)
-      //const troveManagerInterface = (await ethers.getContractAt("TroveManager", contracts.troveManager.address)).interface;
-      var drip = toBN(await th.getRawEventArgByName(tx, troveManagerInterface, contracts.troveManager.address, "Drip", "_spInterest"))
-     // console.log("drip", drip.toString())
+      //var drip = toBN(await th.getRawEventArgByName(tx, feeRouterInterface, feeRouter.address, "Drip", "_spInterest"))
+      // console.log("drip", drip.toString())
       const totalIssuanceAfterB = await communityIssuanceTester.totalLQTYIssued()
       // 1 month passes (M1)
       await th.fastForwardTime(await getDuration(timeValues.SECONDS_IN_ONE_MONTH), web3.currentProvider)

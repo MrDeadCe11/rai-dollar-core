@@ -54,7 +54,7 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     // per troveManager debt target,  % of total debt
     mapping (address => uint256) public debtTarget;
 
-    address[23] troveManagers;
+    address[1] public troveManagers;
 
     // --- Events ---
     event BaseRateUpdated(uint _baseRate);
@@ -76,6 +76,8 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         //troveManagerAddress = _troveManagerAddress;
         troveManager = ITroveManager(_troveManagerAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
+
+        troveManagers[0] = address(troveManager);
 
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit LUSDTokenAddressChanged(_lusdTokenAddress);
@@ -182,11 +184,23 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return (_measured.sub(_target)).mul(DECIMAL_PRECISION).div(_target);
     }
 
+    function troveManagerLength() external view returns (uint) {
+        return troveManagers.length;
+    }
+
     // --- 'require' wrapper functions ---
 
     function _requireCallerIsTroveManager() internal view {
         //require(msg.sender == troveManagerAddress, "Aggregator: Caller is not TroveManager contract");
         require(msg.sender == address(troveManager), "Aggregator: Caller is not TroveManager contract");
+    }
+
+    function getEntireSystemDebt() external view returns (uint totalDebt) {
+        uint len = troveManagers.length;
+        for (uint i = 0; i < len; i++) {
+            totalDebt += ITroveManager(troveManagers[i]).getEntireSystemDebt();
+        }
+
     }
 
 }

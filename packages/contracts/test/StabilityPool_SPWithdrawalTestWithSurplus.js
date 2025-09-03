@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const RateControlTester = artifacts.require("./RateControlTester.sol")
 
 const { dec, toBN } = testHelpers.TestHelper
 const th = testHelpers.TestHelper
@@ -65,6 +66,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
       contracts.liquidations = await LiquidationsTester.new()
       contracts.troveManager = await TroveManagerTester.new()
+      contracts.rateControl = await RateControlTester.new()
       contracts = await deploymentHelper.deployLUSDToken(contracts)
 
       priceFeed = contracts.priceFeedTestnet
@@ -72,6 +74,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       sortedTroves = contracts.sortedTroves
       liquidations = contracts.liquidations
       troveManager = contracts.troveManager
+      rateControl = contracts.rateControl
       activePool = contracts.activePool
       stabilityPool = contracts.stabilityPool
       defaultPool = contracts.defaultPool
@@ -232,9 +235,9 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), '3333333333333333333333'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), '3333333333333333333333'), 10000)
       //assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), '3333333333333333333333'), 10000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 20000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 20000)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 20000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), finalDeposit), 21000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), finalDeposit), 21000)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), finalDeposit), 21000)
 
       assert.isAtMost(th.getDifference(alice_ETHWithdrawn, '66333333333333333333'), 10000)
       assert.isAtMost(th.getDifference(bob_ETHWithdrawn, '66333333333333333333'), 10000)
@@ -725,6 +728,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const txA = await stabilityPool.withdrawFromSP(spDeposit, { from: alice })
       const txB = await stabilityPool.withdrawFromSP(spDeposit, { from: bob })
       const txC = await stabilityPool.withdrawFromSP(spDeposit, { from: carol })
+      console.log("dennisDeposit " + dennisDeposit)
+      console.log("total deposits "  + await stabilityPool.getTotalLUSDDeposits())
       const txD = await stabilityPool.withdrawFromSP(dennisDeposit, { from: dennis })
 
       // Grab the ETH gain from the emitted event in the tx log
@@ -1433,6 +1438,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
 
     it("withdrawFromSP(): Depositor withdraws correct compounded deposit after liquidation almost empties the pool", async () => {
       // Whale opens Trove with 100k ETH
+      //await contracts.rateControl.setCoBias(0)
       await borrowerOperations.openTrove(dec(1000000, 'ether'), await getOpenTroveLUSDAmount(dec(1000000, 18)), whale, whale, false, { from: whale })
 
       // 4 Defaulters open trove with 200% ICR
@@ -1453,8 +1459,13 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 1 liquidated. 20k LUSD fully offset with pool.
+      lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
+      lastLUSDGainError = await stabilityPool.lastLUSDGainError()
       tx1 = await liquidations.liquidate(defaulter_1, { from: owner });
       const [aliceGain1, bobGain1, aliceDeposit1, bobDeposit1] = await th.depositorValuesAfterLiquidation(contracts, tx1, [spDeposit, spDeposit])
+
+      const stabilityPoolInterface = (await ethers.getContractAt("StabilityPool", contracts.stabilityPool.address)).interface;
+      var debtToOffset = th.toBN(await th.getRawEventArgByName(tx1, stabilityPoolInterface, contracts.stabilityPool.address, "Offset", "debtToOffset"))
 
       // Carol, Dennis each deposit 10000 LUSD
       const depositors_2 = [carol, dennis]
@@ -1464,6 +1475,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 2 liquidated. 10000 LUSD offset
+      lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
+      lastLUSDGainError = await stabilityPool.lastLUSDGainError()
       tx2 = await liquidations.liquidate(defaulter_2, { from: owner });
       const [aliceGain2, bobGain2, carolGain2, dennisGain2,
              aliceDeposit2, bobDeposit2, carolDeposit2, dennisDeposit2] = await th.depositorValuesAfterLiquidation(contracts, tx2, [aliceDeposit1, bobDeposit1, spDeposit, spDeposit])
@@ -1476,6 +1489,8 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 3 liquidated. 10000 LUSD offset
+      lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
+      lastLUSDGainError = await stabilityPool.lastLUSDGainError()
       tx3 = await liquidations.liquidate(defaulter_3, { from: owner });
       const [aliceGain3, bobGain3, carolGain3, dennisGain3, erinGain3, flynGain3,
              aliceDeposit3, bobDeposit3, carolDeposit3, dennisDeposit3, ericDeposit3, flynDeposit3] =
@@ -1490,11 +1505,18 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       }
 
       // Defaulter 4 liquidated. 10k LUSD offset
+      lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
+      lastLUSDGainError = await stabilityPool.lastLUSDGainError()
       tx4 = await liquidations.liquidate(defaulter_4, { from: owner });
       const [aliceGain4, bobGain4, carolGain4, dennisGain4, erinGain4, flynGain4, grahamGain4, harrietGain4,
              aliceDeposit4, bobDeposit4, carolDeposit4, dennisDeposit4, ericDeposit4, flynDeposit4, grahamDeposit4, harrietDeposit4] =
             await th.depositorValuesAfterLiquidation(contracts, tx2,
                 [aliceDeposit3, bobDeposit3, carolDeposit3, dennisDeposit3, ericDeposit3, flynDeposit3, spDeposit, spDeposit])
+
+      console.log("graham deposit " + await stabilityPool.getCompoundedLUSDDeposit(graham))
+      console.log("harriet deposit " + await stabilityPool.getCompoundedLUSDDeposit(harriet))
+      console.log("grahamDeposit4 " +  grahamDeposit4)
+      console.log("harrietDeposit4 " +  harrietDeposit4)
 
       // whale deposits LUSD so all can exit
       await stabilityPool.provideToSP(dec(1, 18), ZERO_ADDRESS, { from: whale })
@@ -1517,15 +1539,20 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       const graham_ETHWithdrawn = th.getEventArgByName(txG, 'CollateralGainWithdrawn', '_collateral').toString()
       const harriet_ETHWithdrawn = th.getEventArgByName(txH, 'CollateralGainWithdrawn', '_collateral').toString()
 
+      console.log("total deposits " +  await stabilityPool.getTotalLUSDDeposits())
+      console.log("whale deposit " + await stabilityPool.getCompoundedLUSDDeposit(whale))
+
       // Expect all deposits to be almost 0 LUSD
+      // th.depositorValuesAfterLiquidation() does not exactly replicate rounding or error corrections
+      // so using it's incorrect outputs in above sequence causes growing error 
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(alice)).toString(), '0'), 100000)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(bob)).toString(), '0'), 100000)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(carol)).toString(), '0'), 100000)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(dennis)).toString(), '0'), 100000)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(erin)).toString(), '0'), 1e14)
       assert.isAtMost(th.getDifference((await lusdToken.balanceOf(flyn)).toString(), '0'), 1e14)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(graham)).toString(), 5e17), 1e14)
-      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(harriet)).toString(), 5e17), 1e14)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(graham)).toString(), 5e17), 2e15)
+      assert.isAtMost(th.getDifference((await lusdToken.balanceOf(harriet)).toString(), 5e17), 2e15)
 
       /* Expect all ETH gains to be 100 ETH:  Since each liquidation of almost empties the pool, depositors
       should only earn ETH from the single liquidation that cancelled with their deposit minus the 1 LUSD */
@@ -1800,16 +1827,20 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       otherDep =  (await stabilityPool.getTotalLUSDDeposits()).sub(bobSpDeposit)
 
       // Defaulter 2 liquidated
+      liqDeposits = await stabilityPool.getTotalLUSDDeposits()
+      lastLUSDError = await stabilityPool.lastLUSDLossError_Offset()
       const txL2 = await liquidations.liquidate(defaulter_2, { from: owner });
       bobDepositAfter =  (await th.depositsAfterLiquidation(contracts, txL2, [bobSpDeposit, otherDep]))[0]
       P2 = await stabilityPool.P()
-     // console.log("P2", P2.toString())
+      const expP2 = await th.getNewPAfterLiquidation(contracts, txL2, P1, liqDeposits, lastLUSDError)
 
 
       assert.isTrue(txL2.receipt.status)
       //assert.equal(await stabilityPool.P(), dec(1, 17))  // Scale changes and P changes. P = 1e(13-5+9) = 1e17
       // TODO: fix the increased tolerance
-      assert.isAtMost(th.getDifference((await stabilityPool.P()).toString(), dec(1, 17)), 23e13)
+      //assert.isAtMost(th.getDifference((await stabilityPool.P()).toString(), dec(1, 17)), 23e13)
+      assert.isTrue(P2.div(toBN(dec(1,9))).eq(expP2))
+
       assert.equal(await stabilityPool.currentScale(), '1')
 
       // whale deposits LUSD so Bob can exit

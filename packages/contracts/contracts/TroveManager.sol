@@ -4,6 +4,8 @@ pragma solidity 0.6.11;
 
 import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/IRewards.sol";
+import "./Interfaces/IFeeRouter.sol";
+import "./Interfaces/IGlobalFeeRouter.sol";
 import "./Interfaces/ILiquidations.sol";
 import "./Interfaces/IAggregator.sol";
 import "./Interfaces/IStabilityPool.sol";
@@ -51,6 +53,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     IAggregator public aggregator;
 
     IRewards public rewards;
+
+    IFeeRouter public feeRouter;
+
+    IGlobalFeeRouter public globalFeeRouter;
 
     ILiquidations public liquidations;
 
@@ -185,8 +191,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     // --- Events ---
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint _stake,TroveManagerOperation _operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, TroveManagerOperation _operation);
-    event Drip(uint256 _stakeInterest, uint256 _spInterest);
+    event Drip(uint256 _newInterest);
     event Value(uint256 value);
+    event Values(uint256 value1, uint256 value2);
 
      enum TroveManagerOperation {
         applyPendingRewards,
@@ -225,6 +232,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         relayer = IRelayer(addresses[15]);
         IERC20 collateralToken = IERC20(addresses[16]);
         rewards = IRewards(addresses[17]);
+        feeRouter = IFeeRouter(addresses[18]);
+        globalFeeRouter = IGlobalFeeRouter(addresses[19]);
 
         assert(address(collateralToken) != address(0));
         
@@ -530,7 +539,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
 
-        locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
+        //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
+        locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();
         assert(contractsCache.lusdToken.balanceOf(msg.sender) <= locals.totalLUSDSupplyAtStart);
 
         totals.remainingLUSD = _LUSDamount;
@@ -965,6 +975,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     }
 
     function drip() public override {
+        // TODO call drip() before LPers remove liquidity  and before SP depositors withdraw
         uint interestRate = relayer.getRate();
         uint shieldedInterestRate = interestRate.sub(RATE_PRECISION).mul(kappa).div(DECIMAL_PRECISION).add(RATE_PRECISION);
         _drip(interestRate, shieldedInterestRate);
@@ -992,15 +1003,19 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint256 existingAccShieldRate = accumulatedShieldRate;
 
         //emit PreDrip(existingSystemDebt, lusdToken.totalSupply());
+       
 
         uint256 newAccRate = _calcAccumulatedRate(existingAccRate, interestRate, secondsPassed);
         uint256 newAccShieldRate = _calcAccumulatedRate(existingAccShieldRate, shieldedInterestRate, secondsPassed);
-        //uint256 rateDelta = newAccRate - accumulatedRate;
 
         _updateAccRates(newAccRate, newAccShieldRate);
 
+        // TODO: This logic needs to be changed for multi-TM
+        // simple fix is 1. get current branch debt. 2. update rates 3. get new branch debt. 4. mint diff
         uint256 totalNewDebt = getEntireSystemDebt(newAccRate, newAccShieldRate);
-        uint256 currentSupply = lusdToken.totalSupply();
+
+        // for purpose of calculating new debt supply=totatSupply + pending in SP + pending in GlobalFeeRouter
+        uint256 currentSupply = lusdToken.totalSupply() + stabilityPool.pendingLUSDDeposits() + globalFeeRouter.pendingFees();
 
         uint256 newInterest = 0;
 
@@ -1008,33 +1023,17 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             newInterest = totalNewDebt - currentSupply;
         }
 
-        //emit Drip(newInterest, totalNewDebt, currentSupply);
-
         if (newInterest == 0) {
-            emit Drip(0, 0);
             return;
         }
-        (uint256 spPayment, uint256 stakePayment) = _calcRevenuePayments(newInterest);
 
-        emit Drip(stakePayment, spPayment);
-
-        // Mint and distribute to SP
-        lusdToken.mint(address(stabilityPool), spPayment);
-        stabilityPool.distributeToSP(spPayment);
-
-        // Mint and distribute to staking
-        if (stakePayment > 0) {
-            lusdToken.mint(address(lqtyStaking), stakePayment);
-            lqtyStaking.increaseF_LUSD(stakePayment);
-        }
-
-        //emit PostDrip(existingSystemDebt, existingSupply, existingAccRate, getEntireSystemDebt(newAccRate), lusdToken.totalSupply(), newAccRate, newInterest, rateDelta);
+        feeRouter.allocateFees(newInterest);
 
     }
 
     // External view wrapper
-    function calcAccumulatedRate(uint256 accRate, uint256 interestRate, uint256 minutesPassed) external pure returns (uint256) {
-        return _calcAccumulatedRate(accRate, interestRate, minutesPassed);
+    function calcAccumulatedRate(uint256 accRate, uint256 interestRate, uint256 secondsPassed) external pure returns (uint256) {
+        return _calcAccumulatedRate(accRate, interestRate, secondsPassed);
     }
 
     // Internal rate compounding function
@@ -1110,6 +1109,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     function _requireValidMaxFeePercentage(uint _maxFeePercentage) internal pure {
         require(_maxFeePercentage >= REDEMPTION_FEE_FLOOR && _maxFeePercentage <= DECIMAL_PRECISION,
             "Max fee percentage must be between 0.5% and 100%");
+    }
+
+    function getEntireSystemDebt() public view override returns (uint) {
+        return getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
     }
 
     // --- Trove property getters ---

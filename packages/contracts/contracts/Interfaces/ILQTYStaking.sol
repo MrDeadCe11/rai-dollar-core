@@ -29,6 +29,7 @@ interface ILQTYStaking {
         address _troveManagerAddress, 
         address _borrowerOperationsAddress,
         address _activePoolAddress,
+        address _globalFeeRouterAddress,
         address _collateralTokenAddress
     )  external;
 
