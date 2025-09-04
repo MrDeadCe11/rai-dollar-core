@@ -36,6 +36,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     ISortedTroves public sortedShieldedTroves;
 
     IERC20 public override collateralToken;
+
+    uint256 shutdownTimestamp;
     
     /* --- Variable container structs  ---
 
@@ -156,7 +158,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     function openTrove(uint256 _collateralAmount, uint _LUSDAmount, address _upperHint, address _lowerHint, bool _redemptionShield) external override {
-
+        _requireNotShutdown();
         ContractsCache memory contractsCache = ContractsCache(troveManager, rewards, activePool, lusdToken, collateralToken);
         LocalVariables_openTrove memory vars;
 
@@ -276,6 +278,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     */
     function _adjustTrove(address _borrower, uint _collateralToAdd, uint _collWithdrawal, uint _LUSDChange, bool _isDebtIncrease,
                           bool _toggleShield, address _upperHint, address _lowerHint) internal {
+        _requireNotShutdown();
         ContractsCache memory contractsCache = ContractsCache(troveManager, rewards, activePool, lusdToken, collateralToken);
         LocalVariables_adjustTrove memory vars;
 
@@ -383,7 +386,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
         _requireTroveisActive(troveManagerCached, msg.sender);
 
-        troveManager.drip();
+        _drip();
         uint accRate = shielded ? troveManagerCached.accumulatedShieldRate() : troveManagerCached.accumulatedRate();
 
         rewardsCached.applyPendingRewards(msg.sender);
@@ -411,6 +414,23 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
         // Send the collateral back to the user
         activePoolCached.sendCollateral(msg.sender, coll);
+    }
+
+    function shutdownFromOracleFailure() external override {
+        _requireIsOracleContract();
+        _requireNotShutdown();
+        _shutdown(true);
+    }
+
+    function _drip() internal {
+        if (shutdownTimestamp == 0) {
+            troveManager.drip();
+        }
+    }
+
+    function _shutdown(bool _oracleFailure) internal {
+        shutdownTimestamp = block.timestamp;
+        troveManager.shutdown(_oracleFailure);
     }
 
     /**
@@ -541,6 +561,10 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     function _requireNoCollWithdrawal(uint _collWithdrawal) internal pure {
         require(_collWithdrawal == 0, "BorrowerOps: Collateral withdrawal not permitted when TCR < CCR");
     }
+
+    function _requireNotShutdown() internal view {
+        require(shutdownTimestamp == 0, "BorrowerOps: System is shutdown");
+    }
    
     function _requireValidAdjustment
     (
@@ -626,6 +650,10 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     function _requireSufficientCollateralBalance(IERC20 _collateralToken, address _borrower, uint256 _collateralAmount) internal view {
         require(_collateralToken.balanceOf(_borrower) >= _collateralAmount, "Insufficient collateral balance");
+    }
+
+    function _requireIsOracleContract() internal view {
+        require(msg.sender == address(priceFeed), "BorrowerOps: Caller is not the Oracle contract");
     }
 
     // --- ICR and TCR getters ---
