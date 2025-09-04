@@ -141,6 +141,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         lusdToken = ILUSDToken(addresses[11]);
         relayer = IRelayer(addresses[12]);
         collateralToken = IERC20(addresses[13]);
+        SCR = _SCR;
 
         emit TroveManagerAddressChanged(addresses[0]);
         emit RewardsAddressChanged(addresses[1]);
