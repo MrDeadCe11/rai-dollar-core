@@ -660,6 +660,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         drip();
     }
 
+    function shutdown(bool _oracleFailure) external override {
+        _requireCallerIsBorrowerOperations();
+       
+    }
+
     // --- Helper functions ---
 
     // Return the nominal collateral ratio (ICR) of a given Trove, without the price. Takes a trove's pending coll and debt rewards from redistributions into account.
