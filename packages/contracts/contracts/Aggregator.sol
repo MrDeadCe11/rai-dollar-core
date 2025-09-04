@@ -36,6 +36,22 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     uint constant public MINUTE_DECAY_FACTOR = 999037758833783000;
     uint constant public REDEMPTION_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
+    // shutdown discount parameters
+    uint256 constant public DECIMAL_PRECISION = 1e18;
+    uint256 constant public FOUR_HOURS = 14400; // 14400 seconds
+    uint256 constant public BASE_DISCOUNT = 2e16; // 2%
+    uint256 constant public MAX_DISCOUNT = 5e17; // 50%
+    uint256 constant public MULTIPLIER = 125e16; // 1.25 * 1e18
+    
+    struct CollateralShutdown {
+        address shutdownTime;
+        uint256 par;
+        bool oracleFailure;
+    }
+
+    // troveManager address => collateralShutdown
+    mapping (address => CollateralShutdown) public collateralShutdown;
+
     /*
     * BETA: 18 digit decimal. Parameter by which to divide the redeemed fraction, in order to calc the new base rate from a redemption.
     * Corresponds to (1 / ALPHA) in the white paper.
@@ -125,19 +141,20 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return _calcRedemptionRate(newBaseRate);
     }
 
+    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
+        uint256 newBaseRate = calcNewBaseRate(_LUSDAmount, baseRate, _totalLUSDSupply);
+        uint256 discount = _calcDiscount(newBaseRate);
+        uint256 redemptionRate = _calcRedemptionRate(newBaseRate);
+
+        return redemptionRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
+    }
+
     function getRedemptionRate() public view override returns (uint) {
         return _calcRedemptionRate(baseRate);
     }
 
     function getRedemptionRateWithDecay() public view override returns (uint) {
         return _calcRedemptionRate(_calcDecayedBaseRate());
-    }
-
-    function _calcRedemptionRate(uint _baseRate) internal pure returns (uint) {
-        return LiquityMath._min(
-            REDEMPTION_FEE_FLOOR.add(_baseRate),
-            DECIMAL_PRECISION // cap at a maximum of 100%
-        );
     }
 
     function getRedemptionFee(uint _ETHDrawn) public view override returns (uint) {
@@ -155,8 +172,34 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return redemptionFee;
     }
 
+    function shutdownCollateral(uint256 _par, bool _oracleFailure) external override {
+        _requireCallerIsTroveManager();
+        collateralShutdown[address(troveManager)] = CollateralShutdown(block.timestamp, par, _oracleFailure);
+    }
 
     // --- Internal fee functions ---
+
+    function _calcRedemptionRate(uint _baseRate) internal pure returns (uint) {
+        return LiquityMath._min(
+            REDEMPTION_FEE_FLOOR.add(_baseRate),
+            DECIMAL_PRECISION // cap at a maximum of 100%
+        );
+    }
+
+    function _calcDiscount(uint _baseRate) internal view returns (uint) {
+        uint timePassed = block.timestamp.sub(collateralShutdown[address(troveManager)].shutdownTime);
+        
+        uint256 periods = timePassed.div(FOUR_HOURS);
+        
+        // Calculate 1.25^periods using existing _rpower function
+        uint256 multiplierPowered = LiquityMath._rpower(MULTIPLIER, periods, DECIMAL_PRECISION);
+        
+        // Calculate discount = 2% × 1.25^periods
+        uint256 discount = BASE_DISCOUNT.mul(multiplierPowered).div(DECIMAL_PRECISION);
+        
+        // Apply 50% cap
+        return discount > MAX_DISCOUNT ? MAX_DISCOUNT : discount;
+    }
 
     // Update the last fee operation time only if time passed >= decay interval. This prevents base rate griefing.
     function _updateLastFeeOpTime() internal {

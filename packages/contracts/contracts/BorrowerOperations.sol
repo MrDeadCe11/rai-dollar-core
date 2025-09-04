@@ -37,7 +37,9 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     IERC20 public override collateralToken;
 
-    uint256 shutdownTimestamp;
+    bool shutdown;
+
+    uint256 public immutable SCR;
     
     /* --- Variable container structs  ---
 
@@ -111,7 +113,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     // --- Dependency setters ---
 
     function setAddresses(
-        address[] memory addresses
+        address[] memory addresses,
+        uint256 _SCR
     )
         external
         override
@@ -138,6 +141,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         lusdToken = ILUSDToken(addresses[11]);
         relayer = IRelayer(addresses[12]);
         collateralToken = IERC20(addresses[13]);
+        SCR = _SCR;
 
         emit TroveManagerAddressChanged(addresses[0]);
         emit RewardsAddressChanged(addresses[1]);
@@ -416,6 +420,23 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         activePoolCached.sendCollateral(msg.sender, coll);
     }
 
+    function shutdown() external override {
+        _requireNotShutdown();
+
+        uint totalCollateral = cgetEntireSystemColl();
+        uint totalDebt = getEntireSystemDebt();
+        uint256 par = relayer.getPar();
+        uint (price, bool oracleFailure) = priceFeed.fetchPrice();
+
+        if(oracleFailure) return;
+
+        uint TCR = LiquityMath._computeCR(totalCollateral, totalDebt, price, par);
+
+        require(TCR < SCR, "BorrowerOps: TCR must be less than SCR");
+
+        _shutdown(false);
+    }
+
     function shutdownFromOracleFailure() external override {
         _requireIsOracleContract();
         _requireNotShutdown();
@@ -423,14 +444,16 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     function _drip() internal {
-        if (shutdownTimestamp == 0) {
+        if (!shutdown) {
             troveManager.drip();
         }
     }
 
     function _shutdown(bool _oracleFailure) internal {
-        shutdownTimestamp = block.timestamp;
+        shutdown = true;
         troveManager.shutdown(_oracleFailure);
+
+        emit SystemShutdown(_oracleFailure);
     }
 
     /**
@@ -563,7 +586,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     function _requireNotShutdown() internal view {
-        require(shutdownTimestamp == 0, "BorrowerOps: System is shutdown");
+        require(!shutdown, "BorrowerOps: System is shutdown");
     }
    
     function _requireValidAdjustment
