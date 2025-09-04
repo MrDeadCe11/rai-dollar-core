@@ -46,7 +46,7 @@ abstract contract CompositePriceFeed is MainnetPriceFeedBase {
         returns (uint256)
     {
         // Shut down the branch
-        // borrowerOperations.shutdownFromOracleFailure();
+        borrowerOperations.shutdownFromOracleFailure();
 
         priceSource = PriceSource.ETHUSDxCanonical;
 
