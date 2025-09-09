@@ -570,33 +570,14 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
             _maxIterations--;
-
-            // get redemption candidates
-            uint icrB = type(uint).max;
-            uint icrS = type(uint).max;
-
-            if (locals.curBase != address(0)) {
-                uint b = _getCurrentICR(locals.curBase, locals.price, locals.par);
-                if (b >= MCR) icrB = b; // else no longer redeemable
-            }
-
-            if (locals.curSh != address(0)) {
-                uint s = _getCurrentICR(locals.curSh, locals.price, locals.par);
-                if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
-            }
+            uint icrB;
+            uint icrS;
+            (icrB, icrS) = _selectNextBaseOrShielded(locals);
 
             // stop if neither candidate is eligible
             if (icrB == type(uint).max && icrS == type(uint).max) { break; }
 
-            // pick lower-ICR eligible; tie -> prefer BASE
-            locals.pickBase = (icrB <= icrS);
-            locals.currentBorrower = locals.pickBase ? locals.curBase : locals.curSh;
-
-            // Save next pointer for the chosen list before redemption possibly modifies list
-            // getPrev => larger ICR
-            locals.nextUserToCheck = locals.pickBase
-                ? sortedTroves.getPrev(locals.currentBorrower)
-                : sortedShieldedTroves.getPrev(locals.currentBorrower);
+            locals = _selectNextBorrower(locals, icrB, icrS);
 
             // apply pending rewards so debt is all in normalized format for redemption
             rewards.applyPendingRewards(locals.currentBorrower);
@@ -621,7 +602,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 !locals.pickBase,
                 redemptionRate
             );
-
 
             if (singleRedemption.cancelledPartial) { break; }
             
@@ -689,7 +669,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint _maxFeePercentage
         ) external override {
         _requireShutdown();
-        
+
     }
 
     function shutdown(bool _oracleFailure) external override {
@@ -785,6 +765,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _requireCallerIsBorrowerOperations();
         _closeTrove(_borrower, Status.closedByOwner);
     }
+
     function closeTroveLiquidation(address _borrower) external override {
         _requireCallerIsLiquidations();
         _closeTrove(_borrower, Status.closedByLiquidation);
@@ -812,6 +793,37 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         } else {
             sortedTroves.remove(_borrower);
         }
+    }
+
+
+    function _selectNextBaseOrShielded(RedemptionLocals memory locals) internal view returns (uint icrB, uint icrS) {
+                // get redemption candidates
+            icrB = type(uint).max;
+            icrS = type(uint).max;
+
+            if (locals.curBase != address(0)) {
+                uint b = _getCurrentICR(locals.curBase, locals.price, locals.par);
+                if (b >= MCR) icrB = b; // else no longer redeemable
+            }
+
+            if (locals.curSh != address(0)) {
+                uint s = _getCurrentICR(locals.curSh, locals.price, locals.par);
+                if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
+            }
+    }
+
+    function _selectNextBorrower(RedemptionLocals memory locals, uint icrB, uint icrS) internal view returns (RedemptionLocals memory) {
+            // pick lower-ICR eligible; tie -> prefer BASE
+            locals.pickBase = (icrB <= icrS);
+            locals.currentBorrower = locals.pickBase ? locals.curBase : locals.curSh;
+
+            // Save next pointer for the chosen list before redemption possibly modifies list
+            // getPrev => larger ICR
+            locals.nextUserToCheck = locals.pickBase
+                ? sortedTroves.getPrev(locals.currentBorrower)
+                : sortedShieldedTroves.getPrev(locals.currentBorrower);
+
+            return locals;
     }
 
     function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
