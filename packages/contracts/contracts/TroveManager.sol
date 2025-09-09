@@ -562,6 +562,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
             // stop if neither candidate is eligible
             if (icrB == type(uint).max && icrS == type(uint).max) { break; }
+
+            locals = _selectNextBorrower(locals, icrB, icrS);
+
             // apply pending rewards so debt is all in normalized format for redemption
             contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
 
@@ -644,6 +647,19 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             }
 
         return (_totals, _locals);
+    function redeemCollateralDuringShutdown(
+        uint _LUSDamount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
+        uint _partialRedemptionHintNICR,
+        uint _maxIterations,
+        uint _maxFeePercentage
+        ) external override {
+        _requireShutdown();
+
     }
 
     function shutdown(bool _oracleFailure) external override {
@@ -775,7 +791,38 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         }
     }
 
-    function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
+
+    function _selectNextBaseOrShielded(RedemptionLocals memory locals) internal view returns (uint icrB, uint icrS) {
+                // get redemption candidates
+            icrB = type(uint).max;
+            icrS = type(uint).max;
+
+            if (locals.curBase != address(0)) {
+                uint b = _getCurrentICR(locals.curBase, locals.price, locals.par);
+                if (b >= MCR) icrB = b; // else no longer redeemable
+            }
+
+            if (locals.curSh != address(0)) {
+                uint s = _getCurrentICR(locals.curSh, locals.price, locals.par);
+                if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
+            }
+    }
+
+    function _selectNextBorrower(RedemptionLocals memory locals, uint icrB, uint icrS) internal view returns (RedemptionLocals memory) {
+            // pick lower-ICR eligible; tie -> prefer BASE
+            locals.pickBase = (icrB <= icrS);
+            locals.currentBorrower = locals.pickBase ? locals.curBase : locals.curSh;
+
+            // Save next pointer for the chosen list before redemption possibly modifies list
+            // getPrev => larger ICR
+            locals.nextUserToCheck = locals.pickBase
+                ? sortedTroves.getPrev(locals.currentBorrower)
+                : sortedShieldedTroves.getPrev(locals.currentBorrower);
+
+            return locals;
+    }
+
+function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
         // Push the Troveowner to the array
         TroveOwners.push(_borrower);
 
