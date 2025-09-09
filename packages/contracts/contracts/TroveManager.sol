@@ -506,34 +506,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         if (_maxIterations == 0) { _maxIterations = uint(-1); }
         while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
             _maxIterations--;
-
-            // get redemption candidates
-            uint icrB = type(uint).max;
-            uint icrS = type(uint).max;
-
-            if (locals.curBase != address(0)) {
-                uint b = _getCurrentICR(contractsCache, locals.curBase, locals.price, locals.par);
-                if (b >= MCR) icrB = b; // else no longer redeemable
-            }
-
-            if (locals.curSh != address(0)) {
-                uint s = _getCurrentICR(contractsCache, locals.curSh, locals.price, locals.par);
-                if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
-            }
+            uint icrB;
+            uint icrS;
+            (icrB, icrS) = _selectNextBaseOrShielded(locals);
 
             // stop if neither candidate is eligible
             if (icrB == type(uint).max && icrS == type(uint).max) { break; }
-
-            // pick lower-ICR eligible; tie -> prefer BASE
-            locals.pickBase = (icrB <= icrS);
-            locals.currentBorrower = locals.pickBase ? locals.curBase : locals.curSh;
-
-            // Save next pointer for the chosen list before redemption possibly modifies list
-            // getPrev => larger ICR
-            locals.nextUserToCheck = locals.pickBase
-                ? contractsCache.sortedTroves.getPrev(locals.currentBorrower)
-                : contractsCache.sortedShieldedTroves.getPrev(locals.currentBorrower);
-
             // apply pending rewards so debt is all in normalized format for redemption
             contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
 
@@ -557,7 +535,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 !locals.pickBase,
                 redemptionRate
             );
-
 
             if (singleRedemption.cancelledPartial) { break; }
             
@@ -625,7 +602,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         uint _maxFeePercentage
         ) external override {
         _requireShutdown();
-        
+
     }
 
     function shutdown(bool _oracleFailure) external override {
@@ -725,6 +702,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
         _closeTrove(contractsCache, _borrower, Status.closedByOwner);
     }
+
     function closeTroveLiquidation(address _borrower) external override {
         _requireCallerIsLiquidations();
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();    
@@ -756,10 +734,34 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         }
     }
 
-    // function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
-    //     TroveStorage storage ts = getTroveStorage();
-    //     // Push the Troveowner to the array
-    //     ts.TroveOwners.push(_borrower);
+    function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
+        // Push the Troveowner to the array
+        TroveOwners.push(_borrower);
+
+        // Record the index of the new Troveowner on their Trove struct
+        index = uint128(TroveOwners.length.sub(1));
+        Troves[_borrower].arrayIndex = index;
+
+        return index;
+    }
+
+    function _addTroveOwnerToArray(address _borrower, bool _shielded) internal returns (uint128 index) {
+        // Push the Troveowner to the array
+
+        address[] storage array = _shielded ? ShieldedTroveOwners : TroveOwners;
+
+        array.push(_borrower);
+
+        // Record the index of the new Troveowner on their Trove struct
+        index = uint128(array.length.sub(1));
+        Troves[_borrower].arrayIndex = index;
+
+        return index;
+    }
+
+    function _addShieldedTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
+        // Push the Troveowner to the array
+        ShieldedTroveOwners.push(_borrower);
 
     //     // Record the index of the new Troveowner on their Trove struct
     //     index = uint128(ts.TroveOwners.length.sub(1));
