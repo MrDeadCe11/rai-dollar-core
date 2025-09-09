@@ -8,7 +8,7 @@ import "../Dependencies/IERC20.sol";
 import "../Interfaces/IBorrowerOperations.sol";
 import "../Interfaces/ITroveManagerRelayer.sol";
 import "../Interfaces/IStabilityPool.sol";
-import "../Interfaces/IPriceFeed.sol";
+import {IPriceFeedV2} from "../Interfaces/IPriceFeed.sol";
 import "../Interfaces/ILQTYStaking.sol";
 import "../Interfaces/IRelayer.sol";
 import "./BorrowerOperationsScript.sol";
@@ -24,7 +24,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
 
     ITroveManagerRelayer immutable troveManager;
     IStabilityPool immutable stabilityPool;
-    IPriceFeed immutable priceFeed;
+    IPriceFeedV2 immutable priceFeed;
     IERC20 immutable lusdToken;
     IERC20 immutable lqtyToken;
     ILQTYStaking immutable lqtyStaking;
@@ -50,7 +50,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         checkContract(address(stabilityPoolCached));
         stabilityPool = stabilityPoolCached;
 
-        IPriceFeed priceFeedCached = troveManagerCached.priceFeed();
+        IPriceFeedV2 priceFeedCached = troveManagerCached.priceFeed();
         checkContract(address(priceFeedCached));
         priceFeed = priceFeedCached;
 
@@ -156,7 +156,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
     }
 
     function _getNetLUSDAmount(uint _collateral) internal returns (uint) {
-        uint price = priceFeed.fetchPrice();
+        (uint price, ) = priceFeed.fetchPrice();
         uint ICR = troveManager.getCurrentICR(address(this), price);
         uint par = relayer.par();
 

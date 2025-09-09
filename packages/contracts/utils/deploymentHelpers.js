@@ -3,6 +3,7 @@ const SortedTroves = artifacts.require("./SortedTroves.sol")
 const TroveManager = artifacts.require("./TroveManager.sol")
 const Liquidations = artifacts.require("./Liquidations.sol")
 const PriceFeedTestnet = artifacts.require("./PriceFeedTestnet.sol")
+const PriceFeedTestnetV2 = artifacts.require("./PriceFeedTestnetV2")
 const LUSDToken = artifacts.require("./LUSDToken.sol")
 const ActivePool = artifacts.require("./ActivePool.sol");
 const ActiveShieldedPool = artifacts.require("./ActivePool.sol");
@@ -105,7 +106,7 @@ class DeploymentHelper {
 
   static async deployLiquityCoreHardhat() {
     const collateralToken = await CollateralToken.new("Hardhat Collateral Token", "HCT")
-    const priceFeedTestnet = await PriceFeedTestnet.new()
+    const priceFeedTestnet = await PriceFeedTestnetV2.new()
     const aggregator = await Aggregator.new()
     const sortedTroves = await SortedTroves.new()
     const sortedShieldedTroves = await SortedTroves.new()
@@ -141,7 +142,7 @@ class DeploymentHelper {
     CollateralToken.setAsDeployed(collateralToken)
     LUSDToken.setAsDeployed(lusdToken)
     DefaultPool.setAsDeployed(defaultPool)
-    PriceFeedTestnet.setAsDeployed(priceFeedTestnet)
+    PriceFeedTestnetV2.setAsDeployed(priceFeedTestnet)
     SortedTroves.setAsDeployed(sortedTroves)
     SortedTroves.setAsDeployed(sortedShieldedTroves)
     Aggregator.setAsDeployed(aggregator)
@@ -199,7 +200,7 @@ class DeploymentHelper {
     const testerContracts = {}
     testerContracts.collateralToken = await CollateralToken.new("Test Collateral Token", "TCT")
     // Contract without testers (yet)
-    testerContracts.priceFeedTestnet = await PriceFeedTestnet.new()
+    testerContracts.priceFeedTestnet = await PriceFeedTestnetV2.new()
     testerContracts.sortedTroves = await SortedTroves.new()
     testerContracts.sortedShieldedTroves = await SortedTroves.new()
     testerContracts.rewards = await Rewards.new()
@@ -298,7 +299,7 @@ class DeploymentHelper {
   }
 
   static async deployLiquityCoreTruffle() {
-    const priceFeedTestnet = await PriceFeedTestnet.new()
+    const priceFeedTestnet = await PriceFeedTestnetV2.new()
     const sortedTroves = await SortedTroves.new()
     const sortedShieldedTroves = await SortedTroves.new()
     const aggregator = await Aggregator.new()
@@ -463,8 +464,7 @@ class DeploymentHelper {
       contracts.sortedShieldedTroves.address,
       contracts.lusdToken.address,
       contracts.relayer.address,
-      contracts.collateralToken.address],
-      toBN("1100000000000000000")  //SCR 110%
+      contracts.collateralToken.address]
     )
 
     await contracts.activePool.setAddresses(
