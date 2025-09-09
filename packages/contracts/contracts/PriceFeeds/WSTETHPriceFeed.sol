@@ -16,10 +16,10 @@ contract WSTETHPriceFeed is CompositePriceFeed, IWSTETHPriceFeed {
         address _stEthUsdOracleAddress,
         address _wstEthTokenAddress,
         uint256 _ethUsdStalenessThreshold,
-        uint256 _stEthUsdStalenessThreshold /*,
-        address _borrowerOperationsAddress*/
+        uint256 _stEthUsdStalenessThreshold ,
+        address _borrowerOperationsAddress 
     )
-        CompositePriceFeed(_ethUsdOracleAddress, _wstEthTokenAddress, _ethUsdStalenessThreshold /*, _borrowerOperationsAddress*/)
+        CompositePriceFeed(_ethUsdOracleAddress, _wstEthTokenAddress, _ethUsdStalenessThreshold, _borrowerOperationsAddress)
     {
         stEthUsdOracle.aggregator = AggregatorV3Interface(_stEthUsdOracleAddress);
         stEthUsdOracle.stalenessThreshold = _stEthUsdStalenessThreshold;

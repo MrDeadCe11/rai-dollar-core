@@ -37,9 +37,9 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     IERC20 public override collateralToken;
 
-    bool shutdown;
-
-    uint256 public immutable SCR;
+    bool public isShutdown;
+    // TODO: for now we hard code it, when more collateral types are added, we will need to set it on deployment
+    uint256 public immutable SCR = 1100000000000000000;
     
     /* --- Variable container structs  ---
 
@@ -109,13 +109,13 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, BorrowerOperation operation);
+    event BorrowerOperationsShutdown(bool _oracleFailure);
 
     // --- Dependency setters ---
 
     function setAddresses(
-        address[] memory addresses,
-        uint256 _SCR
-    )
+        address[] memory addresses
+        )
         external
         override
         onlyOwner
@@ -135,13 +135,12 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         stabilityPoolAddress = addresses[5];
         gasPoolAddress = addresses[6];
         collSurplusPool = ICollSurplusPool(addresses[7]);
-        priceFeed = IPriceFeed(addresses[8]);
+        priceFeed = IPriceFeedV2(addresses[8]);
         sortedTroves = ISortedTroves(addresses[9]);
         sortedShieldedTroves = ISortedTroves(addresses[10]);
         lusdToken = ILUSDToken(addresses[11]);
         relayer = IRelayer(addresses[12]);
         collateralToken = IERC20(addresses[13]);
-        SCR = _SCR;
 
         emit TroveManagerAddressChanged(addresses[0]);
         emit RewardsAddressChanged(addresses[1]);
@@ -176,7 +175,13 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.par = relayer.getPar();
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
-        vars.price = priceFeed.fetchPrice();
+        bool oracleFailure;
+        (vars.price, oracleFailure) = priceFeed.fetchPrice();
+
+        if(oracleFailure) {
+            // shutdown should be called by oracle contract
+            return;
+        }
 
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
         _requireAtLeastMinNetDebt(_LUSDAmount);
@@ -320,7 +325,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.par = relayer.getPar();
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
-        vars.price = priceFeed.fetchPrice();
+
+        (vars.price,) = priceFeed.fetchPrice();
 
         contractsCache.rewards.applyPendingRewards(_borrower);
 
@@ -423,11 +429,15 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     function shutdown() external override {
         _requireNotShutdown();
 
-        uint totalCollateral = cgetEntireSystemColl();
-        uint totalDebt = getEntireSystemDebt();
-        uint256 par = relayer.getPar();
-        uint (price, bool oracleFailure) = priceFeed.fetchPrice();
+        uint totalCollateral = getEntireSystemColl();
+        uint accRate = troveManager.accumulatedRate();
+        uint accShieldRate = troveManager.accumulatedShieldRate();
 
+        uint totalDebt = getEntireSystemDebt(accRate, accShieldRate);
+        uint256 par = relayer.getPar();
+
+        (uint price, bool oracleFailure) = priceFeed.fetchPrice();
+        // shutdown should be called by oracle contract
         if(oracleFailure) return;
 
         uint TCR = LiquityMath._computeCR(totalCollateral, totalDebt, price, par);
@@ -439,21 +449,21 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     function shutdownFromOracleFailure() external override {
         _requireIsOracleContract();
-        _requireNotShutdown();
+        if(isShutdown) return;
         _shutdown(true);
     }
 
     function _drip() internal {
-        if (!shutdown) {
+        if (!isShutdown) {
             troveManager.drip();
         }
     }
 
     function _shutdown(bool _oracleFailure) internal {
-        shutdown = true;
+        isShutdown = true;
         troveManager.shutdown(_oracleFailure);
 
-        emit SystemShutdown(_oracleFailure);
+        emit BorrowerOperationsShutdown(_oracleFailure);
     }
 
     /**
@@ -587,7 +597,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     }
 
     function _requireNotShutdown() internal view {
-        require(!shutdown, "BorrowerOps: System is shutdown");
+        require(!isShutdown, "BorrowerOps: System is shutdown");
     }
    
     function _requireValidAdjustment

@@ -312,7 +312,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         lusdToken = ILUSDToken(_lusdTokenAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
-        priceFeed = IPriceFeed(_priceFeedAddress);
+        priceFeed = IPriceFeedV2(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
         collateralToken = IERC20(_collateralToken);
         feeRouter = _feeRouterAddress;
@@ -1030,7 +1030,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     }
 
     function _requireNoUnderCollateralizedTroves() internal {
-        uint price = priceFeed.fetchPrice();
+        (uint price, ) = priceFeed.fetchPrice();
         address lowestTrove = sortedTroves.getLast();
         uint ICR = troveManager.getCurrentICR(lowestTrove, price);
         require(ICR >= MCR, "StabilityPool: Cannot withdraw while there are troves with ICR < MCR");

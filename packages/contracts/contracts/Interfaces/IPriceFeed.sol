@@ -10,3 +10,11 @@ interface IPriceFeed {
     // --- Function ---
     function fetchPrice() external returns (uint);
 }
+
+interface IPriceFeedV2 {
+        // --- Events ---
+    event LastGoodPriceUpdated(uint _lastGoodPrice);
+    
+    // --- Function ---
+    function fetchPrice() external returns (uint256, bool);
+}

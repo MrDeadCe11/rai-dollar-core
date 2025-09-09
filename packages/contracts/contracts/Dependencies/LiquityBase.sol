@@ -6,7 +6,7 @@ import "./BaseMath.sol";
 import "./LiquityMath.sol";
 import "../Interfaces/IActivePool.sol";
 import "../Interfaces/IDefaultPool.sol";
-import "../Interfaces/IPriceFeed.sol";
+import {IPriceFeedV2} from "../Interfaces/IPriceFeed.sol";
 import "../Interfaces/IRelayer.sol";
 import "../Interfaces/ILiquityBase.sol";
 import "../Dependencies/console.sol";
@@ -43,7 +43,7 @@ contract LiquityBase is BaseMath, ILiquityBase {
 
     IDefaultPool public defaultPool;
 
-    IPriceFeed public override priceFeed;
+    IPriceFeedV2 public override priceFeed;
 
     IRelayer public relayer; 
 
