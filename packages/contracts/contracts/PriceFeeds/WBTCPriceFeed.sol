@@ -15,8 +15,9 @@ contract WBTCPriceFeed is CompositePriceFeed {
         address _wbtcBtcAddress, 
         address _btcUsdOracleAddress,
         uint256 _wbtcUsdStalenessThreshold,
-        uint256 _btcUsdStalenessThreshold
-    ) CompositePriceFeed(_wbtcBtcAddress, _btcUsdOracleAddress, _wbtcUsdStalenessThreshold)
+        uint256 _btcUsdStalenessThreshold,
+        address _borrowerOperationsAddress
+    ) CompositePriceFeed(_wbtcBtcAddress, _btcUsdOracleAddress, _wbtcUsdStalenessThreshold, _borrowerOperationsAddress)
     {
         // Store BTC-USD oracle
         btcUsdOracle.aggregator = AggregatorV3Interface(_btcUsdOracleAddress);

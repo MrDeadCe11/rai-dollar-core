@@ -60,4 +60,8 @@ interface IBorrowerOperations is ILiquityBase {
     function claimCollateral() external returns (uint256);
 
     function getCompositeDebt(uint _debt) external pure returns (uint);
+
+    function shutdown() external;
+
+    function shutdownFromOracleFailure() external;
 }

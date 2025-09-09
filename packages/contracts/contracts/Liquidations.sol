@@ -247,7 +247,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         stabilityPool = IStabilityPool(_stabilityPoolAddress);
         gasPoolAddress = _gasPoolAddress;
         collSurplusPool = ICollSurplusPool(_collSurplusPoolAddress);
-        priceFeed = IPriceFeed(_priceFeedAddress);
+        priceFeed = IPriceFeedV2(_priceFeedAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         sortedShieldedTroves = ISortedTroves(_sortedShieldedTrovesAddress);
@@ -426,7 +426,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         vars.accumulatedRate = troveManager.accumulatedRate();
         vars.accumulatedShieldRate = troveManager.accumulatedShieldRate();
 
-        vars.price = priceFeed.fetchPrice();
+        (vars.price, ) = priceFeed.fetchPrice();
         vars.LUSDInSPForOffsets = stabilityPoolCached.getMaxAmountToOffset();
 
         // Perform the liquidation sequence - tally the values, and obtain their totals
@@ -642,7 +642,7 @@ contract Liquidations is LiquityBase, Ownable, CheckContract, ILiquidations {
         vars.accumulatedRate = troveManager.accumulatedRate();
         vars.accumulatedShieldRate = troveManager.accumulatedShieldRate();
 
-        vars.price = priceFeed.fetchPrice();
+        (vars.price, ) = priceFeed.fetchPrice();
         vars.LUSDInSPForOffsets = stabilityPoolCached.getMaxAmountToOffset();
         emit MaxAmountToOffset(vars.LUSDInSPForOffsets);
         emit TotalDeposits(stabilityPoolCached.getTotalLUSDDeposits());

@@ -70,6 +70,21 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     uint public override accumulatedShieldRate = RATE_PRECISION;
 
     uint public lastAccRateUpdateTime = block.timestamp;
+        // shutdown discount parameters
+    uint256 constant public SEVENTY_TWO_HOURS = 259200; // 72 hours in seconds
+    uint256 constant public BASE_DISCOUNT = 2e16; // 2%
+    uint256 constant public MAX_DISCOUNT_ORACLE_FAILURE = DECIMAL_PRECISION; // 100%
+    uint256 constant public MAX_DISCOUNT_TCR_BELOW_SCR = DECIMAL_PRECISION / 100 * 10; // 10%
+    uint256 constant public MULTIPLIER = 125e16; // 1.25 * 1e18
+    
+    struct CollateralShutdown {
+        uint256 shutdownTime;
+        uint256 par;
+        uint256 rate;
+        bool oracleFailure;
+    }
+
+    CollateralShutdown public collateralShutdown;
 
 
     // Store the necessary data for a trove
@@ -133,6 +148,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     event Drip(uint256 _newInterest);
     event Value(uint256 value);
     event Values(uint256 value1, uint256 value2);
+    event Shutdown(bool _oracleFailure, uint256 _rate, uint256 _par, uint256 _shutdownTime);
 
     enum TroveManagerOperation {
         applyPendingRewards,
@@ -466,7 +482,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         _requireValidMaxFeePercentage(_maxFeePercentage);
         _requireAfterBootstrapPeriod();
 
-        locals.price = priceFeed.fetchPrice();
+        (locals.price, ) = priceFeed.fetchPrice();
 
         //(, locals.par) = relayer.updateRateAndPar();
         locals.par = relayer.par();
@@ -597,9 +613,27 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         drip();
     }
 
+    function redeemCollateralDuringShutdown(
+        uint _LUSDamount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
+        uint _partialRedemptionHintNICR,
+        uint _maxIterations,
+        uint _maxFeePercentage
+        ) external override {
+        _requireShutdown();
+        
+    }
+
     function shutdown(bool _oracleFailure) external override {
-        _requireCallerIsBorrowerOperations();
-       
+       _requireCallerIsBorrowerOperations();
+       if(_isShutdown()) return;
+       (uint256 rate, uint256 par) = relayer.updateRateAndPar();
+       drip();
+       _shutdown(_oracleFailure, rate, par);
     }
 
     // --- Helper functions ---
@@ -888,6 +922,62 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
     }
 
+    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
+        uint256 newBaseRate = aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
+        uint256 discount = _calcDiscount(newBaseRate);
+        
+        return newBaseRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
+    }
+
+    function _calcDiscount(uint _baseRate) internal view returns (uint) {
+        
+        uint timePassed = block.timestamp.sub(collateralShutdown.shutdownTime);
+        
+        uint256 maxDiscount = collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
+
+        if (timePassed >= SEVENTY_TWO_HOURS) {
+            return maxDiscount;
+        }
+
+        return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
+    }
+
+    function _shutdown(bool _oracleFailure, uint256 _rate, uint256 _par) internal {
+        collateralShutdown.shutdownTime = block.timestamp;
+        collateralShutdown.par = _par;
+        collateralShutdown.rate = _rate;
+        collateralShutdown.oracleFailure = _oracleFailure;
+        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
+    }
+
+    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
+        uint256 newBaseRate = aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
+        uint256 discount = _calcDiscount(newBaseRate);
+        
+        return newBaseRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
+    }
+
+    function _calcDiscount(uint _baseRate) internal view returns (uint) {
+        
+        uint timePassed = block.timestamp.sub(collateralShutdown.shutdownTime);
+        
+        uint256 maxDiscount = collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
+
+        if (timePassed >= SEVENTY_TWO_HOURS) {
+            return maxDiscount;
+        }
+
+        return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
+    }
+
+    function _shutdown(bool _oracleFailure, uint256 _rate, uint256 _par) internal {
+        collateralShutdown.shutdownTime = block.timestamp;
+        collateralShutdown.par = _par;
+        collateralShutdown.rate = _rate;
+        collateralShutdown.oracleFailure = _oracleFailure;
+        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
+    }
+
     // External view wrapper
     function calcAccumulatedRate(uint256 accRate, uint256 interestRate, uint256 secondsPassed) external pure returns (uint256) {
         return _calcAccumulatedRate(accRate, interestRate, secondsPassed);
@@ -957,7 +1047,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     }
 
     function _requireTCRoverMCR(uint _price) internal view {
+        if(!_isShutdown()) {
         require(_getTCR(_price) >= MCR, "TM: Cannot redeem when TCR < MCR");
+        }
     }
 
     function _requireAfterBootstrapPeriod() internal view {
@@ -968,6 +1060,18 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     function _requireValidMaxFeePercentage(uint _maxFeePercentage) internal pure {
         require(_maxFeePercentage >= REDEMPTION_FEE_FLOOR && _maxFeePercentage <= DECIMAL_PRECISION,
             "Max fee percentage must be between 0.5% and 100%");
+    }
+
+    function _requireNotShutdown() internal view {
+        require(!_isShutdown(), "TM: Collateral is shutdown");
+    }
+
+    function _requireShutdown() internal view {
+        require(_isShutdown(), "TM: Collateral is not shutdown");
+    }
+
+    function _isShutdown() internal view returns (bool) {
+        return collateralShutdown.shutdownTime != 0;
     }
 
     function getEntireSystemDebt() public view override returns (uint) {
