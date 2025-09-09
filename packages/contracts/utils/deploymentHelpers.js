@@ -481,8 +481,7 @@ class DeploymentHelper {
       contracts.sortedShieldedTroves.address,
       contracts.lusdToken.address,
       contracts.relayer.address,
-      contracts.collateralToken.address],
-      toBN("1100000000000000000")  //SCR 110%
+      contracts.collateralToken.address]
     )
 
     await contracts.activePool.setAddresses(

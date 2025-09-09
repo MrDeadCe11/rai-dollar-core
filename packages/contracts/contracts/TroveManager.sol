@@ -961,8 +961,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             return;
         }
 
-        _contractsCache.feeRouter.allocateFees(newInterest);
-
+         _contractsCache.feeRouter..allocateFees(newInterest);
     }
 
     function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
@@ -1112,7 +1111,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     }
 
     function _requireTCRoverMCR(uint _price) internal view {
+        if(!_isShutdown()) {
         require(_getTCR(_price) >= MCR, "TM: Cannot redeem when TCR < MCR");
+        }
     }
 
     function _requireAfterBootstrapPeriod() internal view {

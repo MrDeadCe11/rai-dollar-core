@@ -36,22 +36,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     uint constant public MINUTE_DECAY_FACTOR = 999037758833783000;
     uint constant public REDEMPTION_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
-    // shutdown discount parameters
-    uint256 constant public DECIMAL_PRECISION = 1e18;
-    uint256 constant public FOUR_HOURS = 14400; // 14400 seconds
-    uint256 constant public BASE_DISCOUNT = 2e16; // 2%
-    uint256 constant public MAX_DISCOUNT = 5e17; // 50%
-    uint256 constant public MULTIPLIER = 125e16; // 1.25 * 1e18
-    
-    struct CollateralShutdown {
-        address shutdownTime;
-        uint256 par;
-        bool oracleFailure;
-    }
-
-    // troveManager address => collateralShutdown
-    mapping (address => CollateralShutdown) public collateralShutdown;
-
     /*
     * BETA: 18 digit decimal. Parameter by which to divide the redeemed fraction, in order to calc the new base rate from a redemption.
     * Corresponds to (1 / ALPHA) in the white paper.
@@ -141,14 +125,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         return _calcRedemptionRate(newBaseRate);
     }
 
-    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
-        uint256 newBaseRate = calcNewBaseRate(_LUSDAmount, baseRate, _totalLUSDSupply);
-        uint256 discount = _calcDiscount(newBaseRate);
-        uint256 redemptionRate = _calcRedemptionRate(newBaseRate);
-
-        return redemptionRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
-    }
-
     function getRedemptionRate() public view override returns (uint) {
         return _calcRedemptionRate(baseRate);
     }
@@ -170,11 +146,6 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         uint redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
         require(redemptionFee < _ETHDrawn, "TroveManager: Fee would eat up all returned collateral");
         return redemptionFee;
-    }
-
-    function shutdownCollateral(uint256 _par, bool _oracleFailure) external override {
-        _requireCallerIsTroveManager();
-        collateralShutdown[address(troveManager)] = CollateralShutdown(block.timestamp, par, _oracleFailure);
     }
 
     // --- Internal fee functions ---
