@@ -251,13 +251,13 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     // Shield Trove
     function shieldTrove(address _upperHint, address _lowerHint) external override {
-        // TODO add drip() here. It will break tests
+        troveManager.drip();
         require(!troveManager.shielded(msg.sender), "Trove is already shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }
     // un-Shield Trove
     function unShieldTrove(address _upperHint, address _lowerHint) external override {
-        // TODO add drip() here. It will break tests
+        troveManager.drip();
         require(troveManager.shielded(msg.sender), "Trove is already un-shielded");
         _adjustTrove(msg.sender, 0, 0, 0, false, true, _upperHint, _lowerHint);
     }
@@ -292,7 +292,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         _requireTroveisActive(contractsCache.troveManager, _borrower);
         _requireSufficientCollateralBalance(collateralToken, _borrower, _collateralToAdd);
 
-        // TODO add drip() here. It will break tests
+        troveManager.drip();
 
         // final shield status
         vars.shielded = troveManager.shielded(_borrower) != _toggleShield;
@@ -417,6 +417,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
      * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode
      */
     function claimCollateral() external override returns (uint256 collateralClaimed) {
+        troveManager.drip();
         // send Collateral from CollSurplus Pool to owner
         collateralClaimed = collSurplusPool.claimColl(msg.sender);
     }

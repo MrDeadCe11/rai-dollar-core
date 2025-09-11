@@ -321,7 +321,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         collateralToken.approve(address(activePool), type(uint256).max);
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
-        emit LiquidationsAddressChanged(_borrowerOperationsAddress);
+        emit LiquidationsAddressChanged(_liquidationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
         emit ActiveShieldedPoolAddressChanged(_activeShieldedPoolAddress);
@@ -360,7 +360,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         _requireFrontEndNotRegistered(msg.sender);
         _requireNonZeroAmount(_amount);
 
-        // TODO add drip() here. This will break many tests
+        troveManager.drip();
         _mintPendingDeposits();
 
         uint initialDeposit = deposits[msg.sender].initialValue;
@@ -395,6 +395,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         _sendCollateralGainToDepositor(depositorCollateralGain);
      }
 
+    function withdrawAllFromSP() external {
+        withdrawFromSP(type(uint256).max);
+    }
+
     /*  withdrawFromSP():
     *
     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
@@ -405,12 +409,12 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     *
     * If _amount > userDeposit, the user withdraws all of their compounded deposit.
     */
-    function withdrawFromSP(uint _amount) external override {
+    function withdrawFromSP(uint _amount) public override {
         if (_amount !=0) {_requireNoUnderCollateralizedTroves();}
         uint initialDeposit = deposits[msg.sender].initialValue;
         _requireUserHasDeposit(initialDeposit);
 
-        // TODO add drip()
+        troveManager.drip();
         _mintPendingDeposits();
 
         ICommunityIssuance communityIssuanceCached = communityIssuance;
@@ -434,6 +438,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         
         // Update front end stake
         uint compoundedFrontEndStake = getCompoundedFrontEndStake(frontEnd);
+
+        // this was needed after adding drip to this function and emptying a frontend's stake
+        if (LUSDtoWithdraw > compoundedFrontEndStake) LUSDtoWithdraw= compoundedFrontEndStake;
+
         uint newFrontEndStake = compoundedFrontEndStake.sub(LUSDtoWithdraw);
         _updateFrontEndStakeAndSnapshots(frontEnd, newFrontEndStake);
         emit FrontEndStakeChanged(frontEnd, newFrontEndStake, msg.sender);
@@ -464,7 +472,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         _requireUserHasTrove(msg.sender);
         _requireUserHasCollateralGain(msg.sender);
 
-        // TODO add drip()
+        troveManager.drip();
         _mintPendingDeposits();
         ICommunityIssuance communityIssuanceCached = communityIssuance;
 
@@ -929,6 +937,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         _requireUserHasNoDeposit(msg.sender);
         _requireValidKickbackRate(_kickbackRate);
 
+        troveManager.drip();
         frontEnds[msg.sender].kickbackRate = _kickbackRate;
         frontEnds[msg.sender].registered = true;
 

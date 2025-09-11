@@ -3080,8 +3080,8 @@ contract('TroveManager', async accounts => {
   })
 
   it("liquidate(): liquidates a SP depositor's trove with ICR < 110%, and the liquidation correctly impacts their SP deposit and Collateral gain", async () => {
-    const A_spDeposit = toBN(dec(3, 24))
-    const B_spDeposit = toBN(dec(1, 24))
+    A_spDeposit = toBN(dec(3, 24))
+    B_spDeposit = toBN(dec(1, 24))
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
     await openTrove({ ICR: toBN(dec(8, 18)), extraLUSDAmount: A_spDeposit, extraParams: { from: alice } })
     // lowered bob's ICR from 218 to 211 so ensure liq ratio < liq penalty and full collateral is seized
@@ -3092,99 +3092,64 @@ contract('TroveManager', async accounts => {
     //Bob provides LUSD to SP
     await stabilityPool.provideToSP(B_spDeposit, ZERO_ADDRESS, { from: bob })
 
-    /*
-    const depositsBeforeLiq = await stabilityPool.getTotalLUSDDeposits()
-    console.log("depositsBeforeLiq", depositsBeforeLiq.toString())
-    const bob_Deposit_BeforeLiq = await stabilityPool.getCompoundedLUSDDeposit(bob)
-    console.log("bob_Deposit_BeforeLiq", bob_Deposit_BeforeLiq.toString())
-    */
-
-    collateral_before = await stabilityPool.getCollateral()
-    /*
-    scaleSumSnapshot = await stabilityPool.scaleToSum(1)
-    console.log("scaleSumSnapshot1", scaleSumSnapshot.toString())
-    console.log("P", (await stabilityPool.P()).toString());
-
-    console.log("lastCollateralError_Offset", (await stabilityPool.lastCollateralError_Offset()).toString())
-    console.log("lastLUSDLossError_Offset", (await stabilityPool.lastLUSDLossError_Offset()).toString())
-    */
+    // deposits increase from deposit
+    totalDeposits = B_spDeposit
 
     // Carol gets liquidated
     await priceFeed.setPrice(dec(100, 18))
     tx = await liquidations.liquidate(carol)
     lusdGain = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "DistributeToSP", "lusdGain"));
 
-    //const ethGain = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "ethGain"));
-    //const debtToOffset = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "debtToOffset"));
-    //console.log("ethGain", ethGain.toString())
-    //console.log("debtToOffset", debtToOffset.toString())
-    //const totalLUSD = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "totalLUSD"));
-    //console.log("totalLUSD", totalLUSD.toString())
+    // Sp deposits increase from drip
+    B_spDeposit = B_spDeposit.add(lusdGain)
+    totalDeposits = totalDeposits.add(lusdGain)
+
     liquidatedC_debt = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "debtToOffset"));
 
-    //console.log("collToSp", collToSp.toString())
-    const [liquidatedDebt, liquidatedColl, gasComp] = th.getEmittedLiquidationValues(tx)
-    //console.log("liquidatedC_debtSeq", liquidatedC_debtSeq.toString())
-    //console.log("liquidatedDebt", liquidatedDebt.toString())
+    // Sp deposits decrease from liquidation offset
+    totalDeposits = totalDeposits.sub(liquidatedC_debt)
 
-    collateral_after = await stabilityPool.getCollateral()
-    //console.log("collateral diff", (collateral_before.sub(collateral_after).toString()))
-
-    const newB_spDeposit = B_spDeposit.add(lusdGain)
-    //console.log("lusdGain", lusdGain.toString())
     // Check Bob' SP deposit has absorbed Carol's debt, and he has received her liquidated collateral
-    const bob_Deposit_Before = await stabilityPool.getCompoundedLUSDDeposit(bob)
-    const initialDeposits = await stabilityPool.getTotalLUSDDeposits()
+    const B_spDepositAfterLiq = await stabilityPool.getCompoundedLUSDDeposit(bob)
     const bob_CollateralGain_Before = await stabilityPool.getDepositorCollateralGain(bob)
-    //const [initial_val, tag] = await stabilityPool.deposits(bob)
+
     const initial_val = (await stabilityPool.deposits(bob))[0]
-    //console.log("bob_initial_val", initial_val.toString())
     const {S, P, G, scale} = await stabilityPool.depositSnapshots(bob)
 
-    /*
-    console.log("S", S.toString())
-    console.log("P", P.toString())
-    console.log("G", G.toString())
-    console.log("scale", scale.toString())
-    */
     scaleSumSnapshot = await stabilityPool.scaleToSum(scale)
-    //console.log("scaleSumSnapshot", scaleSumSnapshot.toString())
-    //console.log("init_val x ssumsnap", initial_val.mul(scaleSumSnapshot).div(toBN(dec(1,18))).div(toBN(dec(1,18))).toString())
     init_val_time_ssumsnap = initial_val.mul(scaleSumSnapshot).div(toBN(dec(1,18))).div(toBN(dec(1,18)))
     assert.isTrue(bob_CollateralGain_Before.eq(init_val_time_ssumsnap))
 
-    //console.log("bob_deposit_snaphost", bob_deposit_snapshot.toString())
-
-
-    // console.log("initialDeposits", initialDeposits.toString())
-    // console.log("bob_Deposit_Before", bob_Deposit_Before.toString())
-    // console.log("liquidatedColl", liquidatedColl.toString())
-    // console.log("C_collateral", C_collateral.toString())
-    // console.log("bob_CollateralGain_Before", bob_CollateralGain_Before.toString())
-    // console.log("th.applyLiquidationFee(C_collateral)", th.applyLiquidationFee(C_collateral).toString())
-    // console.log("lastCollateralError_Offset", (await stabilityPool.lastCollateralError_Offset()).toString())
-    // console.log("lastLUSDLossError_Offset", (await stabilityPool.lastLUSDLossError_Offset()).toString())
-
-
-    //assert.isAtMost(th.getDifference(bob_Deposit_Before, newB_spDeposit.sub(liquidatedC_debt)), 1000000)
-    assert.isAtMost(th.getDifference(bob_Deposit_Before, newB_spDeposit.sub(liquidatedC_debt)), 2280000)
+    assert.isAtMost(th.getDifference(B_spDepositAfterLiq, B_spDeposit.sub(liquidatedC_debt)), 1600000)
     // Increase tolerance here but might be okay with collateral error feedback in stabilityPool._computeRewardsPerUnitStaked()
-    assert.isAtMost(th.getDifference(bob_CollateralGain_Before, th.applyLiquidationFee(C_collateral)), 1000000)
+    assert.isAtMost(th.getDifference(bob_CollateralGain_Before, th.applyLiquidationFee(C_collateral)), 550000)
+
+    B_spDeposit = await stabilityPool.getCompoundedLUSDDeposit(bob)
 
     // Alice provides LUSD to SP
-    await stabilityPool.provideToSP(A_spDeposit, ZERO_ADDRESS, { from: alice })
+    txA = await stabilityPool.provideToSP(A_spDeposit, ZERO_ADDRESS, { from: alice })
+    lusdGain = toBN(th.getRawEventArgByName(txA, stabilityPoolInterface, stabilityPool.address, "DistributeToSP", "lusdGain"));
+
+    // deposits increase from drip
+    B_spDeposit = B_spDeposit.add(lusdGain)
+    totalDeposits = totalDeposits.add(lusdGain)
+    // deposits increase from deposit
+    totalDeposits = totalDeposits.add(A_spDeposit)
+
     assert.isFalse(await th.checkRecoveryMode(contracts))
 
-    prev_deposits = await stabilityPool.getTotalLUSDDeposits()
+    assert.isTrue(totalDeposits.eq(await stabilityPool.getTotalLUSDDeposits()))
+    assert.isTrue(A_spDeposit.eq(await stabilityPool.getCompoundedLUSDDeposit(alice)))
+
     // Liquidate Bob
     tx = await liquidations.liquidate(bob)
     lusdGain = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "DistributeToSP", "lusdGain"));
     liquidatedB_debt = toBN(th.getRawEventArgByName(tx, stabilityPoolInterface, stabilityPool.address, "Offset", "debtToOffset"));
-    // liquidate calls drip() and thus increases SP deposits right before liquidating
-    const newA_spDeposit = A_spDeposit.add(lusdGain.mul(A_spDeposit).div(prev_deposits))
-    const newBob_Deposit_Before = bob_Deposit_Before.add(lusdGain.mul(bob_Deposit_Before).div(prev_deposits))
-    // console.log("newA_spDeposit", newA_spDeposit.toString())
-    // console.log("A_spDeposit", A_spDeposit.toString())
+
+    // depositor deposits increase proportionate to their deposit before liquidating
+    A_spDeposit = A_spDeposit.add(lusdGain.mul(A_spDeposit).div(totalDeposits))
+    B_spDeposit = B_spDeposit.add(lusdGain.mul(B_spDeposit).div(totalDeposits))
+    totalDeposits = totalDeposits.add(lusdGain)
 
     // Confirm Bob's trove has been closed
     assert.isFalse(await sortedTroves.contains(bob))
@@ -3198,21 +3163,21 @@ contract('TroveManager', async accounts => {
        Bob's collateral gain = (100 / 400) * 2*0.995 = 0.4975 collateral
 
      Check Bob' SP deposit has been reduced to 50 LUSD, and his collateral gain has increased to 1.5 collateral. */
-    const alice_Deposit_After = (await stabilityPool.getCompoundedLUSDDeposit(alice)).toString()
-    const alice_CollateralGain_After = (await stabilityPool.getDepositorCollateralGain(alice)).toString()
+    const alice_Deposit_After = await stabilityPool.getCompoundedLUSDDeposit(alice)
+    const alice_CollateralGain_After = await stabilityPool.getDepositorCollateralGain(alice)
 
     //const totalDeposits = bob_Deposit_Before.add(A_spDeposit)
-    const totalDeposits = prev_deposits.add(lusdGain)
+    //totalDeposits = prev_deposits.add(lusdGain)
     
     // TODO increased tolerance for both of these from 1e6 to 43e5. is this ok? 
-    assert.isAtMost(th.getDifference(alice_Deposit_After, newA_spDeposit.sub(liquidatedB_debt.mul(newA_spDeposit).div(totalDeposits))), 6120000)
-    assert.isAtMost(th.getDifference(alice_CollateralGain_After, th.applyLiquidationFee(B_collateral).mul(newA_spDeposit).div(totalDeposits)), 3000000)
+    assert.isAtMost(th.getDifference(alice_Deposit_After, A_spDeposit.sub(liquidatedB_debt.mul(A_spDeposit).div(totalDeposits))), 6120000)
+    assert.isAtMost(th.getDifference(alice_CollateralGain_After, th.applyLiquidationFee(B_collateral).mul(A_spDeposit).div(totalDeposits)), 3000000)
 
     const bob_Deposit_After = await stabilityPool.getCompoundedLUSDDeposit(bob)
     const bob_CollateralGain_After = await stabilityPool.getDepositorCollateralGain(bob)
 
-    assert.isAtMost(th.getDifference(bob_Deposit_After, newBob_Deposit_Before.sub(liquidatedB_debt.mul(newBob_Deposit_Before).div(totalDeposits))), 2040000)
-    assert.isAtMost(th.getDifference(bob_CollateralGain_After, bob_CollateralGain_Before.add(th.applyLiquidationFee(B_collateral).mul(newBob_Deposit_Before).div(totalDeposits))), 1000000)
+    assert.isAtMost(th.getDifference(bob_Deposit_After, B_spDeposit.sub(liquidatedB_debt.mul(B_spDeposit).div(totalDeposits))), 2120000)
+    assert.isAtMost(th.getDifference(bob_CollateralGain_After, bob_CollateralGain_Before.add(th.applyLiquidationFee(B_collateral).mul(B_spDeposit).div(totalDeposits))), 1000000)
   })
 
   it("liquidate(): does not alter the liquidated user's token balance", async () => {
@@ -3388,11 +3353,13 @@ contract('TroveManager', async accounts => {
     // B tries to fully withdraw
     //await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
     balanceBefore = await lusdToken.balanceOf(B)
-    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    tx = await stabilityPool.withdrawFromSP(dec(101, 18), { from: B })
+    const [, drip] = await th.getEmittedDripValues(contracts, tx)
+
     balanceAfter = await lusdToken.balanceOf(B)
 
     balanceDiff = balanceAfter.sub(balanceBefore)
-    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18)).add(drip)))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))
@@ -3412,7 +3379,7 @@ contract('TroveManager', async accounts => {
     await priceFeed.setPrice(dec(175, 18))
     let price = await priceFeed.getPrice()
     assert.isFalse(await th.checkRecoveryMode(contracts))
-    
+
     // A gets liquidated, creates pending rewards for all
     const liqTxA = await liquidations.liquidate(A)
     assert.isTrue(liqTxA.receipt.status)
@@ -3442,8 +3409,12 @@ contract('TroveManager', async accounts => {
 
     // // All remaining troves D and E repay a little debt, applying their pending rewards
     assert.isTrue((await sortedTroves.getSize()).eq(toBN('3')))
-    await borrowerOperations.repayLUSD(dec(1, 18), D, D, {from: D})
+
+    // In original test D and E have same final ICR but D is liquidated first since ties on insert
+    // puts the new node towards the higher end of the list.
+    // To preserve D liquidated first in this test, we have E repay before D, unlike original test
     await borrowerOperations.repayLUSD(dec(1, 18), E, E, {from: E})
+    await borrowerOperations.repayLUSD(dec(1, 18), D, D, {from: D})
 
     // Check C is the only trove that has pending rewards
     assert.isTrue(await rewards.hasPendingRewards(C))
@@ -3468,6 +3439,7 @@ contract('TroveManager', async accounts => {
 
     await priceFeed.setPrice(dec(50, 18))
 
+    assert.isTrue(await sortedTroves.contains(D))
     // Try to liquidate C again. Check it succeeds and closes C's trove
     const liqTx2 = await liquidations.liquidateTroves(2)
     assert.isTrue(liqTx2.receipt.status)
@@ -3964,24 +3936,38 @@ contract('TroveManager', async accounts => {
 
   it("liquidateTroves(): Liquidating troves with SP deposits correctly impacts their SP deposit and Collateral gain", async () => {
     // Whale provides 400 LUSD to the SP
-    const whaleDeposit = toBN(dec(40000, 18))
+    whaleDeposit = toBN(dec(40000, 18))
     await openTrove({ ICR: toBN(dec(100, 18)), extraLUSDAmount: whaleDeposit, extraParams: { from: whale } })
 
-    const A_deposit = toBN(dec(10000, 18))
-    const B_deposit = toBN(dec(30000, 18))
+    A_deposit = toBN(dec(10000, 18))
+    B_deposit = toBN(dec(30000, 18))
     const { collateral: A_coll, totalDebt: A_debt } = await openTrove({ ICR: toBN(dec(2, 18)), extraLUSDAmount: A_deposit, extraParams: { from: alice } })
     const { collateral: B_coll, totalDebt: B_debt } = await openTrove({ ICR: toBN(dec(2, 18)), extraLUSDAmount: B_deposit, extraParams: { from: bob } })
     const { collateral: C_coll, totalDebt: C_debt } = await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: carol } })
 
     await stabilityPool.provideToSP(whaleDeposit, ZERO_ADDRESS, { from: whale })
 
+    totalDeposits = whaleDeposit
+
     const liquidatedColl = A_coll.add(B_coll).add(C_coll)
     //const liquidatedDebt = A_debt.add(B_debt).add(C_debt)
 
     // A, B provide 100, 300 to the SP
-    await stabilityPool.provideToSP(A_deposit, ZERO_ADDRESS, { from: alice })
-    await stabilityPool.provideToSP(B_deposit, ZERO_ADDRESS, { from: bob })
+    tx1 = await stabilityPool.provideToSP(A_deposit, ZERO_ADDRESS, { from: alice })
+    const [, drip1] = await th.getEmittedDripValues(contracts, tx1)
 
+    whaleDeposit = whaleDeposit.add(drip1)
+    totalDeposits = totalDeposits.add(drip1)
+    totalDeposits = totalDeposits.add(A_deposit)
+    assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).eq(totalDeposits))
+
+    tx2 = await stabilityPool.provideToSP(B_deposit, ZERO_ADDRESS, { from: bob })
+    const [, drip2] = await th.getEmittedDripValues(contracts, tx2)
+
+    whaleDeposit = whaleDeposit.add(drip2.mul(whaleDeposit).div(totalDeposits))
+    A_deposit = A_deposit.add(drip2.mul(A_deposit).div(totalDeposits))
+    totalDeposits = totalDeposits.add(drip2).add(B_deposit)
+     
     assert.equal((await sortedTroves.getSize()).toString(), '4')
 
     // Price drops
@@ -3989,7 +3975,7 @@ contract('TroveManager', async accounts => {
 
     // Check eq 800 LUSD in Pool.
     // no drips after provide so should be eq
-    const totalDeposits = whaleDeposit.add(A_deposit).add(B_deposit)
+    //totalDeposits = whaleDeposit.add(A_deposit).add(B_deposit).add(drip1).add(drip2)
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).eq(totalDeposits))
 
     assert.isFalse(await th.checkRecoveryMode(contracts))
@@ -4061,6 +4047,8 @@ contract('TroveManager', async accounts => {
     assert.isAtMost(th.getDifference(bob_Deposit_After, B_deposit.sub(liquidatedDebt.mul(B_deposit).div(totalDeposits))), 100000)
     */
 
+    console.log("whale_Deposit_After " + whale_Deposit_After)
+    console.log("Exp " + newWhaleDeposit.sub(liquidatedDebt.mul(newWhaleDeposit).div(newTotalDeposits)))
     assert.isAtMost(th.getDifference(whale_Deposit_After, newWhaleDeposit.sub(liquidatedDebt.mul(newWhaleDeposit).div(newTotalDeposits))), 100000)
     assert.isAtMost(th.getDifference(alice_Deposit_After, newA_deposit.sub(liquidatedDebt.mul(newA_deposit).div(newTotalDeposits))), 100000)
     assert.isAtMost(th.getDifference(bob_Deposit_After, newB_deposit.sub(liquidatedDebt.mul(newB_deposit).div(newTotalDeposits))), 100000)
@@ -4132,11 +4120,12 @@ contract('TroveManager', async accounts => {
     //await assertRevert(stabilityPool.withdrawFromSP(dec(100, 18), { from: B }), "Withdrawal must leave totalBoldDeposits >= MIN_LUSD_IN_SP")
       //
     balanceBefore = await lusdToken.balanceOf(B)
-    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    tx = await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    const [, drip] = await th.getEmittedDripValues(contracts, tx)
     balanceAfter = await lusdToken.balanceOf(B)
 
     balanceDiff = balanceAfter.sub(balanceBefore)
-    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18)).add(drip)))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))
@@ -4843,11 +4832,12 @@ contract('TroveManager', async accounts => {
       //
     // Change from V1: withdraw over available doesn't revert, just rounds down to amount available
     balanceBefore = await lusdToken.balanceOf(B)
-    await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    tx = await stabilityPool.withdrawFromSP(dec(100, 18), { from: B })
+    const [, drip] = await th.getEmittedDripValues(contracts, tx)
     balanceAfter = await lusdToken.balanceOf(B)
 
     balanceDiff = balanceAfter.sub(balanceBefore)
-    assert.isTrue(balanceDiff.eq(toBN(dec(99,18))))
+    assert.isTrue(balanceDiff.eq(toBN(dec(99,18)).add(drip)))
 
     // Check SP is not empty
     assert.isTrue((await stabilityPool.getTotalLUSDDeposits()).gt(toBN('0')))

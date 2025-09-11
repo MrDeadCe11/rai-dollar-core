@@ -171,10 +171,11 @@ contract('FeeRouter', async accounts => {
       spAlloc1 = await feeRouter.spAllocFrac()
       assert.isTrue(spAlloc1.eq(spAlloc))
 
-      // fast-forward
-      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
       // increase SP deposit
       await stabilityPool.provideToSP(startSp.div(toBN('2')), ZERO_ADDRESS, { from: whale })
+
+      // fast-forward
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
 
       // Drip
       tx2 = await troveManager.drip() 
@@ -190,10 +191,11 @@ contract('FeeRouter', async accounts => {
       spAlloc2 = await feeRouter.spAllocFrac()
       assert.isTrue(spAlloc2.lt(spAlloc1))
 
-      // fast-forward
-      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
       // increase SP deposit
       await stabilityPool.provideToSP(startSp.div(toBN('2')), ZERO_ADDRESS, { from: whale })
+
+      // fast-forward
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
 
       // Drip
       tx3 = await troveManager.drip()
@@ -208,10 +210,11 @@ contract('FeeRouter', async accounts => {
       spAlloc3 = await feeRouter.spAllocFrac()
       assert.isTrue(spAlloc3.lt(spAlloc2))
 
-      // fast-forward
-      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
       // increase SP deposit
       await stabilityPool.provideToSP(startSp.div(toBN('2')), ZERO_ADDRESS, { from: whale })
+
+      // fast-forward
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
 
       // Drip
       tx4 = await troveManager.drip()
@@ -226,11 +229,11 @@ contract('FeeRouter', async accounts => {
       spAlloc4 = await feeRouter.spAllocFrac()
       assert.isTrue(spAlloc4.lt(spAlloc3))
 
-      // fast-forward
-      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
-
       // **decrease** SP deposit
       await stabilityPool.withdrawFromSP(startSp.mul(toBN('2')), { from: whale })
+
+      // fast-forward
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK, web3.currentProvider)
 
       // Drip
       tx5 = await troveManager.drip()

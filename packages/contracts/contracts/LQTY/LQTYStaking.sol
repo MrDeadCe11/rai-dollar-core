@@ -8,6 +8,7 @@ import "../Dependencies/Ownable.sol";
 import "../Dependencies/CheckContract.sol";
 import "../Dependencies/console.sol";
 import "../Interfaces/ILQTYToken.sol";
+import "../Interfaces/ITroveManager.sol";
 import "../Interfaces/ILQTYStaking.sol";
 import "../Dependencies/LiquityMath.sol";
 import "../Interfaces/ILUSDToken.sol";
@@ -36,7 +37,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     ILQTYToken public lqtyToken;
     ILUSDToken public lusdToken;
     IERC20 public collateralToken;
-    address public troveManagerAddress;
+    ITroveManager public troveManager;
     address public borrowerOperationsAddress;
     address public activePoolAddress;
     address public globalFeeRouterAddress;
@@ -84,7 +85,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
 
         lqtyToken = ILQTYToken(_lqtyTokenAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
-        troveManagerAddress = _troveManagerAddress;
+        troveManager = ITroveManager(_troveManagerAddress);
         borrowerOperationsAddress = _borrowerOperationsAddress;
         activePoolAddress = _activePoolAddress;
         globalFeeRouterAddress = _globalFeeRouterAddress;
@@ -103,6 +104,8 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     // If caller has a pre-existing stake, send any accumulated ETH and LUSD gains to them. 
     function stake(uint _LQTYamount) external override {
         _requireNonZeroAmount(_LQTYamount);
+
+        troveManager.drip();
 
         uint currentStake = stakes[msg.sender];
 
@@ -141,6 +144,8 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     function unstake(uint _LQTYamount) external override {
         uint currentStake = stakes[msg.sender];
         _requireUserHasStake(currentStake);
+
+        troveManager.drip();
 
         // Grab any accumulated ETH and LUSD gains from the current stake
         uint ETHGain = _getPendingETHGain(msg.sender);
@@ -233,7 +238,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     // --- 'require' functions ---
 
     function _requireCallerIsTroveManager() internal view {
-        require(msg.sender == troveManagerAddress, "LQTYStaking: caller is not TroveM");
+        require(msg.sender == address(troveManager), "LQTYStaking: caller is not TroveM");
     }
 
     function _requireCallerIsBorrowerOperations() internal view {
@@ -243,7 +248,7 @@ contract LQTYStaking is ILQTYStaking, Ownable, CheckContract, BaseMath {
     function _requireCallerIsBorrowerOperationsOrTroveManagerOrGFR() internal view {
         require(msg.sender == borrowerOperationsAddress ||
                 msg.sender == globalFeeRouterAddress ||
-                msg.sender == troveManagerAddress, "LQTYStaking: caller is not BorrowerOps or TroveManager or GFR");
+                msg.sender == address(troveManager), "LQTYStaking: caller is not BorrowerOps or TroveManager or GFR");
     }
 
      function _requireCallerIsActivePool() internal view {

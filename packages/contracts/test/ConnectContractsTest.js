@@ -278,7 +278,7 @@ contract('Deployment script - Sets correct contract addresses dependencies after
   it('Sets the correct ActivePool address in LQTYStaking', async () => {
     const troveManagerAddress = troveManager.address
 
-    const recordedTroveManagerAddress = await lqtyStaking.troveManagerAddress()
+    const recordedTroveManagerAddress = await lqtyStaking.troveManager()
     assert.equal(troveManagerAddress, recordedTroveManagerAddress)
   })
 
