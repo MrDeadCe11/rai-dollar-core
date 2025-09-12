@@ -371,23 +371,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                     return singleRedemption;
                 }
                 */
-            }
-
-            TroveStorage storage t = getTroveStorage().Troves[_borrower];
-            t.debt = locals.newDebt;
-            t.coll = locals.newColl;
-            rewards.updateStakeAndTotalStakes(_borrower);
-
-            emit TroveUpdated(
-                _borrower,
-                locals.newDebt, locals.newColl,
-                t.stake,
-                TroveManagerOperation.redeemCollateral
-            );
-        }
-       
-    //     return singleRedemption;
-    // }
+            }       
+        return singleRedemption;
+    }
     
     /*
     * Called when a full redemption occurs, and closes the trove.
@@ -1008,11 +994,11 @@ function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 
             return;
         }
 
-         _contractsCache.feeRouter..allocateFees(newInterest);
+         _contractsCache.feeRouter.allocateFees(newInterest);
     }
 
     function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
-        uint256 newBaseRate = aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
+        uint256 newBaseRate = getContractsStorage().aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
         uint256 discount = _calcDiscount(newBaseRate);
         
         return newBaseRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
@@ -1039,33 +1025,7 @@ function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 
         emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
     }
 
-    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view override returns (uint) {
-        uint256 newBaseRate = aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
-        uint256 discount = _calcDiscount(newBaseRate);
-        
-        return newBaseRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
-    }
 
-    function _calcDiscount(uint _baseRate) internal view returns (uint) {
-        
-        uint timePassed = block.timestamp.sub(collateralShutdown.shutdownTime);
-        
-        uint256 maxDiscount = collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
-
-        if (timePassed >= SEVENTY_TWO_HOURS) {
-            return maxDiscount;
-        }
-
-        return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
-    }
-
-    function _shutdown(bool _oracleFailure, uint256 _rate, uint256 _par) internal {
-        collateralShutdown.shutdownTime = block.timestamp;
-        collateralShutdown.par = _par;
-        collateralShutdown.rate = _rate;
-        collateralShutdown.oracleFailure = _oracleFailure;
-        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
-    }
 
 
     function _calcDiscountForShutdown() internal view returns (uint) {
