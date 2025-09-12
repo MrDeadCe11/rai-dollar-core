@@ -321,6 +321,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@colors/colors@npm:1.5.0":
+  version: 1.5.0
+  resolution: "@colors/colors@npm:1.5.0"
+  checksum: d64d5260bed1d5012ae3fc617d38d1afc0329fec05342f4e6b838f46998855ba56e0a73833f4a80fa8378c84810da254f76a8a19c39d038260dc06dc4e007425
+  languageName: node
+  linkType: hard
+
 "@commitlint/cli@npm:^12.0.1":
   version: 12.0.1
   resolution: "@commitlint/cli@npm:12.0.1"
@@ -1782,6 +1789,7 @@ __metadata:
     ethereumjs-util: ^7.0.9
     ethers: ^5.4.3
     hardhat: ^2.6.1
+    hardhat-contract-sizer: ^2.10.1
     hardhat-gas-reporter: ^1.0.1
     npm-run-all: ^4.1.5
     solc: ^0.6.11
@@ -8439,6 +8447,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"cli-table3@npm:^0.6.0":
+  version: 0.6.5
+  resolution: "cli-table3@npm:0.6.5"
+  dependencies:
+    "@colors/colors": 1.5.0
+    string-width: ^4.2.0
+  dependenciesMeta:
+    "@colors/colors":
+      optional: true
+  checksum: ab7afbf4f8597f1c631f3ee6bb3481d0bfeac8a3b81cffb5a578f145df5c88003b6cfff46046a7acae86596fdd03db382bfa67f20973b6b57425505abc47e42c
+  languageName: node
+  linkType: hard
+
 "cli-table@npm:^0.3.1":
   version: 0.3.5
   resolution: "cli-table@npm:0.3.5"
@@ -13201,6 +13222,19 @@ __metadata:
   version: 2.1.0
   resolution: "hard-rejection@npm:2.1.0"
   checksum: 7baaf80a0c7fff4ca79687b4060113f1529589852152fa935e6787a2bc96211e784ad4588fb3048136ff8ffc9dfcf3ae385314a5b24db32de20bea0d1597f9dc
+  languageName: node
+  linkType: hard
+
+"hardhat-contract-sizer@npm:^2.10.1":
+  version: 2.10.1
+  resolution: "hardhat-contract-sizer@npm:2.10.1"
+  dependencies:
+    chalk: ^4.0.0
+    cli-table3: ^0.6.0
+    strip-ansi: ^6.0.0
+  peerDependencies:
+    hardhat: ^2.0.0
+  checksum: 478e636883b1fa7c7a51b61831a440e74ba8e10c087b44361ed84dde5992bf16158aa7059532e766dc6bd9ba66bf57fa7e36b29ae4080309e144983b7f6e1f27
   languageName: node
   linkType: hard
 
