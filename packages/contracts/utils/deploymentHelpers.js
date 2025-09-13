@@ -82,7 +82,7 @@ let troveManagerLib;
 let libLinked = false;
 
 class DeploymentHelper {
-  
+
   static async deployLiquityCore() {
     const cmdLineArgs = process.argv
     const frameworkPath = cmdLineArgs[1]
@@ -223,8 +223,13 @@ class DeploymentHelper {
     testerContracts.collSurplusPool = await CollSurplusPool.new()
     testerContracts.math = await LiquityMathTester.new()
     testerContracts.borrowerOperations = await BorrowerOperationsTester.new()
-    testerContracts.troveManagerLib = await TroveManagerLib.new()
-    await TroveManagerTester.link(testerContracts.troveManagerLib)
+    if (!troveManagerLib) {
+    troveManagerLib = await TroveManagerLib.new()
+    }
+    if (!libLinked) {
+      await TroveManager.link(troveManagerLib)
+      libLinked = true;
+    }
     testerContracts.troveManager = await TroveManagerTester.new()
     testerContracts.feeRouter = await FeeRouter.new()
     testerContracts.globalFeeRouter = await GlobalFeeRouter.new()

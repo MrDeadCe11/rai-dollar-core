@@ -255,6 +255,14 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         return getTroveStorage().TroveOwners[_index];
     }
 
+    function ShieldedTroveOwners() external view returns (address[] memory) {
+        return getTroveStorage().ShieldedTroveOwners;
+    }
+
+    function TroveOwners() external view returns (address[] memory) {
+        return getTroveStorage().TroveOwners;
+    }
+
     function getShieldedTroveOwnersCount() external view override returns (uint) {
         return getTroveStorage().ShieldedTroveOwners.length;
     }
@@ -1106,6 +1114,18 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     
     function shielded(address _borrower) external view override returns (bool) {
         return getTroveStorage().shielded[_borrower];
+    }
+
+    function sortedTroves() external view returns (ISortedTroves) {
+        return getContractsStorage().sortedTroves;
+    }
+
+    function sortedShieldedTroves() external view returns (ISortedTroves) {
+        return getContractsStorage().sortedShieldedTroves;
+    }
+
+    function borrowerOperationsAddress() external view returns (address) {
+        return getContractsStorage().borrowerOperationsAddress;
     }
 
     function Troves(address _borrower) external view returns

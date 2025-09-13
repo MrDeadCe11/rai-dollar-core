@@ -8,6 +8,7 @@ const getDifference = th.getDifference
 const mv = testHelpers.MoneyValues
 
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("TroveManagerLib")
 const LiquidationsTester = artifacts.require("LiquidationsTester")
 const LUSDToken = artifacts.require("LUSDToken")
 

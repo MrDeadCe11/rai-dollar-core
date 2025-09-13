@@ -3,6 +3,7 @@ const testHelpers = require("../utils/testHelpers.js")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const RateControlTester = artifacts.require("./RateControlTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const FeeRouterTester = artifacts.require("./FeeRouterTester.sol")
 const StabilityPoolTester = artifacts.require("./StabilityPoolTester.sol")
 
@@ -11,6 +12,12 @@ const th = testHelpers.TestHelper
 
 contract('StabilityPool - Withdrawal of stability deposit - Reward calculations', async accounts => {
 
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   const [owner,
     defaulter_1,
     defaulter_2,

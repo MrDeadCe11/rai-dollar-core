@@ -73,7 +73,10 @@ contract('HintHelpers', async accounts => {
   }
 
   before(async () => {
+    const lib = await TroveManagerLib.new();
+
     contracts = await deploymentHelper.deployLiquityCore()
+    await TroveManagerTester.link(lib);
     contracts.troveManager = await TroveManagerTester.new()
     contracts.lusdToken = await LUSDToken.new(
       contracts.troveManager.address,
