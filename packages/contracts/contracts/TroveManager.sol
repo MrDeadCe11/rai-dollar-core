@@ -339,12 +339,22 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             emit TroveUpdated(_borrower, 0, 0, 0, TroveManagerOperation.redeemCollateral);
 
         } else {
+            locals.newNICR = LiquityMath._computeNominalCR(locals.newColl, locals.newDebt);
+            /*
+            * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
+            * certainly result in running out of gas. 
+            *
+            * If the resultant net debt of the partial is less than the minimum, net debt we bail.
+            */
 
-            singleRedemption = _reInsertTroves(_contractsCache, locals, hints, singleRedemption, _shielded, _borrower);
-            // if the partial redemption is cancelled during  the reinsertion, return the singleRedemption
-            if(singleRedemption.cancelledPartial) {
+            // This options would allow par drift after off-chain hint
+            //if (!sorted.isValidInsertPosition(locals.newNICR, hints.upper, hints.lower)  || _getNetDebt(_actualDebt(locals.newDebt, _shielded)) < MIN_NET_DEBT) {
+            if (locals.newNICR != hints.partialNICR || _getNetDebt(_actualDebt(locals.newDebt, _shielded)) < MIN_NET_DEBT) {
+                singleRedemption.cancelledPartial = true;
                 return singleRedemption;
             }
+
+            _reInsertTroves(_contractsCache, locals, hints, _shielded, _borrower);
 
             Troves[_borrower].debt = locals.newDebt;
             Troves[_borrower].coll = locals.newColl;
@@ -385,21 +395,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         return _singleRedemption;
     }
 
-    function _reInsertTroves(ContractsCache memory _contractsCache, RedemptionFromTroveLocals memory _locals, RedemptionHints memory _hints, SingleRedemptionValues memory _singleRedemption, bool _shielded, address _borrower) internal returns (SingleRedemptionValues memory singleRedemption){
-      _locals.newNICR = LiquityMath._computeNominalCR(_locals.newColl, _locals.newDebt);
-            /*
-            * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
-            * certainly result in running out of gas. 
-            *
-            * If the resultant net debt of the partial is less than the minimum, net debt we bail.
-            */
-
-            // This options would allow par drift after off-chain hint
-            //if (!sorted.isValidInsertPosition(locals.newNICR, hints.upper, hints.lower)  || _getNetDebt(_actualDebt(locals.newDebt, _shielded)) < MIN_NET_DEBT) {
-            if (_locals.newNICR != _hints.partialNICR || _getNetDebt(_actualDebt(_locals.newDebt, _shielded)) < MIN_NET_DEBT) {
-                _singleRedemption.cancelledPartial = true;
-                return _singleRedemption;
-            }
+    function _reInsertTroves(ContractsCache memory _contractsCache, RedemptionFromTroveLocals memory _locals, RedemptionHints memory _hints, bool _shielded, address _borrower) internal {
 
             if (_shielded) {
                 _contractsCache.sortedShieldedTroves.reInsert(_borrower, _locals.newNICR, _hints.upperShieldedHint, _hints.lowerShieldedHint);
@@ -418,8 +414,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
                 }
                 */
             }
-
-            return _singleRedemption;
     }
     
     /*
