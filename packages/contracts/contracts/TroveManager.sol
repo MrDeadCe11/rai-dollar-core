@@ -341,6 +341,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         } else {
 
             singleRedemption = _reInsertTroves(_contractsCache, locals, hints, singleRedemption, _shielded, _borrower);
+            // if the partial redemption is cancelled during  the reinsertion, return the singleRedemption
+            if(singleRedemption.cancelledPartial) {
+                return singleRedemption;
+            }
 
             Troves[_borrower].debt = locals.newDebt;
             Troves[_borrower].coll = locals.newColl;
