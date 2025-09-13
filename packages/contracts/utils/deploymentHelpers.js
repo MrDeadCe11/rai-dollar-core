@@ -1,6 +1,7 @@
 const { ethers } = require("hardhat")
 const SortedTroves = artifacts.require("./SortedTroves.sol")
 const TroveManager = artifacts.require("./TroveManager.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const Liquidations = artifacts.require("./Liquidations.sol")
 const PriceFeedTestnet = artifacts.require("./PriceFeedTestnet.sol")
 const LUSDToken = artifacts.require("./LUSDToken.sol")
@@ -77,10 +78,11 @@ LQTY contracts consist of only those contracts related to the LQTY Token:
 
 const ZERO_ADDRESS = '0x' + '0'.repeat(40)
 const maxBytes32 = '0x' + 'f'.repeat(64)
+let troveManagerLib;
+let libLinked = false;
 
 class DeploymentHelper {
-
-
+  
   static async deployLiquityCore() {
     const cmdLineArgs = process.argv
     const frameworkPath = cmdLineArgs[1]
@@ -109,6 +111,13 @@ class DeploymentHelper {
     const aggregator = await Aggregator.new()
     const sortedTroves = await SortedTroves.new()
     const sortedShieldedTroves = await SortedTroves.new()
+    if (!troveManagerLib) {
+    troveManagerLib = await TroveManagerLib.new()
+    }
+    if (!libLinked) {
+      await TroveManager.link(troveManagerLib)
+      libLinked = true;
+    }
     const troveManager = await TroveManager.new()
     const rewards = await Rewards.new()
     const feeRouter = await FeeRouter.new()
@@ -214,6 +223,8 @@ class DeploymentHelper {
     testerContracts.collSurplusPool = await CollSurplusPool.new()
     testerContracts.math = await LiquityMathTester.new()
     testerContracts.borrowerOperations = await BorrowerOperationsTester.new()
+    testerContracts.troveManagerLib = await TroveManagerLib.new()
+    await TroveManagerTester.link(testerContracts.troveManagerLib)
     testerContracts.troveManager = await TroveManagerTester.new()
     testerContracts.feeRouter = await FeeRouter.new()
     testerContracts.globalFeeRouter = await GlobalFeeRouter.new()

@@ -45,6 +45,8 @@ contract('Gas compensation tests', async accounts => {
   }
 
   before(async () => {
+    const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
     liquidationsTester = await LiquidationsTester.new()
     troveManagerTester = await TroveManagerTester.new()
     borrowerOperationsTester = await BorrowerOperationsTester.new()

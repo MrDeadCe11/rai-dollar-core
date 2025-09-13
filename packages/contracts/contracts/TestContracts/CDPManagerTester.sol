@@ -32,6 +32,38 @@ contract TroveManagerTester is TroveManager {
     }
 
     function callInternalRemoveTroveOwner(address _troveOwner) external {
-        _removeTroveOwner(_troveOwner, shielded[_troveOwner]);
+        _removeTroveOwner(_troveOwner, getTroveStorage().shielded[_troveOwner]);
     }
+
+    function _removeTroveOwner(address _borrower, bool _shielded) internal {
+        //Status troveStatus = Troves[_borrower].status;
+
+        // It’s set in caller function `_closeTrove`
+        // skipping this since all calling functions handle this responsibility
+        //assert(troveStatus != Status.nonExistent && troveStatus != Status.active);
+        TroveStorage storage ts = getTroveStorage();
+        Trove storage t = ts.Troves[_borrower];
+        uint128 index = t.arrayIndex;
+
+        uint length = _shielded ? ts.ShieldedTroveOwners.length : ts.TroveOwners.length;
+
+        uint idxLast = length.sub(1);
+
+        assert(index <= idxLast);
+
+        address addressToMove = _shielded ? ts.ShieldedTroveOwners[idxLast] : ts.TroveOwners[idxLast];
+        ts.Troves[addressToMove].arrayIndex = index;
+
+        if (_shielded) {
+            ts.ShieldedTroveOwners[index] = addressToMove;
+            ts.ShieldedTroveOwners.pop();
+        } else {
+            ts.TroveOwners[index] = addressToMove;
+            ts.TroveOwners.pop();
+        }
+
+        emit TroveIndexUpdated(addressToMove, index, _shielded);
+
+    }
+    
 }

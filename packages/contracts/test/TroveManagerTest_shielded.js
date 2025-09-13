@@ -69,6 +69,12 @@ contract('TroveManager - Shielded', async accounts => {
   const openTrove = async (params) => th.openTrove(contracts, params)
   const openShieldedTrove = async (params) => th.openShieldedTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
 
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()

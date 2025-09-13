@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const testInvariants = require("../utils/testInvariants.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
@@ -37,7 +38,12 @@ contract('GlobalFeeRouter', async accounts => {
 
     const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
   
-
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   let priceFeed
   let lusdToken
   let sortedTroves

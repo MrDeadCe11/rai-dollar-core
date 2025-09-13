@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const testInvariants = require("../utils/testInvariants.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
@@ -25,10 +26,15 @@ const timeValues = testHelpers.TimeValues
 const GAS_PRICE = 10000000
 
 contract('FeeRouter', async accounts => {
-
+  
+  before(async () => {
+    const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   const ZERO_ADDRESS = th.ZERO_ADDRESS
   const ONE_DOLLAR = toBN(dec(1, 18))
-  const ONE_CENT = toBN(dec(1, 16))
+  const ONE_CENT = toBN(dec(1, 16)) 
 
   const [
     owner,

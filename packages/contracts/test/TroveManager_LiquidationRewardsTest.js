@@ -39,6 +39,12 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee)
   const openTrove = async (params) => th.openTrove(contracts, params)
 
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.liquidations = await LiquidationsTester.new()

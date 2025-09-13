@@ -9,12 +9,19 @@ const getDifference = th.getDifference
 
 const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LUSDToken = artifacts.require("LUSDToken")
 
 const GAS_PRICE = 10000000
 
 contract('StabilityPool - Small Liquidation', async accounts => {
 
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   const [
     owner,
     whale,

@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const testInvariants = require("../utils/testInvariants.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
@@ -68,11 +69,18 @@ contract('TroveManager', async accounts => {
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee)
   const openTrove = async (params) => th.openTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
 
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.aggregator = await AggregatorTester.new()
     contracts.liquidations = await LiquidationsTester.new()
+    contracts.troveManagerLib = await TroveManagerLib.new()
     contracts.troveManager = await TroveManagerTester.new()
     contracts.rateControl = await RateControlTester.new()
     contracts.lusdToken = await LUSDTokenTester.new(

@@ -2,6 +2,7 @@ const {time} = require('@openzeppelin/test-helpers');
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
 
@@ -16,6 +17,12 @@ const GAS_PRICE = 10000000
 
 contract('Relayer', async accounts => {
 
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   const _18_zeros = '000000000000000000'
   const ONE_DOLLAR = toBN(dec(1, 18))
   const ZERO_RATE = toBN(dec(1, 27))
