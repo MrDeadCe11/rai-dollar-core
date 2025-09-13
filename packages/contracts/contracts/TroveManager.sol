@@ -18,6 +18,8 @@ import "./Interfaces/IRelayer.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
+import "./Dependencies/TroveManagerStorageLib.sol";
+import "./Interfaces/ITroveManagerStorage.sol";
 // import "./Dependencies/console.sol";
 
 /*
@@ -45,40 +47,10 @@ library Str {
 }
 */
 
-contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
+contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITroveManagerStorage {
     //string constant public NAME = "TroveManager";
 
     // --- Connected contract declarations ---
-
-    IAggregator public aggregator;
-
-    IRewards public rewards;
-
-    IFeeRouter public feeRouter;
-
-    IGlobalFeeRouter public globalFeeRouter;
-
-    ILiquidations public liquidations;
-
-    address public borrowerOperationsAddress;
-
-    IStabilityPool public override stabilityPool;
-
-    address gasPoolAddress;
-
-    ICollSurplusPool public override collSurplusPool;
-
-    ILUSDToken public override lusdToken;
-
-    ILQTYToken public override lqtyToken;
-
-    ILQTYStaking public override lqtyStaking;
-
-    // A doubly linked list of Troves, sorted by their collateral ratios
-    ISortedTroves public sortedTroves;
-
-    // A doubly linked list of Shielded Troves, sorted by their collateral ratios
-    ISortedTroves public sortedShieldedTroves;
 
     uint internal constant REDEMPTION_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
@@ -131,18 +103,18 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     address[] public TroveOwners;
     address[] public ShieldedTroveOwners;
 
-    struct ContractsCache {
-        IActivePool activePool;
-        IActivePool activeShieldedPool;
-        IAggregator aggregator;
-        IDefaultPool defaultPool;
-        ILUSDToken lusdToken;
-        ILQTYStaking lqtyStaking;
-        ISortedTroves sortedTroves;
-        ISortedTroves sortedShieldedTroves;
-        ICollSurplusPool collSurplusPool;
-        address gasPoolAddress;
-    }
+    // struct ContractsCache {
+    //     IActivePool activePool;
+    //     IActivePool activeShieldedPool;
+    //     IAggregator aggregator;
+    //     IDefaultPool defaultPool;
+    //     ILUSDToken lusdToken;
+    //     ILQTYStaking lqtyStaking;
+    //     ISortedTroves sortedTroves;
+    //     ISortedTroves sortedShieldedTroves;
+    //     ICollSurplusPool collSurplusPool;
+    //     address gasPoolAddress;
+    // }
     // --- Variable container structs for redemptions ---
 
     struct RedemptionTotals {
@@ -214,30 +186,41 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             checkContract(addresses[i]);
         }
 
-        aggregator = IAggregator(addresses[0]);
-        liquidations = ILiquidations(addresses[1]);
-        borrowerOperationsAddress = addresses[2];
+        // ContractsStorage
+        ContractsStorage storage contractsStorage = TroveManagerStorageLib.getContractsStorage();
+        contractsStorage.aggregator = IAggregator(addresses[0]);
+        contractsStorage.liquidations = ILiquidations(addresses[1]);
+        contractsStorage.borrowerOperationsAddress = addresses[2];
+
+        // LiquityBase
         activePool = IActivePool(addresses[3]);
         activeShieldedPool = IActivePool(addresses[4]);
         defaultPool = IDefaultPool(addresses[5]);
-        stabilityPool = IStabilityPool(addresses[6]);
-        gasPoolAddress = addresses[7];
-        collSurplusPool = ICollSurplusPool(addresses[8]);
-        priceFeed = IPriceFeed(addresses[9]);
-        lusdToken = ILUSDToken(addresses[10]);
-        sortedTroves = ISortedTroves(addresses[11]);
-        sortedShieldedTroves = ISortedTroves(addresses[12]);
-        lqtyToken = ILQTYToken(addresses[13]);
-        lqtyStaking = ILQTYStaking(addresses[14]);
-        relayer = IRelayer(addresses[15]);
-        IERC20 collateralToken = IERC20(addresses[16]);
-        rewards = IRewards(addresses[17]);
-        feeRouter = IFeeRouter(addresses[18]);
-        globalFeeRouter = IGlobalFeeRouter(addresses[19]);
 
-        assert(address(collateralToken) != address(0));
+        contractsStorage.stabilityPool = IStabilityPool(addresses[6]);
+        contractsStorage.gasPoolAddress = addresses[7];
+        contractsStorage.collSurplusPool = ICollSurplusPool(addresses[8]);
+
+        // LiquityBase
+        priceFeed = IPriceFeed(addresses[9]);
+
+        contractsStorage.lusdToken = ILUSDToken(addresses[10]);
+        contractsStorage.sortedTroves = ISortedTroves(addresses[11]);
+        contractsStorage.sortedShieldedTroves = ISortedTroves(addresses[12]);
+        contractsStorage.lqtyToken = ILQTYToken(addresses[13]);
+        contractsStorage.lqtyStaking = ILQTYStaking(addresses[14]);
+
+        // LiquityBase
+        relayer = IRelayer(addresses[15]);
+
+        contractsStorage.collateralToken = IERC20(addresses[16]);
+        contractsStorage.rewards = IRewards(addresses[17]);
+        contractsStorage.feeRouter = IFeeRouter(addresses[18]);
+        contractsStorage.globalFeeRouter = IGlobalFeeRouter(addresses[19]);
+
+        assert(address(contractsStorage.collateralToken) != address(0));
         
-        collateralToken.approve(address(activePool), type(uint256).max);
+        contractsStorage.collateralToken.approve(address(activePool), type(uint256).max);
 
         /*
         // commenting these out for now to reduce contract size
@@ -284,7 +267,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     // Redeem as much collateral as possible from _borrower's Trove in exchange for LUSD up to _maxLUSDamount
     function _redeemCollateralFromTrove(
-        ContractsCache memory _contractsCache,
+        ContractsStorage memory _contractsCache,
         address _borrower,
         uint _maxLUSDamount,
         uint _price,
@@ -323,8 +306,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         //if (_actualDebt(newDebt).sub(1) <= LUSD_GAS_COMPENSATION) {
         if (_actualDebt(locals.newDebt, _shielded) <= LUSD_GAS_COMPENSATION) {
             // No debt left in the Trove (except for the liquidation reserve), therefore the trove gets closed
-            rewards.removeStake(_borrower);
-            _closeTrove(_borrower, Status.closedByRedemption);
+            _contractsCache.rewards.removeStake(_borrower);
+            _closeTrove(_contractsCache, _borrower, Status.closedByRedemption);
             _redeemCloseTrove(_contractsCache, _borrower, LUSD_GAS_COMPENSATION, locals.newColl, _shielded);
             emit TroveUpdated(_borrower, 0, 0, 0, TroveManagerOperation.redeemCollateral);
 
@@ -364,7 +347,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
             Troves[_borrower].debt = locals.newDebt;
             Troves[_borrower].coll = locals.newColl;
-            rewards.updateStakeAndTotalStakes(_borrower);
+            _contractsCache.rewards.updateStakeAndTotalStakes(_borrower);
 
             emit TroveUpdated(
                 _borrower,
@@ -384,8 +367,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     * The debt recorded on the trove's struct is zero'd elswhere, in _closeTrove.
     * Any surplus collateral left in the trove, is sent to the Coll surplus pool, and can be later claimed by the borrower.
     */
-    function _redeemCloseTrove(ContractsCache memory _contractsCache, address _borrower, uint _LUSD, uint _collateral, bool _shielded) internal {
-        _contractsCache.lusdToken.burn(gasPoolAddress, _LUSD);
+    function _redeemCloseTrove(ContractsStorage memory _contractsCache, address _borrower, uint _LUSD, uint _collateral, bool _shielded) internal {
+        _contractsCache.lusdToken.burn(_contractsCache.gasPoolAddress, _LUSD);
 
         // TODO: is this needed?
         /*
@@ -400,11 +383,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _contractsCache.collSurplusPool.accountSurplus(_borrower, _collateral);
 
         if (_shielded) {
-            _contractsCache.activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(_LUSD, _shielded));
-            _contractsCache.activeShieldedPool.sendCollateral(address(_contractsCache.collSurplusPool), _collateral);
+            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(_LUSD, _shielded));
+            activeShieldedPool.sendCollateral(address(_contractsCache.collSurplusPool), _collateral);
         } else {
-            _contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(_LUSD, _shielded));
-            _contractsCache.activePool.sendCollateral(address(_contractsCache.collSurplusPool), _collateral);
+            activePool.decreaseLUSDDebt(_normalizedDebt(_LUSD, _shielded));
+           activePool.sendCollateral(address(_contractsCache.collSurplusPool), _collateral);
         }
 
     }
@@ -426,7 +409,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     */
 
     // --- redeemCollateral() helpers ---------------------------------------------------------------
-    function _validateFirstHint(address _first, uint256 _price, uint256 _par)
+    function _validateFirstHint(ContractsStorage memory _contractsCache, address _first, uint256 _price, uint256 _par)
         internal
         view
         returns (bool ok, bool isShieldedList)
@@ -434,41 +417,41 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         if (_first == address(0)) return (false, false);
 
         // if hint is in base list
-        if (sortedTroves.contains(_first)) {
-            uint256 icr = _getCurrentICR(_first, _price, _par);
+        if (_contractsCache.sortedTroves.contains(_first)) {
+            uint256 icr = _getCurrentICR(_contractsCache, _first, _price, _par);
             if (icr < MCR) return (false, false);
 
             // hint is redeemable, but is it first?
-            address next = sortedTroves.getNext(_first); // next => lower ICR
+            address next = _contractsCache.sortedTroves.getNext(_first); // next => lower ICR
             if (next == address(0)) return (true, false);
-            if (_getCurrentICR(next, _price, _par) < MCR) return (true, false);
+            if (_getCurrentICR(_contractsCache, next, _price, _par) < MCR) return (true, false);
             return (false, false);
         }
 
         // if hint is in hielded list
-        if (sortedShieldedTroves.contains(_first)) {
-            uint256 icr = _getCurrentICR(_first, _price, _par);
+        if (_contractsCache.sortedShieldedTroves.contains(_first)) {
+            uint256 icr = _getCurrentICR(_contractsCache, _first, _price, _par);
             // shielded redeemable only in [MCR, HCR)
             if (icr < MCR || icr >= HCR) return (false, true);
 
             // hint is redeemable, but is it first?
-            address next = sortedShieldedTroves.getNext(_first);
+            address next = _contractsCache.sortedShieldedTroves.getNext(_first);
             if (next == address(0)) return (true, true);
-            if (_getCurrentICR(next, _price, _par) < MCR) return (true, true);
+            if (_getCurrentICR(_contractsCache, next, _price, _par) < MCR) return (true, true);
             return (false, true);
         }
 
         return (false, false);
     }
 
-    function _seedCursorsFromHint(address _firstHint, uint256 _price, uint256 _par)
+    function _seedCursorsFromHint(ContractsStorage memory _contractsCache, address _firstHint, uint256 _price, uint256 _par)
         internal
         view
         returns (address curBase, address curSh)
     {
         // 1) Try to use the provided hint (resolve membership first)
         if (_firstHint != address(0)) {
-            (bool ok, bool isSh) = _validateFirstHint(_firstHint, _price, _par);
+            (bool ok, bool isSh) = _validateFirstHint(_contractsCache, _firstHint, _price, _par);
             if (ok) {
                 if (isSh) curSh = _firstHint;
                 else      curBase = _firstHint;
@@ -477,21 +460,21 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         // 2) Seed Base cursor if still needed
         if (curBase == address(0)) {
-            address n = sortedTroves.getLast();
+            address n = _contractsCache.sortedTroves.getLast();
             while (n != address(0)) {
-                uint256 icr = _getCurrentICR(n, _price, _par);
+                uint256 icr = _getCurrentICR(_contractsCache, n, _price, _par);
                 if (icr >= MCR) { curBase = n; break; }
-                n = sortedTroves.getPrev(n); // prev => larger ICR
+                n = _contractsCache.sortedTroves.getPrev(n); // prev => larger ICR
             }
         }
 
         // 3) Seed Shielded cursor if still needed
         if (curSh == address(0)) {
-            address n = sortedShieldedTroves.getLast();
+            address n = _contractsCache.sortedShieldedTroves.getLast();
             while (n != address(0)) {
-                uint256 icr = _getCurrentICR(n, _price, _par);
+                uint256 icr = _getCurrentICR(_contractsCache, n, _price, _par);
                 if (icr >= MCR) { curSh = (icr < HCR) ? n : address(0); break; }
-                n = sortedShieldedTroves.getPrev(n); // prev => larger ICR
+                n = _contractsCache.sortedShieldedTroves.getPrev(n); // prev => larger ICR
             }
         }
     }
@@ -510,18 +493,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         external
         override
     {
-        ContractsCache memory contractsCache = ContractsCache(
-            activePool,
-            activeShieldedPool,
-            aggregator,
-            defaultPool,
-            lusdToken,
-            lqtyStaking,
-            sortedTroves,     // kept for compatibility; not used below once split lists exist
-            sortedShieldedTroves,     // kept for compatibility; not used below once split lists exist
-            collSurplusPool,
-            gasPoolAddress
-        );
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+
         RedemptionTotals memory totals;
         RedemptionLocals memory locals;
         RedemptionHints memory hints;
@@ -546,7 +519,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         totals.remainingLUSD = _LUSDamount;
 
         // seed base and shielded cursors from hint or scanning tails
-        (locals.curBase, locals.curSh) = _seedCursorsFromHint(_firstRedemptionHint, locals.price, locals.par);
+        (locals.curBase, locals.curSh) = _seedCursorsFromHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
         
         uint256 redemptionRate = contractsCache.aggregator.calcRateForRedemption(totals.remainingLUSD, locals.totalLUSDSupplyAtStart);
 
@@ -559,12 +532,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             uint icrS = type(uint).max;
 
             if (locals.curBase != address(0)) {
-                uint b = _getCurrentICR(locals.curBase, locals.price, locals.par);
+                uint b = _getCurrentICR(contractsCache, locals.curBase, locals.price, locals.par);
                 if (b >= MCR) icrB = b; // else no longer redeemable
             }
 
             if (locals.curSh != address(0)) {
-                uint s = _getCurrentICR(locals.curSh, locals.price, locals.par);
+                uint s = _getCurrentICR(contractsCache, locals.curSh, locals.price, locals.par);
                 if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
             }
 
@@ -578,11 +551,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             // Save next pointer for the chosen list before redemption possibly modifies list
             // getPrev => larger ICR
             locals.nextUserToCheck = locals.pickBase
-                ? sortedTroves.getPrev(locals.currentBorrower)
-                : sortedShieldedTroves.getPrev(locals.currentBorrower);
+                ? contractsCache.sortedTroves.getPrev(locals.currentBorrower)
+                : contractsCache.sortedShieldedTroves.getPrev(locals.currentBorrower);
 
             // apply pending rewards so debt is all in normalized format for redemption
-            rewards.applyPendingRewards(locals.currentBorrower);
+            contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
 
             // Hints object
             hints = RedemptionHints(
@@ -634,7 +607,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         locals.totalCollateralDrawn = totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn);
         uint256 grossCollateralDrawn = locals.totalCollateralDrawn.add(locals.totalCollateralFee);
         // Base rate update
-        aggregator.updateBaseRateFromRedemption(
+        contractsCache.aggregator.updateBaseRateFromRedemption(
             locals.totalRedeemed, locals.totalLUSDSupplyAtStart
         );
 
@@ -647,12 +620,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
 
         if (totals.totalBaseLUSDToRedeem > 0) {
-            contractsCache.activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
-            contractsCache.activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
+            activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
+            activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
         }
         if (totals.totalShieldedLUSDToRedeem > 0) {
-            contractsCache.activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
-            contractsCache.activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
+            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
+            activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
         }
 
         // Do these last to avoid conflict with off-chain partialNICRhint
@@ -665,18 +638,24 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     // Return the nominal collateral ratio (ICR) of a given Trove, without the price. Takes a trove's pending coll and debt rewards from redistributions into account.
     // TODO adjust for shielded
     function getNominalICR(address _borrower) public view override returns (uint) {
-        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+        return _getNominalICR(contractsCache, _borrower);
+    }
+
+    function _getNominalICR(ContractsStorage memory _contractsCache, address _borrower) internal view returns (uint) {
+        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_contractsCache, _borrower);
         uint NICR = LiquityMath._computeNominalCR(currentCollateral, currentLUSDDebt);
         return NICR;
     }
 
     // Return the current collateral ratio (ICR) of a given Trove. Takes a trove's pending coll and debt rewards from redistributions into account.
     function getCurrentICR(address _borrower, uint _price) public view override returns (uint) {
-        return _getCurrentICR(_borrower, _price, relayer.par());
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+        return _getCurrentICR(contractsCache, _borrower, _price, relayer.par());
     }
 
-    function _getCurrentICR(address _borrower, uint _price, uint _par) internal view returns (uint) {
-        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_borrower);
+    function _getCurrentICR(ContractsStorage memory _contractsCache, address _borrower, uint _price, uint _par) internal view returns (uint) {
+        (uint currentCollateral, uint currentLUSDDebt) = _getCurrentTroveAmounts(_contractsCache, _borrower);
         uint ICR = LiquityMath._computeCR(currentCollateral, _actualDebt(currentLUSDDebt, shielded[_borrower]), _price, _par);
         return ICR;
     }
@@ -712,13 +691,14 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     // Get the borrower's pending accumulated LUSD reward, earned by their stake
     function getPendingActualLUSDDebtReward(address _borrower) public view override returns (uint) {
-        return _actualDebt(rewards.getPendingLUSDDebtReward(_borrower), shielded[_borrower]);
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+        return _actualDebt(contractsCache.rewards.getPendingLUSDDebtReward(_borrower), shielded[_borrower]);
     }
 
-    function _getCurrentTroveAmounts(address _borrower) internal view returns (uint, uint) {
+    function _getCurrentTroveAmounts(ContractsStorage memory _contractsCache, address _borrower) internal view returns (uint, uint) {
         // Compute and apply pending collateral rewards
-        return (Troves[_borrower].coll.add(rewards.getPendingCollateralReward(_borrower)),
-                Troves[_borrower].debt.add(rewards.getPendingLUSDDebtReward(_borrower)));
+        return (Troves[_borrower].coll.add(_contractsCache.rewards.getPendingCollateralReward(_borrower)),
+                Troves[_borrower].debt.add(_contractsCache.rewards.getPendingLUSDDebtReward(_borrower)));
     }
 
     // Return the Troves entire debt and coll, including pending rewards from redistributions.
@@ -730,11 +710,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         override
         returns (uint debt, uint coll, uint pendingLUSDDebtReward, uint pendingCollateralReward)
     {
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         debt = Troves[_borrower].debt;
         coll = Troves[_borrower].coll;
 
         (pendingLUSDDebtReward,
-         pendingCollateralReward) = rewards.getPendingRewards(_borrower);
+         pendingCollateralReward) = contractsCache.rewards.getPendingRewards(_borrower);
 
         debt = debt.add(_normalizedDebt(pendingLUSDDebtReward, shielded[_borrower]));
         coll = coll.add(pendingCollateralReward);
@@ -743,14 +724,16 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     function closeTrove(address _borrower) external override {
         _requireCallerIsBorrowerOperations();
-        _closeTrove(_borrower, Status.closedByOwner);
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+        _closeTrove(contractsCache, _borrower, Status.closedByOwner);
     }
     function closeTroveLiquidation(address _borrower) external override {
         _requireCallerIsLiquidations();
-        _closeTrove(_borrower, Status.closedByLiquidation);
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();    
+        _closeTrove(contractsCache, _borrower, Status.closedByLiquidation);
     }
 
-    function _closeTrove(address _borrower, Status closedStatus) internal {
+    function _closeTrove(ContractsStorage memory _contractsCache, address _borrower, Status closedStatus) internal {
         assert(closedStatus != Status.nonExistent && closedStatus != Status.active);
 
         bool isShielded = shielded[_borrower];
@@ -761,16 +744,16 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         Troves[_borrower].coll = 0;
         Troves[_borrower].debt = 0;
 
-        rewards.resetTroveRewardSnapshots(_borrower);
+        _contractsCache.rewards.resetTroveRewardSnapshots(_borrower);
 
         //_removeTroveOwner(_borrower, isShielded);
         _removeTroveOwnerFromArray(_borrower, isShielded);
 
         if (isShielded) {
             shielded[_borrower] = false;
-            sortedShieldedTroves.remove(_borrower);
+            _contractsCache.sortedShieldedTroves.remove(_borrower);
         } else {
-            sortedTroves.remove(_borrower);
+            _contractsCache.sortedTroves.remove(_borrower);
         }
     }
 
@@ -812,7 +795,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     function shieldTrove(address _borrower, address _upperHint, address _lowerHint) external override {
         _requireCallerIsBorrowerOperations();
-
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         require(Troves[_borrower].status == Status.active, "Trove is not active");
         require(!shielded[_borrower], "Trove is already shielded");
 
@@ -826,7 +809,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             uint256 newNormDebt = currentNormDebt * accumulatedRate / accumulatedShieldRate;
             Troves[_borrower].debt = newNormDebt;
             // Add to shielded pool
-            activeShieldedPool.increaseLUSDDebt(newNormDebt);
+           activeShieldedPool.increaseLUSDDebt(newNormDebt);
         }
 
         shielded[_borrower] = true;
@@ -838,11 +821,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _addShieldedTroveOwnerToArray(_borrower);
 
         // add to shielded list
-        sortedShieldedTroves.insert(_borrower, getNominalICR(_borrower), _upperHint, _lowerHint);
-
+        contractsCache.sortedShieldedTroves.insert(_borrower, _getNominalICR(contractsCache, _borrower), _upperHint, _lowerHint);
 
         // remove from base list
-        sortedTroves.remove(_borrower);
+        contractsCache.sortedTroves.remove(_borrower);
     }
 
     function unShieldTrove(address _borrower, address _upperHint, address _lowerHint) external override {
@@ -850,7 +832,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
         require(Troves[_borrower].status == Status.active, "Trove is not active");
         require(shielded[_borrower], "Trove is already unshielded");
-
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         uint256 currentNormDebt = Troves[_borrower].debt;
 
         if (currentNormDebt > 0) {
@@ -874,24 +856,25 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         _addTroveOwnerToArray(_borrower, false);
 
         // add to base list
-        sortedTroves.insert(_borrower, getNominalICR(_borrower), _upperHint, _lowerHint);
+        contractsCache.sortedTroves.insert(_borrower, _getNominalICR(contractsCache, _borrower), _upperHint, _lowerHint);
 
 
         // remove from shielded list
-        sortedShieldedTroves.remove(_borrower);
+        contractsCache.sortedShieldedTroves.remove(_borrower);
     }
 
     function createTrove(address _borrower, uint _nicr, address _upperHint, address _lowerHint, bool _redemptionShield) external override {
         _requireCallerIsBorrowerOperations();
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         require(Troves[_borrower].status != Status.active, "Trove is already active");
         shielded[_borrower] = _redemptionShield;
 
         if (_redemptionShield) {
             _addTroveOwnerToArray(_borrower, true);
-            sortedShieldedTroves.insert(_borrower, _nicr, _upperHint, _lowerHint);
+            contractsCache.sortedShieldedTroves.insert(_borrower, _nicr, _upperHint, _lowerHint);
         } else {
             _addTroveOwnerToArray(_borrower, false);
-            sortedTroves.insert(_borrower, _nicr, _upperHint, _lowerHint);
+            contractsCache.sortedTroves.insert(_borrower, _nicr, _upperHint, _lowerHint);
         }
 
     }
@@ -976,9 +959,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     function drip() public override {
         // TODO call drip() before LPers remove liquidity  and before SP depositors withdraw
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         uint interestRate = relayer.getRate();
         uint shieldedInterestRate = interestRate.sub(RATE_PRECISION).mul(kappa).div(DECIMAL_PRECISION).add(RATE_PRECISION);
-        _drip(interestRate, shieldedInterestRate);
+        _drip(contractsCache, interestRate, shieldedInterestRate);
     }
 
     function _updateAccRates(uint256 newAccRate, uint256 newAccShieldRate) internal {
@@ -988,10 +972,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         emit AccInterestRateUpdated(newAccRate, newAccShieldRate);
     }
 
-    function _drip(uint256 interestRate, uint256 shieldedInterestRate) internal {
+    function _drip(ContractsStorage memory _contractsCache, uint256 interestRate, uint256 shieldedInterestRate) internal {
 
         // can't distributetoSP() when empty
-        if (stabilityPool.getTotalLUSDDeposits() == 0) return;
+        if (_contractsCache.stabilityPool.getTotalLUSDDeposits() == 0) return;
 
         // time since last update
         uint256 secondsPassed = block.timestamp - lastAccRateUpdateTime;
@@ -1015,7 +999,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         uint256 totalNewDebt = getEntireSystemDebt(newAccRate, newAccShieldRate);
 
         // for purpose of calculating new debt supply=totatSupply + pending in SP + pending in GlobalFeeRouter
-        uint256 currentSupply = lusdToken.totalSupply() + stabilityPool.pendingLUSDDeposits() + globalFeeRouter.pendingFees();
+        uint256 currentSupply = _contractsCache.lusdToken.totalSupply() + _contractsCache.stabilityPool.pendingLUSDDeposits() + _contractsCache.globalFeeRouter.pendingFees();
 
         uint256 newInterest = 0;
 
@@ -1027,7 +1011,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
             return;
         }
 
-        feeRouter.allocateFees(newInterest);
+        _contractsCache.feeRouter.allocateFees(newInterest);
 
     }
 
@@ -1070,20 +1054,21 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     // --- 'require' wrapper functions ---
 
     function _requireCallerIsBorrowerOperations() internal view {
-        require(msg.sender == borrowerOperationsAddress, "TM: Caller is not BO");
+        require(msg.sender == getContractsStorageCache().borrowerOperationsAddress, "TM: Caller is not BO");
     }
 
     function _requireCallerIsBorrowerOperationsOrRewards() internal view {
-        require(msg.sender == borrowerOperationsAddress || msg.sender == address(rewards),
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
+        require(msg.sender == contractsCache.borrowerOperationsAddress || msg.sender == address(contractsCache.rewards),
         "TroveManager: Caller is not BO or Rewards contract");
     }
 
     function _requireCallerIsLiquidations() internal view {
-        require(msg.sender == address(liquidations), "TM: Caller is not Liq");
+        require(msg.sender == address(getContractsStorageCache().liquidations), "TM: Caller is not Liq");
     }
 
     function _requireCallerIsRewards() internal view {
-        require(msg.sender == address(rewards), "TMr: Caller is not Rewards");
+        require(msg.sender == address(getContractsStorageCache().rewards), "TMr: Caller is not Rewards");
     }
 
     function _requireLUSDBalanceCoversRedemption(ILUSDToken _lusdToken, address _redeemer, uint _amount) internal view {
@@ -1091,9 +1076,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     }
 
     function _requireMoreThanOneTroveInSystem() internal view {
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorageCache();
         // original check
         //require (TroveOwnersArrayLength > 1 && sortedTroves.getSize() > 1, "TroveManager: Only one trove in the system");
-        uint total = sortedTroves.getSize() + sortedShieldedTroves.getSize();
+        uint total = contractsCache.sortedTroves.getSize() + contractsCache.sortedShieldedTroves.getSize();
         require(total > 1, "Only one trove in the system");
     }
 
@@ -1102,7 +1088,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
     }
 
     function _requireAfterBootstrapPeriod() internal view {
-        uint systemDeploymentTime = lqtyToken.getDeploymentStartTime();
+        uint systemDeploymentTime = getContractsStorageCache().lqtyToken.getDeploymentStartTime();
         require(block.timestamp >= systemDeploymentTime.add(BOOTSTRAP_PERIOD), "TM: Redemptions not allowed during bootstrap");
     }
 
@@ -1139,6 +1125,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
 
     function getTroveDebtAndColl(address _borrower) external view override returns (uint, uint) {
         return (Troves[_borrower].debt, Troves[_borrower].coll);
+    }
+
+    function getContractsStorageCache() internal view returns (ContractsStorage memory) {
+        return TroveManagerStorageLib.getContractsStorage();
     }
 
     // --- Trove property setters, called by BorrowerOperations ---
@@ -1180,4 +1170,27 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager {
         Troves[_borrower].debt = newDebt;
         return newDebt;
     }
+
+    // --- Public contract getters ---
+
+    function collSurplusPool() external view override returns (ICollSurplusPool) {
+        return getContractsStorageCache().collSurplusPool;
+    }
+
+    function lqtyStaking() external view override returns (ILQTYStaking) {
+        return getContractsStorageCache().lqtyStaking;
+    }
+    
+    function lusdToken() external view override returns (ILUSDToken) {
+        return getContractsStorageCache().lusdToken;
+    }
+
+    function lqtyToken() external view override returns (ILQTYToken) {
+        return getContractsStorageCache().lqtyToken;
+    }
+
+    function stabilityPool() external view override returns (IStabilityPool) {
+        return getContractsStorageCache().stabilityPool;
+    }
+    
 }
