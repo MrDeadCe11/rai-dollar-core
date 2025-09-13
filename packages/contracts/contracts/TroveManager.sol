@@ -153,7 +153,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     event Value(uint256 value);
     event Values(uint256 value1, uint256 value2);
 
-     enum TroveManagerOperation {
+    enum TroveManagerOperation {
         applyPendingRewards,
         liquidate,
         redeemCollateral
@@ -1108,7 +1108,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         return getTroveStorage().shielded[_borrower];
     }
 
-    function Troves(address _borrower) external view returns (uint debt, uint coll, uint stake, uint8 status, uint128 arrayIndex)
+    function Troves(address _borrower) external view returns
+    (uint debt, uint coll, uint stake, uint8 status, uint128 arrayIndex)
     {
     Trove storage t = getTroveStorage().Troves[_borrower];
     return (t.debt, t.coll, t.stake, uint8(t.status), t.arrayIndex);
