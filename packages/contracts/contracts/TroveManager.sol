@@ -259,17 +259,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
         RedemptionFromTroveLocals memory locals;
-        Trove storage t = getTroveStorage().Troves[_borrower];
-        // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
-        singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDamount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
 
-        // Get the collateralLot of equivalent value in USD
-         singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_par).div(_price);
-
-        // calculate fee for redeemed collateral
-        singleRedemption.collateralFee =  _redemptionRate.mul(singleRedemption.collateralLot).div(DECIMAL_PRECISION);
-        // subtract fee from collateral lot so fee stays in trove
-        singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
+        singleRedemption = _calculateSingleRedemptionValues(singleRedemption, _shielded, _borrower, _maxLUSDamount, _price, _par, _redemptionRate); 
 
         locals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
@@ -586,7 +577,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
             // advance only the list we consumed from
         }
-
         require(totals.totalBaseCollateralDrawn > 0 || totals.totalShieldedCollateralDrawn > 0, "TM: Unable to redeem any amount");
 
         locals.totalRedeemed = totals.totalBaseLUSDToRedeem.add(totals.totalShieldedLUSDToRedeem);
@@ -615,7 +605,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         }
 
         // Do these last to avoid conflict with off-chain partialNICRhint
-        relayer.updateRateAndPar();
+        contractsCache.relayer.updateRateAndPar();
         drip();
     }
 
@@ -1118,9 +1108,7 @@ function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 
     }
 
     function _requireTCRoverMCR(uint _price) internal view {
-        if(!_isShutdown()) {
         require(_getTCR(_price) >= MCR, "TM: Cannot redeem when TCR < MCR");
-        }
     }
 
     function _requireAfterBootstrapPeriod() internal view {
