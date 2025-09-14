@@ -78,7 +78,7 @@ LQTY contracts consist of only those contracts related to the LQTY Token:
 
 const ZERO_ADDRESS = '0x' + '0'.repeat(40)
 const maxBytes32 = '0x' + 'f'.repeat(64)
-let troveManagerLib;
+let troveManagerLib = null;
 let libLinked = false;
 
 class DeploymentHelper {
@@ -228,6 +228,7 @@ class DeploymentHelper {
     }
     if (!libLinked) {
       await TroveManager.link(troveManagerLib)
+      await TroveManagerTester.link(troveManagerLib)
       libLinked = true;
     }
     testerContracts.troveManager = await TroveManagerTester.new()
