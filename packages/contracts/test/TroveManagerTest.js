@@ -7156,17 +7156,20 @@ contract('TroveManager', async accounts => {
     assert.isTrue(C_collAfter.eq(C_coll))
 
     // we are getting the surplus from because collSurplusPool.getCollateral(address) is overflowing
-
+    const blockNumber = await web3.eth.getBlockNumber()
     const AsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: A }
     })
     const BsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: B }
     })
     const CsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: C }
     })
 

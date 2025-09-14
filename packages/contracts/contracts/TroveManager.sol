@@ -255,12 +255,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         return getTroveStorage().TroveOwners[_index];
     }
 
-    function ShieldedTroveOwners() external view returns (address[] memory) {
-        return getTroveStorage().ShieldedTroveOwners;
+    function ShieldedTroveOwners(uint _index) external view returns (address) {
+        return getTroveStorage().ShieldedTroveOwners[_index];
     }
 
-    function TroveOwners() external view returns (address[] memory) {
-        return getTroveStorage().TroveOwners;
+    function TroveOwners(uint _index) external view returns (address) {
+        return getTroveStorage().TroveOwners[_index];
     }
 
     function getShieldedTroveOwnersCount() external view override returns (uint) {
