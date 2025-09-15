@@ -8,6 +8,7 @@ const timeValues = testHelpers.TimeValues
 
 const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("TroveManagerLib")
 const RateControlTester = artifacts.require("RateControlTester")
 const LUSDToken = artifacts.require("LUSDToken")
 const NonPayable = artifacts.require('NonPayable.sol')
@@ -57,8 +58,11 @@ contract('StabilityPool', async accounts => {
 
   describe("Stability Pool Mechanisms", async () => {
 
+    let lib;
     before(async () => {
       gasPriceInWei = await web3.eth.getGasPrice()
+      lib = await TroveManagerLib.new();
+      await TroveManagerTester.link(lib);
     })
 
     beforeEach(async () => {

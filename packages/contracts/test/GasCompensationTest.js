@@ -1,6 +1,7 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol")
 const LUSDToken = artifacts.require("LUSDToken")
@@ -45,6 +46,8 @@ contract('Gas compensation tests', async accounts => {
   }
 
   before(async () => {
+    const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
     liquidationsTester = await LiquidationsTester.new()
     troveManagerTester = await TroveManagerTester.new()
     borrowerOperationsTester = await BorrowerOperationsTester.new()

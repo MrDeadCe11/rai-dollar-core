@@ -6,6 +6,7 @@ const testHelpers = require("../utils/testHelpers.js")
 const LQTYStakingTester = artifacts.require('LQTYStakingTester')
 const AggregatorTester = artifacts.require("AggregatorTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const RateControlTester = artifacts.require("RateControlTester")
 const NonPayable = artifacts.require("./NonPayable.sol")
 
@@ -30,7 +31,12 @@ const GAS_PRICE = 10000000
  */ 
 
 contract('LQTYStaking revenue share tests', async accounts => {
-
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
   
   const [owner, A, B, C, D, E, F, G, whale] = accounts;

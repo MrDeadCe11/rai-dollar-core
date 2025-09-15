@@ -1,6 +1,6 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
-
+const TroveManagerLib = artifacts.require("TroveManagerLib")
 const { keccak256 } = require('@ethersproject/keccak256');
 const { defaultAbiCoder } = require('@ethersproject/abi');
 const { toUtf8Bytes } = require('@ethersproject/strings');
@@ -46,7 +46,11 @@ const getPermitDigest = ( name, address, chainId, version,
 
 contract('LUSDToken', async accounts => {
   const [owner, alice, bob, carol, dennis] = accounts;
-
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    // await TroveManagerTester.link(lib);
+  });
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
 
   // the second account our hardhatenv creates (for Alice)

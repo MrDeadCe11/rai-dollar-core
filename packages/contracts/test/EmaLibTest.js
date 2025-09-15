@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const testInvariants = require("../utils/testInvariants.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")   
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
@@ -65,6 +66,11 @@ contract('GlobalFeeRouter', async accounts => {
   const openTrove = async (params) => th.openTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
 
+  before(async () => {
+   const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.aggregator = await AggregatorTester.new()

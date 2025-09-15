@@ -6,6 +6,7 @@ const NonPayable = artifacts.require('NonPayable.sol')
 const AggregatorTester = artifacts.require("AggregatorTester")
 const LiquidationsTester = artifacts.require("LiquidationsTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester")
 
 const th = testHelpers.TestHelper
@@ -66,7 +67,8 @@ contract('BorrowerOperations', async accounts => {
   let MIN_NET_DEBT
 
   before(async () => {
-
+    const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
   })
 
 

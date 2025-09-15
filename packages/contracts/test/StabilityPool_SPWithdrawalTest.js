@@ -3,7 +3,7 @@ const testHelpers = require("../utils/testHelpers.js")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const RateControlTester = artifacts.require("./RateControlTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
-
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const { dec, toBN } = testHelpers.TestHelper
 const th = testHelpers.TestHelper
 
@@ -56,11 +56,15 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
   const getOpenTroveLUSDAmount = async (totalDebt) => th.getOpenTroveLUSDAmount(contracts, totalDebt)
   const assertRevert = th.assertRevert
 
+  let lib;
+  before(async () => {
+    gasPriceInWei = await web3.eth.getGasPrice()
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  })
+
   describe("Stability Pool Withdrawal", async () => {
 
-    before(async () => {
-      gasPriceInWei = await web3.eth.getGasPrice()
-    })
 
     beforeEach(async () => {
       contracts = await deploymentHelper.deployLiquityCore()

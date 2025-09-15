@@ -4,6 +4,7 @@ const testHelpers = require("../utils/testHelpers.js")
 const SortedTroves = artifacts.require("SortedTroves")
 const SortedTrovesTester = artifacts.require("SortedTrovesTester")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LUSDToken = artifacts.require("LUSDToken")
 
 const th = testHelpers.TestHelper
@@ -12,6 +13,11 @@ const toBN = th.toBN
 const mv = testHelpers.MoneyValues
 
 contract('SortedTroves', async accounts => {
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
   
   const assertSortedListIsOrdered = async (contracts) => {
     const price = await contracts.priceFeedTestnet.getPrice()
