@@ -1,7 +1,7 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const TroveManagerTester = artifacts.require("TroveManagerTester")
-
+const TroveManagerLib = artifacts.require("TroveManagerLib")
 const th = testHelpers.TestHelper
 const timeValues = testHelpers.TimeValues
 
@@ -40,7 +40,10 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
   let lockupContractFactory
 
   before(async () => {
+
     coreContracts = await deploymentHelper.deployLiquityCore()
+    const lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
     coreContracts.troveManager = await TroveManagerTester.new()
     coreContracts = await deploymentHelper.deployLUSDTokenTester(coreContracts)
     const LQTYContracts = await deploymentHelper.deployLQTYTesterContractsHardhat(bountyAddress, lpRewardsAddress, multisig)

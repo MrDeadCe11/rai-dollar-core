@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const testInvariants = require("../utils/testInvariants.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const AggregatorTester = artifacts.require("./AggregatorTester.sol")
 const RelayerTester = artifacts.require("./RelayerTester.sol")
@@ -69,6 +70,12 @@ contract('TroveManager - Shielded', async accounts => {
   const openTrove = async (params) => th.openTrove(contracts, params)
   const openShieldedTrove = async (params) => th.openShieldedTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
 
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
@@ -7530,17 +7537,21 @@ const expectedCollateralReceived = collateralDrawn.sub(fee)
 
 
     // we are getting the surplus from because collSurplusPool.getCollateral(address) is overflowing
-
+    // scoping search to prevent node overflow
+    const blockNumber = await web3.eth.getBlockNumber()
     const AsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: A }
     })
     const BsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: B }
     })
     const CsurplusEvents = await collSurplusPool.getPastEvents('CollBalanceUpdated', {
-      fromBlock: 0,
+      fromBlock: blockNumber - 10,
+      toBlock: blockNumber,
       filter: { _account: C }
     })
 

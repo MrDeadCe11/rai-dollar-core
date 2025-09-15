@@ -2,6 +2,7 @@ const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const LiquidationsTester = artifacts.require("./LiquidationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
+const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
 
 const th = testHelpers.TestHelper
@@ -50,6 +51,12 @@ contract('TroveManager', async accounts => {
     return ratio
   }
 
+  let lib;
+  before(async () => {
+    lib = await TroveManagerLib.new();
+    await TroveManagerTester.link(lib);
+  });
+  
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.liquidations = await LiquidationsTester.new()
