@@ -149,6 +149,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     event Value(uint256 value);
     event Values(uint256 value1, uint256 value2);
     event Shutdown(bool _oracleFailure, uint256 _rate, uint256 _par, uint256 _shutdownTime);
+    event Shutdown(bool _oracleFailure, uint256 _rate, uint256 _par, uint256 _shutdownTime);
 
     enum TroveManagerOperation {
         applyPendingRewards,
@@ -619,19 +620,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             }
 
         return (_totals, _locals);
-    function redeemCollateralDuringShutdown(
-        uint _LUSDamount,
-        address _firstRedemptionHint,
-        address _upperPartialRedemptionHint,
-        address _lowerPartialRedemptionHint,
-        address _upperShieldedPartialRedemptionHint,
-        address _lowerShieldedPartialRedemptionHint,
-        uint _partialRedemptionHintNICR,
-        uint _maxIterations,
-        uint _maxFeePercentage
-        ) external override {
-        _requireShutdown();
-
     }
 
     function shutdown(bool _oracleFailure) external override {
@@ -1012,30 +1000,7 @@ function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 
     }
 
 
-
-
-    function _calcDiscountForShutdown() internal view returns (uint) {
-        
-        uint timePassed = block.timestamp.sub(collateralShutdown.shutdownTime);
-        
-        uint256 maxDiscount = collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
-
-        if (timePassed >= SEVENTY_TWO_HOURS) {
-            return maxDiscount;
-        }
-
-        return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
-    }
-
-    function _shutdown(bool _oracleFailure, uint256 _rate, uint256 _par) internal {
-        collateralShutdown.shutdownTime = block.timestamp;
-        collateralShutdown.par = _par;
-        collateralShutdown.rate = _rate;
-        collateralShutdown.oracleFailure = _oracleFailure;
-        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
-    }
-
-    // External view wrapper
+// External view wrapper
     function calcAccumulatedRate(uint256 accRate, uint256 interestRate, uint256 secondsPassed) external pure returns (uint256) {
         return _calcAccumulatedRate(accRate, interestRate, secondsPassed);
     }
