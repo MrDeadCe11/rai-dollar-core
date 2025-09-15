@@ -82,25 +82,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         uint256 partialNICR;
     }
 
-    // mapping (address => Trove) public Troves;
-    // mapping (address => bool) public override shielded;
-
-    // // Array of all active trove addresses - used to to compute an approximate hint off-chain, for the sorted list insertion
-    // address[] public TroveOwners;
-    // address[] public ShieldedTroveOwners;
-
-    // struct ContractsCache {
-    //     IActivePool activePool;
-    //     IActivePool activeShieldedPool;
-    //     IAggregator aggregator;
-    //     IDefaultPool defaultPool;
-    //     ILUSDToken lusdToken;
-    //     ILQTYStaking lqtyStaking;
-    //     ISortedTroves sortedTroves;
-    //     ISortedTroves sortedShieldedTroves;
-    //     ICollSurplusPool collSurplusPool;
-    //     address gasPoolAddress;
-    // }
     // --- Variable container structs for redemptions ---
 
     struct RedemptionTotals {
@@ -172,41 +153,16 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             checkContract(addresses[i]);
         }
 
-        // ContractsStorage
-        ContractsStorage storage contractsStorage = getContractsStorage();
-        contractsStorage.aggregator = IAggregator(addresses[0]);
-        contractsStorage.liquidations = ILiquidations(addresses[1]);
-        contractsStorage.borrowerOperationsAddress = addresses[2];
-
-        // LiquityBase
+        // set LiquityBase addresses
+        // TODO: maybe re-order these so base contract addresses are set first or possibly pass 2 different arrays
         activePool = IActivePool(addresses[3]);
         activeShieldedPool = IActivePool(addresses[4]);
         defaultPool = IDefaultPool(addresses[5]);
-
-        contractsStorage.stabilityPool = IStabilityPool(addresses[6]);
-        contractsStorage.gasPoolAddress = addresses[7];
-        contractsStorage.collSurplusPool = ICollSurplusPool(addresses[8]);
-
-        // LiquityBase
         priceFeed = IPriceFeed(addresses[9]);
-
-        contractsStorage.lusdToken = ILUSDToken(addresses[10]);
-        contractsStorage.sortedTroves = ISortedTroves(addresses[11]);
-        contractsStorage.sortedShieldedTroves = ISortedTroves(addresses[12]);
-        contractsStorage.lqtyToken = ILQTYToken(addresses[13]);
-        contractsStorage.lqtyStaking = ILQTYStaking(addresses[14]);
-
-        // LiquityBase
         relayer = IRelayer(addresses[15]);
 
-        contractsStorage.collateralToken = IERC20(addresses[16]);
-        contractsStorage.rewards = IRewards(addresses[17]);
-        contractsStorage.feeRouter = IFeeRouter(addresses[18]);
-        contractsStorage.globalFeeRouter = IGlobalFeeRouter(addresses[19]);
-
-        assert(address(contractsStorage.collateralToken) != address(0));
-        
-        contractsStorage.collateralToken.approve(address(activePool), type(uint256).max);
+        // set addresses using TroveManagerLib, will revert if addresses have already been set
+        TroveManagerLib.setAddresses(addresses);
 
         /*
         // commenting these out for now to reduce contract size
@@ -713,8 +669,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         returns (uint debt, uint coll, uint pendingLUSDDebtReward, uint pendingCollateralReward)
     {
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
-        TroveStorage storage ts = getTroveStorage();
-        Trove storage t = ts.Troves[_borrower];
+        ITroveManagerStorage.TroveStorage storage ts = getTroveStorage();
+        ITroveManagerStorage.Trove storage t = ts.Troves[_borrower];
         debt = t.debt;
         coll = t.coll;
 
@@ -723,7 +679,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
         debt = debt.add(_normalizedDebt(pendingLUSDDebtReward, ts.shielded[_borrower]));
         coll = coll.add(pendingCollateralReward);
-
     }
 
     function closeTrove(address _borrower) external override {

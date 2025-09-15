@@ -8,6 +8,7 @@ const moneyVals = testHelpers.MoneyValues
 let latestRandomSeed = 31337
 
 const TroveManagerTester = artifacts.require("TroveManagerTester")
+const TroveManagerLib = artifacts.require("TroveManagerLib")
 const LUSDToken = artifacts.require("LUSDToken")
 
 contract('HintHelpers', async accounts => {

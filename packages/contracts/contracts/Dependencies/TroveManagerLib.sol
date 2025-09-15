@@ -2,9 +2,25 @@
 pragma solidity 0.6.11;
 
 import {ITroveManagerStorage} from "../Interfaces/ITroveManagerStorage.sol";
+import "../Interfaces/ITroveManager.sol";
+import "../Interfaces/IRewards.sol";
+import "../Interfaces/IFeeRouter.sol";
+import "../Interfaces/IGlobalFeeRouter.sol";
+import "../Interfaces/ILiquidations.sol";
+import "../Interfaces/IAggregator.sol";
+import "../Interfaces/IStabilityPool.sol";
+import "../Interfaces/ICollSurplusPool.sol";
+import "../Interfaces/ILUSDToken.sol";
+import "../Interfaces/ISortedTroves.sol";
+import "../Interfaces/ILQTYToken.sol";
+import "../Interfaces/ILQTYStaking.sol";
+import "../Interfaces/IRelayer.sol";
+import "../Dependencies/IERC20.sol";
+import "../Interfaces/IActivePool.sol";
+import "../Interfaces/IDefaultPool.sol";
+import "../Interfaces/IPriceFeed.sol";
 import {SafeMath} from "../Dependencies/SafeMath.sol";
 import {LiquityMath} from "../Dependencies/LiquityMath.sol";
-import "../Interfaces/IActivePool.sol";
 
 library TroveManagerLib {
 
@@ -22,6 +38,44 @@ library TroveManagerLib {
             //kecca256("raidollar.trovemanager.trovestorage")
             $_slot := 0xb4a7d751cb0b438867fefd66a43523806e84b89b85fea4b445161a0afe9bcc82
         }
+    }
+
+    function setAddresses(
+        address[] memory addresses
+    )
+        external
+    {
+        // ContractsStorage
+        ITroveManagerStorage.ContractsStorage storage contractsStorage = getContractsStorage();
+
+        require(address(contractsStorage.aggregator) == address(0), "Addresses alreadySet");
+
+        contractsStorage.aggregator = IAggregator(addresses[0]);
+        contractsStorage.liquidations = ILiquidations(addresses[1]);
+        contractsStorage.borrowerOperationsAddress = addresses[2];
+
+        contractsStorage.stabilityPool = IStabilityPool(addresses[6]);
+        contractsStorage.gasPoolAddress = addresses[7];
+        contractsStorage.collSurplusPool = ICollSurplusPool(addresses[8]);
+
+ 
+
+        contractsStorage.lusdToken = ILUSDToken(addresses[10]);
+        contractsStorage.sortedTroves = ISortedTroves(addresses[11]);
+        contractsStorage.sortedShieldedTroves = ISortedTroves(addresses[12]);
+        contractsStorage.lqtyToken = ILQTYToken(addresses[13]);
+        contractsStorage.lqtyStaking = ILQTYStaking(addresses[14]);
+
+
+        contractsStorage.collateralToken = IERC20(addresses[16]);
+        contractsStorage.rewards = IRewards(addresses[17]);
+        contractsStorage.feeRouter = IFeeRouter(addresses[18]);
+        contractsStorage.globalFeeRouter = IGlobalFeeRouter(addresses[19]);
+
+        assert(address(contractsStorage.collateralToken) != address(0));
+
+        // addresses[3] is active pool
+        contractsStorage.collateralToken.approve(addresses[3], type(uint256).max);
     }
 
     function shieldTrove(address _borrower, address _upperHint, address _lowerHint, uint accumulatedRate, uint accumulatedShieldRate, IActivePool _activePool, IActivePool _activeShieldedPool) external  {
@@ -123,6 +177,9 @@ library TroveManagerLib {
         return NICR;
     }
 
+
+    // shared internal functions
+
     function _getCurrentTroveAmounts(ITroveManagerStorage.ContractsStorage memory _contractsCache, address _borrower) internal view returns (uint, uint) {
         // Compute and apply pending collateral rewards
         ITroveManagerStorage.Trove storage t = getTroveStorage().Troves[_borrower];
@@ -182,5 +239,7 @@ library TroveManagerLib {
         //emit TroveIndexUpdated(addressToMove, index, _shielded);
 
     }
+
+    
     
 }
