@@ -159,15 +159,15 @@ interface ITroveManager is ILiquityBase {
 
     function shutdown(bool _oracleFailure) external;
 
-    // function redeemCollateralForShutdown(
-    //     uint _LUSDamount,
-    //     address _firstRedemptionHint,
-    //     address _upperPartialRedemptionHint,
-    //     address _lowerPartialRedemptionHint,
-    //     address _upperShieldedPartialRedemptionHint,
-    //     address _lowerShieldedPartialRedemptionHint,
-    //     uint _partialRedemptionHintNICR,
-    //     uint _maxIterations,
-    //     uint _maxFeePercentage
-    // ) external;
+    function redeemCollateralForShutdown(
+        uint _LUSDamount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
+        uint _partialRedemptionHintNICR,
+        uint _maxIterations,
+        uint _maxFeePercentage
+    ) external;
 }

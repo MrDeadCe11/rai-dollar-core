@@ -448,40 +448,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         return (false, false);
     }
 
-    function _seedCursorsFromHint(ContractsStorage memory _contractsCache, address _firstHint, uint256 _price, uint256 _par)
-        internal
-        view
-        returns (address curBase, address curSh)
-    {
-        // 1) Try to use the provided hint (resolve membership first)
-        if (_firstHint != address(0)) {
-            (bool ok, bool isSh) = _validateFirstHint(_contractsCache, _firstHint, _price, _par);
-            if (ok) {
-                if (isSh) curSh = _firstHint;
-                else      curBase = _firstHint;
-            }
-        }
 
-        // 2) Seed Base cursor if still needed
-        if (curBase == address(0)) {
-            address n = _contractsCache.sortedTroves.getLast();
-            while (n != address(0)) {
-                uint256 icr = _getCurrentICR(_contractsCache, n, _price, _par);
-                if (icr >= MCR) { curBase = n; break; }
-                n = _contractsCache.sortedTroves.getPrev(n); // prev => larger ICR
-            }
-        }
-
-        // 3) Seed Shielded cursor if still needed
-        if (curSh == address(0)) {
-            address n = _contractsCache.sortedShieldedTroves.getLast();
-            while (n != address(0)) {
-                uint256 icr = _getCurrentICR(_contractsCache, n, _price, _par);
-                if (icr >= MCR) { curSh = (icr < HCR) ? n : address(0); break; }
-                n = _contractsCache.sortedShieldedTroves.getPrev(n); // prev => larger ICR
-            }
-        }
-    }
 
     function redeemCollateral(
         uint _LUSDamount,
@@ -497,11 +464,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         external
         override
     {
-        ContractsStorage memory contractsCache = getContractsStorage();
-
-        RedemptionTotals memory totals;
-        RedemptionLocals memory locals;
-
         RedemptionHints memory redemptionHints = RedemptionHints(
         _upperPartialRedemptionHint,
         _lowerPartialRedemptionHint,
@@ -510,26 +472,15 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         _partialRedemptionHintNICR
         );
 
-        _requireValidMaxFeePercentage(_maxFeePercentage);
-        _requireAfterBootstrapPeriod();
+       (ContractsStorage memory contractsCache,
+        RedemptionTotals memory totals,
+         RedemptionLocals memory locals
+          ) = 
+          _initializeRedemption(_LUSDamount,
+          _firstRedemptionHint,
+          _maxIterations,
+          _maxFeePercentage);
 
-
-        locals = _fetchPriceAndPar(locals);
-        _requireTCRoverMCR(locals.price);
-
-        require(_LUSDamount > 0, "TM: Amount must be gt than zero");
-
-        _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
-
-        //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
-        locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();
-        assert(contractsCache.lusdToken.balanceOf(msg.sender) <= locals.totalLUSDSupplyAtStart);
-
-        totals.remainingLUSD = _LUSDamount;
-
-        // seed base and shielded cursors from hint or scanning tails
-        (locals.curBase, locals.curSh) = _seedCursorsFromHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
-        
         (totals, locals) = _runRedemptionLoop(
             contractsCache,
             totals,
@@ -544,40 +495,75 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         drip();
     }
 
-    function _finalizeRedemption(RedemptionLocals memory _locals, RedemptionTotals memory _totals, uint _LUSDAmount, uint _maxFeePercentage)  internal {
-      _locals = _addTotals(_totals, _locals);
-      ContractsStorage memory _contractsCache = getContractsStorage();
-        // Base rate update
-        _contractsCache.aggregator.updateBaseRateFromRedemption(
-            _locals.totalRedeemed, _locals.totalLUSDSupplyAtStart
-        );
 
-        // Fees
-        _requireUserAcceptsFee(_locals.totalCollateralFee, _locals.grossCollateralDrawn, _maxFeePercentage);
 
-        emit Redemption(_LUSDAmount, _locals.totalRedeemed,
-                        _locals.totalCollateralDrawn, _locals.totalCollateralFee);
+    function _initializeRedemption(uint _LUSDamount,
+        address _firstRedemptionHint,
+        uint _maxIterations,
+        uint _maxFeePercentage) internal returns(ContractsStorage memory, RedemptionTotals memory, RedemptionLocals memory){
+        ContractsStorage memory contractsCache = getContractsStorage();
 
-        _contractsCache.lusdToken.burn(msg.sender, _locals.totalRedeemed);
+        RedemptionTotals memory totals;
+        RedemptionLocals memory locals;
 
-        if (_totals.totalBaseLUSDToRedeem > 0) {
-            activePool.decreaseLUSDDebt(_normalizedDebt(_totals.totalBaseLUSDToRedeem, false));
-            activePool.sendCollateral(msg.sender, _totals.totalBaseCollateralDrawn);
-        }
-        if (_totals.totalShieldedLUSDToRedeem > 0) {
-            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(_totals.totalShieldedLUSDToRedeem, true));
-            activeShieldedPool.sendCollateral(msg.sender, _totals.totalShieldedCollateralDrawn);
-        }
+      
 
-       
-    }
+        _requireValidMaxFeePercentage(_maxFeePercentage);
+        _requireAfterBootstrapPeriod();
 
-    function _fetchPriceAndPar(RedemptionLocals memory _locals) internal returns(RedemptionLocals memory){
-        (_locals.price, ) = priceFeed.fetchPrice();
+
+        (locals.price, ) = priceFeed.fetchPrice();
         //(, locals.par) = relayer.updateRateAndPar();
-        _locals.par = relayer.par();
-        return _locals;
-    }
+        locals.par = relayer.par();
+
+        // _requireTCRoverMCR(locals.price);
+        require(_getTCR(locals.price) >= MCR, "TM: Cannot redeem when TCR < MCR");
+
+        require(_LUSDamount > 0, "TM: Amount must be gt than zero");
+
+        // _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
+        require(contractsCache.lusdToken.balanceOf(msg.sender) >= _LUSDamount, "TM: Requested redemption amount must be <= user's balance");
+
+        //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
+        locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();
+        assert(contractsCache.lusdToken.balanceOf(msg.sender) <= locals.totalLUSDSupplyAtStart);
+
+        totals.remainingLUSD = _LUSDamount;
+
+        // seed base and shielded cursors from hint or scanning tails
+         // 1) Try to use the provided hint (resolve membership first)
+        if (_firstRedemptionHint != address(0)) {
+            (bool ok, bool isSh) = _validateFirstHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
+            if (ok) {
+                if (isSh) locals.curSh = _firstRedemptionHint;
+                else      locals.curBase = _firstRedemptionHint;
+            }
+        }
+
+        // 2) Seed Base cursor if still needed
+        if (locals.curBase == address(0)) {
+            address n = contractsCache.sortedTroves.getLast();
+            while (n != address(0)) {
+                uint256 icr = _getCurrentICR(contractsCache, n, locals.price, locals.par);
+                if (icr >= MCR) { locals.curBase = n; break; }
+                n = contractsCache.sortedTroves.getPrev(n); // prev => larger ICR
+            }
+        }
+
+        // 3) Seed Shielded cursor if still needed
+        if (locals.curSh == address(0)) {
+            address n = contractsCache.sortedShieldedTroves.getLast();
+            while (n != address(0)) {
+                uint256 icr = _getCurrentICR(contractsCache, n, locals.price, locals.par);
+                if (icr >= MCR) { locals.curSh = (icr < HCR) ? n : address(0); break; }
+                n = contractsCache.sortedShieldedTroves.getPrev(n); // prev => larger ICR
+            }
+        }
+
+        return (contractsCache, totals, locals);
+        }
+
+
 
     function _runRedemptionLoop(
         ContractsStorage memory _contractsCache,
@@ -631,132 +617,78 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         return (_totals, _locals);
     }
 
-    function _addTotals(RedemptionTotals memory _totals, RedemptionLocals memory _locals) internal returns (RedemptionLocals memory){
-        _locals.totalRedeemed = _totals.totalBaseLUSDToRedeem.add(_totals.totalShieldedLUSDToRedeem);
+    function _finalizeRedemption(RedemptionLocals memory _locals, RedemptionTotals memory _totals, uint _LUSDAmount, uint _maxFeePercentage)  internal {
+      _locals.totalRedeemed = _totals.totalBaseLUSDToRedeem.add(_totals.totalShieldedLUSDToRedeem);
         _locals.totalCollateralDrawn = _totals.totalBaseCollateralDrawn.add(_totals.totalShieldedCollateralDrawn);
         _locals.grossCollateralDrawn = _locals.totalCollateralDrawn.add(_locals.totalCollateralFee);
-        return _locals;
+
+      ContractsStorage memory _contractsCache = getContractsStorage();
+
+        // Base rate update
+        _contractsCache.aggregator.updateBaseRateFromRedemption(
+            _locals.totalRedeemed, _locals.totalLUSDSupplyAtStart
+        );
+
+        // Fees
+        _requireUserAcceptsFee(_locals.totalCollateralFee, _locals.grossCollateralDrawn, _maxFeePercentage);
+
+        emit Redemption(_LUSDAmount, _locals.totalRedeemed,
+                        _locals.totalCollateralDrawn, _locals.totalCollateralFee);
+
+        _contractsCache.lusdToken.burn(msg.sender, _locals.totalRedeemed);
+
+        if (_totals.totalBaseLUSDToRedeem > 0) {
+            activePool.decreaseLUSDDebt(_normalizedDebt(_totals.totalBaseLUSDToRedeem, false));
+            activePool.sendCollateral(msg.sender, _totals.totalBaseCollateralDrawn);
+        }
+        if (_totals.totalShieldedLUSDToRedeem > 0) {
+            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(_totals.totalShieldedLUSDToRedeem, true));
+            activeShieldedPool.sendCollateral(msg.sender, _totals.totalShieldedCollateralDrawn);
+        }
+
+       
     }
 
-    // function redeemCollateralForShutdown(
-    //     uint _LUSDamount,
-    //     address _firstRedemptionHint,
-    //     address _upperPartialRedemptionHint,
-    //     address _lowerPartialRedemptionHint,
-    //     address _upperShieldedPartialRedemptionHint,
-    //     address _lowerShieldedPartialRedemptionHint,
-    //     uint _partialRedemptionHintNICR,
-    //     uint _maxIterations,
-    //     uint _maxFeePercentage
-    // ) external override {
-    //     _requireCallerIsBorrowerOperations();
-    //     _requireAfterBootstrapPeriod();
-    //     _requireShutdown();
+    function redeemCollateralForShutdown(
+        uint _LUSDamount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
+        uint _partialRedemptionHintNICR,
+        uint _maxIterations,
+        uint _maxFeePercentage
+    ) external override {
+        _requireCallerIsBorrowerOperations();
+        _requireAfterBootstrapPeriod();
+        // _requireShutdown();
+        require(_isShutdown(), "TM: Collateral is not shutdown");
 
-    //     ContractsStorage memory contractsCache = getContractsStorage();
+        RedemptionHints memory redemptionHints = RedemptionHints(
+        _upperPartialRedemptionHint,
+        _lowerPartialRedemptionHint,
+        _upperShieldedPartialRedemptionHint,
+        _lowerShieldedPartialRedemptionHint,
+        _partialRedemptionHintNICR
+        );
 
-    //     RedemptionTotals memory totals;
-    //     RedemptionLocals memory locals;
-    //     RedemptionHints memory hints;
+        (ContractsStorage memory contractsCache,
+        RedemptionTotals memory totals,
+        RedemptionLocals memory locals
+        ) = 
+          _initializeRedemption(_LUSDamount, _firstRedemptionHint, _maxIterations, _maxFeePercentage);
 
-    //     _requireValidMaxFeePercentage(_maxFeePercentage);
-    //     _requireAfterBootstrapPeriod();
+        (totals, locals) = _runRedemptionLoop(
+            contractsCache,
+            totals,
+            locals,
+            redemptionHints,
+            _maxIterations);
 
-    //     (locals.price, ) = priceFeed.fetchPrice();
+        _finalizeRedemption(locals, totals, _LUSDamount, _maxFeePercentage);
 
-    //     //(, locals.par) = relayer.updateRateAndPar();
-    //     locals.par = relayer.par();
-
-    //     _requireTCRoverMCR(locals.price);
-
-    //     require(_LUSDamount > 0, "TM: Amount must be gt than zero");
-
-    //     _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
-
-    //     //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
-    //     locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();
-    //     assert(contractsCache.lusdToken.balanceOf(msg.sender) <= locals.totalLUSDSupplyAtStart);
-
-    //     totals.remainingLUSD = _LUSDamount;
-
-    //     // seed base and shielded cursors from hint or scanning tails
-    //     (locals.curBase, locals.curSh) = _seedCursorsFromHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
-        
-    //     uint256 redemptionRate = contractsCache.aggregator.calcRateForRedemption(totals.remainingLUSD, locals.totalLUSDSupplyAtStart);
-
-    //     if (_maxIterations == 0) { _maxIterations = uint(-1); }
-    //     while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
-    //         _maxIterations--;
-    //         uint icrB;
-    //         uint icrS;
-    //         (icrB, icrS) = _selectNextBaseOrShielded(contractsCache, locals);
-
-    //         // stop if neither candidate is eligible
-    //         if (icrB == type(uint).max && icrS == type(uint).max) { break; }
-
-    //         locals = _selectNextBorrower(contractsCache, locals, icrB, icrS);
-
-    //         // apply pending rewards so debt is all in normalized format for redemption
-    //         contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
-
-    //         // Hints object
-    //         hints = RedemptionHints(
-    //             _upperPartialRedemptionHint,
-    //             _lowerPartialRedemptionHint,
-    //             _upperShieldedPartialRedemptionHint,
-    //             _lowerShieldedPartialRedemptionHint,
-    //             _partialRedemptionHintNICR
-    //         );
-
-    //         // Redeem from the chosen borrower
-    //         SingleRedemptionValues memory singleRedemption = _redeemCollateralFromTrove(
-    //             contractsCache,
-    //             locals.currentBorrower,
-    //             totals.remainingLUSD,
-    //             locals.price,
-    //             locals.par,
-    //             hints,
-    //             !locals.pickBase,
-    //             redemptionRate
-    //         );
-
-    //         if (singleRedemption.cancelledPartial) { break; }
-            
-    //         // add fee to total collateral fee            
-    //         locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
-
-    //         totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
-
-    //         (totals, locals) = _advanceCursor(locals, totals, singleRedemption);
-
-    //         // advance only the list we consumed from
-    //     }
-    //     require(totals.totalBaseCollateralDrawn > 0 || totals.totalShieldedCollateralDrawn > 0, "TM: Unable to redeem any amount");
-
-    //     locals = _addTotals(totals, locals);
-    //     // Base rate update
-    //     contractsCache.aggregator.updateBaseRateFromRedemption(
-    //         locals.totalRedeemed, locals.totalLUSDSupplyAtStart
-    //     );
-
-    //     // Fees
-    //     _requireUserAcceptsFee(locals.totalCollateralFee, locals.grossCollateralDrawn, _maxFeePercentage);
-
-    //     emit Redemption(_LUSDamount, locals.totalRedeemed,
-    //                     locals.totalCollateralDrawn, locals.totalCollateralFee);
-
-    //     contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
-
-    //     if (totals.totalBaseLUSDToRedeem > 0) {
-    //         activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
-    //         activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
-    //     }
-    //     if (totals.totalShieldedLUSDToRedeem > 0) {
-    //         activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
-    //         activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
-    //     }
-
-    // }
+    }
 
     function _advanceCursor(RedemptionLocals memory _locals, RedemptionTotals memory _totals, SingleRedemptionValues memory _singleRedemption) internal returns(RedemptionTotals memory, RedemptionLocals memory){
             if (_locals.pickBase) {
@@ -873,8 +805,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     }
 
     function closeTroveLiquidation(address _borrower) external override {
-        _requireCallerIsLiquidations();
+        // _requireCallerIsLiquidations();
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();    
+        require(msg.sender == address(contractsCache.liquidations), "TM: Caller is not Liq");
         _closeTrove(contractsCache, _borrower, Status.closedByLiquidation);
     }
 
@@ -883,7 +816,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         TroveStorage storage ts = getTroveStorage();
         bool isShielded = ts.shielded[_borrower];
 
-        _requireMoreThanOneTroveInSystem();
+        // _requireMoreThanOneTroveInSystem();
+        uint total = _contractsCache.sortedTroves.getSize() + _contractsCache.sortedShieldedTroves.getSize();
+        require(total > 1, "Only one trove in the system");
         Trove storage t = ts.Troves[_borrower];
 
         t.status = closedStatus;
@@ -1195,29 +1130,29 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         "TroveManager: Caller is not BO or Rewards contract");
     }
 
-    function _requireCallerIsLiquidations() internal view {
-        require(msg.sender == address(getContractsStorage().liquidations), "TM: Caller is not Liq");
-    }
+    // function _requireCallerIsLiquidations() internal view {
+    //     require(msg.sender == address(getContractsStorage().liquidations), "TM: Caller is not Liq");
+    // }
 
-    function _requireCallerIsRewards() internal view {
-        require(msg.sender == address(getContractsStorage().rewards), "TMr: Caller is not Rewards");
-    }
+    // function _requireCallerIsRewards() internal view {
+    //     require(msg.sender == address(getContractsStorage().rewards), "TMr: Caller is not Rewards");
+    // }
 
-    function _requireLUSDBalanceCoversRedemption(ILUSDToken _lusdToken, address _redeemer, uint _amount) internal view {
-        require(_lusdToken.balanceOf(_redeemer) >= _amount, "TM: Requested redemption amount must be <= user's balance");
-    }
+    // function _requireLUSDBalanceCoversRedemption(ILUSDToken _lusdToken, address _redeemer, uint _amount) internal view {
+    //     require(_lusdToken.balanceOf(_redeemer) >= _amount, "TM: Requested redemption amount must be <= user's balance");
+    // }
 
-    function _requireMoreThanOneTroveInSystem() internal view {
-        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
-        // original check
-        //require (TroveOwnersArrayLength > 1 && sortedTroves.getSize() > 1, "TroveManager: Only one trove in the system");
-        uint total = contractsCache.sortedTroves.getSize() + contractsCache.sortedShieldedTroves.getSize();
-        require(total > 1, "Only one trove in the system");
-    }
+    // function _requireMoreThanOneTroveInSystem() internal view {
+    //     ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
+    //     // original check
+    //     //require (TroveOwnersArrayLength > 1 && sortedTroves.getSize() > 1, "TroveManager: Only one trove in the system");
+    //     uint total = contractsCache.sortedTroves.getSize() + contractsCache.sortedShieldedTroves.getSize();
+    //     require(total > 1, "Only one trove in the system");
+    // }
 
-    function _requireTCRoverMCR(uint _price) internal view {
-        require(_getTCR(_price) >= MCR, "TM: Cannot redeem when TCR < MCR");
-    }
+    // function _requireTCRoverMCR(uint _price) internal view {
+    //     require(_getTCR(_price) >= MCR, "TM: Cannot redeem when TCR < MCR");
+    // }
 
     function _requireAfterBootstrapPeriod() internal view {
         uint systemDeploymentTime = getContractsStorage().lqtyToken.getDeploymentStartTime();
@@ -1229,13 +1164,13 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             "Max fee percentage must be between 0.5% and 100%");
     }
 
-    function _requireNotShutdown() internal view {
-        require(!_isShutdown(), "TM: Collateral is shutdown");
-    }
+    // function _requireNotShutdown() internal view {
+    //     require(!_isShutdown(), "TM: Collateral is shutdown");
+    // }
 
-    function _requireShutdown() internal view {
-        require(_isShutdown(), "TM: Collateral is not shutdown");
-    }
+    // function _requireShutdown() internal view {
+    //     require(_isShutdown(), "TM: Collateral is not shutdown");
+    // }
 
     function _isShutdown() internal view returns (bool) {
         return collateralShutdown.shutdownTime != 0;
@@ -1281,7 +1216,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     }
 
     function setTroveStake(address _borrower, uint _num) external override {
-        _requireCallerIsRewards();
+        // _requireCallerIsRewards();
+        require(msg.sender == address(getContractsStorage().rewards), "TMr: Caller is not Rewards");
         getTroveStorage().Troves[_borrower].stake = _num;
     }
 
