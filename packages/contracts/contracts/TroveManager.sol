@@ -125,6 +125,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         uint totalRedeemed;
         uint totalCollateralDrawn;
         uint totalCollateralFee;
+        uint grossCollateralDrawn;
     }
     struct RedemptionFromTroveLocals {
         uint newColl;
@@ -500,16 +501,20 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
         RedemptionTotals memory totals;
         RedemptionLocals memory locals;
-        RedemptionHints memory hints;
+
+        RedemptionHints memory redemptionHints = RedemptionHints(
+        _upperPartialRedemptionHint,
+        _lowerPartialRedemptionHint,
+        _upperShieldedPartialRedemptionHint,
+        _lowerShieldedPartialRedemptionHint,
+        _partialRedemptionHintNICR
+        );
 
         _requireValidMaxFeePercentage(_maxFeePercentage);
         _requireAfterBootstrapPeriod();
 
-        (locals.price, ) = priceFeed.fetchPrice();
 
-        //(, locals.par) = relayer.updateRateAndPar();
-        locals.par = relayer.par();
-
+        locals = _fetchPriceAndPar(locals);
         _requireTCRoverMCR(locals.price);
 
         require(_LUSDamount > 0, "TM: Amount must be gt than zero");
@@ -525,86 +530,233 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         // seed base and shielded cursors from hint or scanning tails
         (locals.curBase, locals.curSh) = _seedCursorsFromHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
         
-        uint256 redemptionRate = contractsCache.aggregator.calcRateForRedemption(totals.remainingLUSD, locals.totalLUSDSupplyAtStart);
+        (totals, locals) = _runRedemptionLoop(
+            contractsCache,
+            totals,
+            locals,
+            redemptionHints,
+            _maxIterations);
 
-        if (_maxIterations == 0) { _maxIterations = uint(-1); }
-        while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
-            _maxIterations--;
-            uint icrB;
-            uint icrS;
-            (icrB, icrS) = _selectNextBaseOrShielded(contractsCache, locals);
+        _finalizeRedemption(locals, totals, _LUSDamount, _maxFeePercentage);
 
-            // stop if neither candidate is eligible
-            if (icrB == type(uint).max && icrS == type(uint).max) { break; }
-
-            locals = _selectNextBorrower(contractsCache, locals, icrB, icrS);
-
-            // apply pending rewards so debt is all in normalized format for redemption
-            contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
-
-            // Hints object
-            hints = RedemptionHints(
-                _upperPartialRedemptionHint,
-                _lowerPartialRedemptionHint,
-                _upperShieldedPartialRedemptionHint,
-                _lowerShieldedPartialRedemptionHint,
-                _partialRedemptionHintNICR
-            );
-
-            // Redeem from the chosen borrower
-            SingleRedemptionValues memory singleRedemption = _redeemCollateralFromTrove(
-                contractsCache,
-                locals.currentBorrower,
-                totals.remainingLUSD,
-                locals.price,
-                locals.par,
-                hints,
-                !locals.pickBase,
-                redemptionRate
-            );
-
-            if (singleRedemption.cancelledPartial) { break; }
-            
-            // add fee to total collateral fee            
-            locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
-
-            totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
-
-            (totals, locals) = _advanceCursor(locals, totals, singleRedemption);
-
-            // advance only the list we consumed from
-        }
-        require(totals.totalBaseCollateralDrawn > 0 || totals.totalShieldedCollateralDrawn > 0, "TM: Unable to redeem any amount");
-
-        locals.totalRedeemed = totals.totalBaseLUSDToRedeem.add(totals.totalShieldedLUSDToRedeem);
-        locals.totalCollateralDrawn = totals.totalBaseCollateralDrawn.add(totals.totalShieldedCollateralDrawn);
-        uint256 grossCollateralDrawn = locals.totalCollateralDrawn.add(locals.totalCollateralFee);
-        // Base rate update
-        contractsCache.aggregator.updateBaseRateFromRedemption(
-            locals.totalRedeemed, locals.totalLUSDSupplyAtStart
-        );
-
-        // Fees
-        _requireUserAcceptsFee(locals.totalCollateralFee, grossCollateralDrawn, _maxFeePercentage);
-
-        emit Redemption(_LUSDamount, locals.totalRedeemed,
-                        locals.totalCollateralDrawn, locals.totalCollateralFee);
-
-        contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
-
-        if (totals.totalBaseLUSDToRedeem > 0) {
-            activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
-            activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
-        }
-        if (totals.totalShieldedLUSDToRedeem > 0) {
-            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
-            activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
-        }
-
-        // Do these last to avoid conflict with off-chain partialNICRhint
+       // Do these last to avoid conflict with off-chain partialNICRhint
         relayer.updateRateAndPar();
         drip();
     }
+
+    function _finalizeRedemption(RedemptionLocals memory _locals, RedemptionTotals memory _totals, uint _LUSDAmount, uint _maxFeePercentage)  internal {
+      _locals = _addTotals(_totals, _locals);
+      ContractsStorage memory _contractsCache = getContractsStorage();
+        // Base rate update
+        _contractsCache.aggregator.updateBaseRateFromRedemption(
+            _locals.totalRedeemed, _locals.totalLUSDSupplyAtStart
+        );
+
+        // Fees
+        _requireUserAcceptsFee(_locals.totalCollateralFee, _locals.grossCollateralDrawn, _maxFeePercentage);
+
+        emit Redemption(_LUSDAmount, _locals.totalRedeemed,
+                        _locals.totalCollateralDrawn, _locals.totalCollateralFee);
+
+        _contractsCache.lusdToken.burn(msg.sender, _locals.totalRedeemed);
+
+        if (_totals.totalBaseLUSDToRedeem > 0) {
+            activePool.decreaseLUSDDebt(_normalizedDebt(_totals.totalBaseLUSDToRedeem, false));
+            activePool.sendCollateral(msg.sender, _totals.totalBaseCollateralDrawn);
+        }
+        if (_totals.totalShieldedLUSDToRedeem > 0) {
+            activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(_totals.totalShieldedLUSDToRedeem, true));
+            activeShieldedPool.sendCollateral(msg.sender, _totals.totalShieldedCollateralDrawn);
+        }
+
+       
+    }
+
+    function _fetchPriceAndPar(RedemptionLocals memory _locals) internal returns(RedemptionLocals memory){
+        (_locals.price, ) = priceFeed.fetchPrice();
+        //(, locals.par) = relayer.updateRateAndPar();
+        _locals.par = relayer.par();
+        return _locals;
+    }
+
+    function _runRedemptionLoop(
+        ContractsStorage memory _contractsCache,
+        RedemptionTotals memory _totals,
+        RedemptionLocals memory _locals,
+        RedemptionHints memory _hints,
+        uint _maxIterations
+    ) internal returns (RedemptionTotals memory, RedemptionLocals memory) {
+        uint256 _redemptionRate = _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _locals.totalLUSDSupplyAtStart);
+            if (_maxIterations == 0) { _maxIterations = uint(-1); }
+            while (_totals.remainingLUSD > 0 && _maxIterations > 0 && (_locals.curBase != address(0) || _locals.curSh != address(0))) {
+                _maxIterations--;
+                uint icrB;
+                uint icrS;
+                (icrB, icrS) = _selectNextBaseOrShielded(_contractsCache, _locals);
+
+                // stop if neither candidate is eligible
+                if (icrB == type(uint).max && icrS == type(uint).max) { break; }
+
+                _locals = _selectNextBorrower(_contractsCache, _locals, icrB, icrS);
+
+                // apply pending rewards so debt is all in normalized format for redemption
+                _contractsCache.rewards.applyPendingRewards(_locals.currentBorrower);
+
+                // Redeem from the chosen borrower
+                SingleRedemptionValues memory singleRedemption = _redeemCollateralFromTrove(
+                    _contractsCache,
+                    _locals.currentBorrower,
+                    _totals.remainingLUSD,
+                    _locals.price,
+                    _locals.par,
+                    _hints,
+                    !_locals.pickBase,
+                    _redemptionRate
+                );
+
+                if (singleRedemption.cancelledPartial) { break; }
+                
+                // add fee to total collateral fee            
+                _locals.totalCollateralFee = _locals.totalCollateralFee.add(singleRedemption.collateralFee);
+
+                _totals.remainingLUSD = _totals.remainingLUSD.sub(singleRedemption.LUSDLot);
+
+                (_totals, _locals) = _advanceCursor(_locals, _totals, singleRedemption);
+
+                // advance only the list we consumed from
+            }
+
+            require(_totals.totalBaseCollateralDrawn > 0 || _totals.totalShieldedCollateralDrawn > 0, "TM: Unable to redeem any amount");
+
+        return (_totals, _locals);
+    }
+
+    function _addTotals(RedemptionTotals memory _totals, RedemptionLocals memory _locals) internal returns (RedemptionLocals memory){
+        _locals.totalRedeemed = _totals.totalBaseLUSDToRedeem.add(_totals.totalShieldedLUSDToRedeem);
+        _locals.totalCollateralDrawn = _totals.totalBaseCollateralDrawn.add(_totals.totalShieldedCollateralDrawn);
+        _locals.grossCollateralDrawn = _locals.totalCollateralDrawn.add(_locals.totalCollateralFee);
+        return _locals;
+    }
+
+    // function redeemCollateralForShutdown(
+    //     uint _LUSDamount,
+    //     address _firstRedemptionHint,
+    //     address _upperPartialRedemptionHint,
+    //     address _lowerPartialRedemptionHint,
+    //     address _upperShieldedPartialRedemptionHint,
+    //     address _lowerShieldedPartialRedemptionHint,
+    //     uint _partialRedemptionHintNICR,
+    //     uint _maxIterations,
+    //     uint _maxFeePercentage
+    // ) external override {
+    //     _requireCallerIsBorrowerOperations();
+    //     _requireAfterBootstrapPeriod();
+    //     _requireShutdown();
+
+    //     ContractsStorage memory contractsCache = getContractsStorage();
+
+    //     RedemptionTotals memory totals;
+    //     RedemptionLocals memory locals;
+    //     RedemptionHints memory hints;
+
+    //     _requireValidMaxFeePercentage(_maxFeePercentage);
+    //     _requireAfterBootstrapPeriod();
+
+    //     (locals.price, ) = priceFeed.fetchPrice();
+
+    //     //(, locals.par) = relayer.updateRateAndPar();
+    //     locals.par = relayer.par();
+
+    //     _requireTCRoverMCR(locals.price);
+
+    //     require(_LUSDamount > 0, "TM: Amount must be gt than zero");
+
+    //     _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
+
+    //     //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
+    //     locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();
+    //     assert(contractsCache.lusdToken.balanceOf(msg.sender) <= locals.totalLUSDSupplyAtStart);
+
+    //     totals.remainingLUSD = _LUSDamount;
+
+    //     // seed base and shielded cursors from hint or scanning tails
+    //     (locals.curBase, locals.curSh) = _seedCursorsFromHint(contractsCache, _firstRedemptionHint, locals.price, locals.par);
+        
+    //     uint256 redemptionRate = contractsCache.aggregator.calcRateForRedemption(totals.remainingLUSD, locals.totalLUSDSupplyAtStart);
+
+    //     if (_maxIterations == 0) { _maxIterations = uint(-1); }
+    //     while (totals.remainingLUSD > 0 && _maxIterations > 0 && (locals.curBase != address(0) || locals.curSh != address(0))) {
+    //         _maxIterations--;
+    //         uint icrB;
+    //         uint icrS;
+    //         (icrB, icrS) = _selectNextBaseOrShielded(contractsCache, locals);
+
+    //         // stop if neither candidate is eligible
+    //         if (icrB == type(uint).max && icrS == type(uint).max) { break; }
+
+    //         locals = _selectNextBorrower(contractsCache, locals, icrB, icrS);
+
+    //         // apply pending rewards so debt is all in normalized format for redemption
+    //         contractsCache.rewards.applyPendingRewards(locals.currentBorrower);
+
+    //         // Hints object
+    //         hints = RedemptionHints(
+    //             _upperPartialRedemptionHint,
+    //             _lowerPartialRedemptionHint,
+    //             _upperShieldedPartialRedemptionHint,
+    //             _lowerShieldedPartialRedemptionHint,
+    //             _partialRedemptionHintNICR
+    //         );
+
+    //         // Redeem from the chosen borrower
+    //         SingleRedemptionValues memory singleRedemption = _redeemCollateralFromTrove(
+    //             contractsCache,
+    //             locals.currentBorrower,
+    //             totals.remainingLUSD,
+    //             locals.price,
+    //             locals.par,
+    //             hints,
+    //             !locals.pickBase,
+    //             redemptionRate
+    //         );
+
+    //         if (singleRedemption.cancelledPartial) { break; }
+            
+    //         // add fee to total collateral fee            
+    //         locals.totalCollateralFee = locals.totalCollateralFee.add(singleRedemption.collateralFee);
+
+    //         totals.remainingLUSD = totals.remainingLUSD.sub(singleRedemption.LUSDLot);
+
+    //         (totals, locals) = _advanceCursor(locals, totals, singleRedemption);
+
+    //         // advance only the list we consumed from
+    //     }
+    //     require(totals.totalBaseCollateralDrawn > 0 || totals.totalShieldedCollateralDrawn > 0, "TM: Unable to redeem any amount");
+
+    //     locals = _addTotals(totals, locals);
+    //     // Base rate update
+    //     contractsCache.aggregator.updateBaseRateFromRedemption(
+    //         locals.totalRedeemed, locals.totalLUSDSupplyAtStart
+    //     );
+
+    //     // Fees
+    //     _requireUserAcceptsFee(locals.totalCollateralFee, locals.grossCollateralDrawn, _maxFeePercentage);
+
+    //     emit Redemption(_LUSDamount, locals.totalRedeemed,
+    //                     locals.totalCollateralDrawn, locals.totalCollateralFee);
+
+    //     contractsCache.lusdToken.burn(msg.sender, locals.totalRedeemed);
+
+    //     if (totals.totalBaseLUSDToRedeem > 0) {
+    //         activePool.decreaseLUSDDebt(_normalizedDebt(totals.totalBaseLUSDToRedeem, false));
+    //         activePool.sendCollateral(msg.sender, totals.totalBaseCollateralDrawn);
+    //     }
+    //     if (totals.totalShieldedLUSDToRedeem > 0) {
+    //         activeShieldedPool.decreaseLUSDDebt(_normalizedDebt(totals.totalShieldedLUSDToRedeem, true));
+    //         activeShieldedPool.sendCollateral(msg.sender, totals.totalShieldedCollateralDrawn);
+    //     }
+
+    // }
 
     function _advanceCursor(RedemptionLocals memory _locals, RedemptionTotals memory _totals, SingleRedemptionValues memory _singleRedemption) internal returns(RedemptionTotals memory, RedemptionLocals memory){
             if (_locals.pickBase) {
@@ -782,8 +934,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             return locals;
     }
 
-function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
-    TroveStorage storage ts = getTroveStorage();
+    function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 index) {
+        TroveStorage storage ts = getTroveStorage();
         // Push the Troveowner to the array
         ts.TroveOwners.push(_borrower);
 
@@ -971,13 +1123,6 @@ function _addBaseTroveOwnerToArray(address _borrower) internal returns (uint128 
         }
 
          _contractsCache.feeRouter.allocateFees(newInterest);
-    }
-
-    function calcRedemptionRateForShutdown(uint _LUSDAmount, uint _totalLUSDSupply) public view returns (uint) {
-        uint256 newBaseRate = getContractsStorage().aggregator.calcRateForRedemption(_LUSDAmount, _totalLUSDSupply);
-        uint256 discount = _calcDiscount();
-        
-        return newBaseRate.mul(DECIMAL_PRECISION.sub(discount)).div(DECIMAL_PRECISION);
     }
 
     function _calcDiscount() internal view returns (uint) {

@@ -86,6 +86,18 @@ interface ITroveManager is ILiquityBase {
         uint _maxFee
     ) external; 
 
+    function redeemCollateralForShutdown(
+        uint _LUSDamount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        address _upperShieldedPartialRedemptionHint,
+        address _lowerShieldedPartialRedemptionHint,
+        uint _partialRedemptionHintNICR,
+        uint _maxIterations,
+        uint _maxFeePercentage
+    ) external;
+
     function updateStakeAndTotalStakes(address _borrower) external returns (uint);
 
     function updateTroveRewardSnapshots(address _borrower) external;
