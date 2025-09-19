@@ -148,9 +148,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     // --- Events ---
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint _stake,TroveManagerOperation _operation);
     event TroveLiquidated(address indexed _borrower, uint _debt, uint _coll, TroveManagerOperation _operation);
-    event Drip(uint256 _newInterest);
-    event Value(uint256 value);
-    event Values(uint256 value1, uint256 value2);
+    // these events aren't used rn
+    // event Drip(uint256 _newInterest);
+    // event Value(uint256 value);
+    // event Values(uint256 value1, uint256 value2);
     event Shutdown(bool _oracleFailure, uint256 _rate, uint256 _par, uint256 _shutdownTime);
 
     enum TroveManagerOperation {
@@ -260,7 +261,22 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         internal returns (SingleRedemptionValues memory singleRedemption)
     {
         RedemptionFromTroveLocals memory troveLocals;
-        singleRedemption = _calculateSingleRedemptionValues(singleRedemption, _maxLUSDAmount, _shielded, _redemptionLocals, _redemptionRate); 
+        
+        // singleRedemption = _calculateSingleRedemptionValues(singleRedemption, _maxLUSDAmount, _shielded, _redemptionLocals, _redemptionRate); 
+           Trove storage t = getTroveStorage().Troves[_redemptionLocals.currentBorrower];
+        // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
+        if(_redemptionLocals.shutdown) {
+            singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
+            // do not take fee during shutdown
+            singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).div(DECIMAL_PRECISION.sub(_calcDiscount()).mul(_redemptionLocals.price));
+        } else {
+            singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
+            singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).div(_redemptionLocals.price);
+            // calculate fee for redeemed collateral
+            singleRedemption.collateralFee =  _redemptionRate.mul(singleRedemption.collateralLot).div(DECIMAL_PRECISION);
+            // subtract fee from collateral lot so fee stays in trove
+            singleRedemption.collateralLot = singleRedemption.collateralLot.sub(singleRedemption.collateralFee);
+        } 
 
         troveLocals.normDebt = _normalizedDebt(singleRedemption.LUSDLot, _shielded);
 
@@ -296,25 +312,26 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
         } else {
             troveLocals.newNICR = LiquityMath._computeNominalCR(troveLocals.newColl, troveLocals.newDebt);
-            /*
-            * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
-            * certainly result in running out of gas. 
-            *
-            * If the resultant net debt of the partial is less than the minimum, net debt we bail.
-            */
+      
 
-            // This options would allow par drift after off-chain hint
-            //if (!sorted.isValidInsertPosition(locals.newNICR, hints.upper, hints.lower)  || _getNetDebt(_actualDebt(locals.newDebt, _shielded)) < MIN_NET_DEBT) {
-            if (troveLocals.newNICR != hints.partialNICR || _getNetDebt(_actualDebt(troveLocals.newDebt, _shielded)) < MIN_NET_DEBT) {
-                singleRedemption.cancelledPartial = true;
-                return singleRedemption;
-            }
             // if not shutdown, reinsert the trove
             if(!_redemptionLocals.shutdown) {
+                /*
+                * If the provided hint is out of date, we bail since trying to reinsert without a good hint will almost
+                * certainly result in running out of gas.
+                * if we are shutdown we don't re-insert partial redemptions
+                *
+                * If the resultant net debt of the partial is less than the minimum, net debt we bail.
+                */
+                // This options would allow par drift after off-chain hint
+                    //if (!sorted.isValidInsertPosition(locals.newNICR, hints.upper, hints.lower)  || _getNetDebt(_actualDebt(locals.newDebt, _shielded)) < MIN_NET_DEBT) {
+                if (troveLocals.newNICR != hints.partialNICR || _getNetDebt(_actualDebt(troveLocals.newDebt, _shielded)) < MIN_NET_DEBT) {
+                    singleRedemption.cancelledPartial = true;
+                    return singleRedemption;
+                }
+
                 _reInsertTroves(_contractsCache, troveLocals, hints, _shielded, _redemptionLocals.currentBorrower);
             }
-
-
             
             ts.debt = troveLocals.newDebt;
             ts.coll = troveLocals.newColl;
@@ -329,30 +346,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         }
        
         return singleRedemption;
-    }
-
-    function _calculateSingleRedemptionValues(SingleRedemptionValues memory _singleRedemption, uint256 _maxLUSDAmount, bool _shielded, RedemptionLocals memory _locals, uint _redemptionRate) internal returns (SingleRedemptionValues memory){
-        Trove storage t = getTroveStorage().Troves[_locals.currentBorrower];
-        // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
-        if(_locals.shutdown) {
-            _singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
-        } else {
-            _singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
-        } 
-        if(_locals.shutdown) {
-            _singleRedemption.collateralLot = _singleRedemption.LUSDLot.mul(_locals.par).div(DECIMAL_PRECISION.sub(_calcDiscount()).mul(_locals.price));
-        } else {
-            _singleRedemption.collateralLot = _singleRedemption.LUSDLot.mul(_locals.par).div(_locals.price);
-        }
-
-        if(!_locals.shutdown) {
-            // calculate fee for redeemed collateral
-            _singleRedemption.collateralFee =  _redemptionRate.mul(_singleRedemption.collateralLot).div(DECIMAL_PRECISION);
-            // subtract fee from collateral lot so fee stays in trove
-            _singleRedemption.collateralLot = _singleRedemption.collateralLot.sub(_singleRedemption.collateralFee);
-        }
-
-        return _singleRedemption;
     }
 
     function _reInsertTroves(ContractsStorage memory _contractsCache, RedemptionFromTroveLocals memory _locals, RedemptionHints memory _hints, bool _shielded, address _borrower) internal {
@@ -577,7 +570,7 @@ function redeemCollateralForShutdown(
         require(_LUSDamount > 0, "TM: must be gt than zero");
 
         // _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
-        require(contractsCache.lusdToken.balanceOf(msg.sender) >= _LUSDamount, "TM:  must be <= user's balance");
+        require(contractsCache.lusdToken.balanceOf(msg.sender) >= _LUSDamount, "TM: must be <= user's balance");
 
         //locals.totalLUSDSupplyAtStart = getEntireSystemDebt(accumulatedRate, accumulatedShieldRate);
         locals.totalLUSDSupplyAtStart = contractsCache.lusdToken.totalSupply();

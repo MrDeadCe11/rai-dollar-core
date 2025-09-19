@@ -6192,7 +6192,7 @@ contract('TroveManager', async accounts => {
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
       assert.include(error.message, "revert")
-      assert.include(error.message, "Requested redemption amount must be <= user's balance")
+      assert.include(error.message, "must be <= user's balance")
     }
 
     // Erin tries to redeem 401 LUSD
@@ -6225,7 +6225,7 @@ contract('TroveManager', async accounts => {
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
       assert.include(error.message, "revert")
-      assert.include(error.message, "Requested redemption amount must be <= user's balance")
+      assert.include(error.message, "must be <= user's balance")
     }
 
     // Erin tries to redeem 239482309 LUSD
@@ -6258,7 +6258,7 @@ contract('TroveManager', async accounts => {
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
       assert.include(error.message, "revert")
-      assert.include(error.message, "Requested redemption amount must be <= user's balance")
+      assert.include(error.message, "must be <= user's balance")
     }
 
     // Erin tries to redeem 2^256 - 1 LUSD
@@ -6293,7 +6293,7 @@ contract('TroveManager', async accounts => {
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
       assert.include(error.message, "revert")
-      assert.include(error.message, "Requested redemption amount must be <= user's balance")
+      assert.include(error.message, "must be <= user's balance")
     }
   })
 
