@@ -267,7 +267,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         if(_redemptionLocals.shutdown) {
             singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
             // do not take fee during shutdown
-            singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).div(DECIMAL_PRECISION.sub(_calcDiscount()).mul(_redemptionLocals.price));
+            singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(_calcDiscount()).mul(_redemptionLocals.price));
         } else {
             singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
             singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).div(_redemptionLocals.price);
@@ -291,7 +291,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         // since sub of normalized debt above could make 1 wei less
         // and actualDebt can also round down
         //if (_actualDebt(newDebt).sub(1) <= LUSD_GAS_COMPENSATION) {
-        if (_actualDebt(troveLocals.newDebt, _shielded) <= (_redemptionLocals.shutdown ? 0 : LUSD_GAS_COMPENSATION)) {
+        if (_actualDebt(troveLocals.newDebt, _shielded) <= LUSD_GAS_COMPENSATION) {
             // No debt left in the Trove (except for the liquidation reserve), therefore the trove gets closed
             _contractsCache.rewards.removeStake(_redemptionLocals.currentBorrower);
             if(!_redemptionLocals.shutdown) {
@@ -609,8 +609,6 @@ function redeemCollateralForShutdown(
         return (contractsCache, totals, locals);
         }
 
-
-
     function _runRedemptionLoop(
         ContractsStorage memory _contractsCache,
         RedemptionTotals memory _totals,
@@ -618,7 +616,7 @@ function redeemCollateralForShutdown(
         RedemptionHints memory _hints,
         uint _maxIterations
     ) internal returns (RedemptionTotals memory, RedemptionLocals memory) {
-        uint256 _redemptionRate = _redemptionLocals.shutdown ? 0 : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
+        uint256 _redemptionRate = _redemptionLocals.shutdown ? collateralShutdown.rate : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
             if (_maxIterations == 0) { _maxIterations = uint(-1); }
             while (_totals.remainingLUSD > 0 && _maxIterations > 0 && (_redemptionLocals.curBase != address(0) || _redemptionLocals.curSh != address(0))) {
                 _maxIterations--;
