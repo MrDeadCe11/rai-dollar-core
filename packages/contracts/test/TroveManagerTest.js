@@ -70,6 +70,7 @@ contract('TroveManager', async accounts => {
   const openTrove = async (params) => th.openTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
   let lib;
+
   before(async () => {
     lib = await TroveManagerLib.new();
     await TroveManagerTester.link(lib);
@@ -3270,12 +3271,7 @@ contract('TroveManager', async accounts => {
 
     /* After liquidation: 
 
-    Alice ICR: (10.15 * 100 / 60) = 183.33%
-    Bob ICR:(1.075 * 100 / 98) =  109.69%
-    Carol ICR: (1.075 *100 /  107.5 ) = 100.0%
-
-    Check Alice is above MCR, Bob below, Carol below. */
-
+    Alice ICR: (10.15 * 100 / 60) = 183.33%_requireAfterBootstrapPeriod
 
     assert.isTrue(alice_ICR_After.gte(mv._MCR))
     assert.isTrue(bob_ICR_After.lte(mv._MCR))

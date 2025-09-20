@@ -109,7 +109,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
     event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, BorrowerOperation operation);
-    event BorrowerOperationsShutdown(bool _oracleFailure);
+    event BorrowerOperationsShutdown(uint256 _shutdownTime, bool _oracleFailure);
 
     // --- Dependency setters ---
 
@@ -385,8 +385,10 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
             nNetDebtChange
         );
     }
-
+    
+    // we don't close troves during shutdown, empty troves are moved to the head of the sorted list
     function closeTrove() external override {
+        _requireNotShutdown();
         ITroveManager troveManagerCached = troveManager;
         IRewards rewardsCached = rewards;
         ILUSDToken lusdTokenCached = lusdToken;
@@ -463,7 +465,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         isShutdown = true;
         troveManager.shutdown(_oracleFailure);
 
-        emit BorrowerOperationsShutdown(_oracleFailure);
+        emit BorrowerOperationsShutdown(block.timestamp, _oracleFailure);
     }
 
     /**

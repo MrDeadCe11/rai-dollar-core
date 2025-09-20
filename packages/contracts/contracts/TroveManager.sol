@@ -81,7 +81,6 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         uint256 shutdownTime;
         uint256 par;
         uint256 rate;
-        uint256 price;
         bool oracleFailure;
     }
 
@@ -469,7 +468,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         external
         override
     {
-        require(!_isShutdown(), "TM: not shutdown");
+        require(!_isShutdown(), "TM: shutdown");
         RedemptionHints memory redemptionHints = RedemptionHints(
         _upperPartialRedemptionHint,
         _lowerPartialRedemptionHint,
@@ -513,8 +512,6 @@ function redeemCollateralForShutdown(
         uint _maxIterations,
         uint _maxFeePercentage
     ) external override {
-        _requireCallerIsBorrowerOperations();
-        _requireAfterBootstrapPeriod();
         require(_isShutdown(), "TM: not shutdown");
 
         (ContractsStorage memory contractsCache,
@@ -553,8 +550,9 @@ function redeemCollateralForShutdown(
         RedemptionLocals memory locals;
 
         locals.shutdown = _isShutdown();
-
+        if(!locals.shutdown) {
         _requireValidMaxFeePercentage(_maxFeePercentage);
+        }
         _requireAfterBootstrapPeriod();
 
         // if oracle is shut down it will return last good price
@@ -714,9 +712,13 @@ function redeemCollateralForShutdown(
     function shutdown(bool _oracleFailure) external override {
        _requireCallerIsBorrowerOperations();
        if(_isShutdown()) return;
-       (uint256 rate, uint256 par) = relayer.updateRateAndPar();
-       drip();
-       _shutdown(_oracleFailure, rate, par);
+       (uint256 _rate, uint256 _par) = relayer.updateRateAndPar();
+        drip();
+        collateralShutdown.shutdownTime = block.timestamp;
+        collateralShutdown.par = _par;
+        collateralShutdown.rate = _rate;
+        collateralShutdown.oracleFailure = _oracleFailure;
+        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
     }
 
     // --- Helper functions ---
@@ -1024,7 +1026,6 @@ function redeemCollateralForShutdown(
     }
 
     function _drip(ContractsStorage memory _contractsCache, uint256 interestRate, uint256 shieldedInterestRate) internal {
-
         // can't distributetoSP() when empty
         if (_contractsCache.stabilityPool.getTotalLUSDDeposits() == 0) return;
 
@@ -1078,18 +1079,7 @@ function redeemCollateralForShutdown(
         return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
     }
 
-    function _shutdown(bool _oracleFailure, uint256 _rate, uint256 _par) internal {
-        collateralShutdown.shutdownTime = block.timestamp;
-        collateralShutdown.par = _par;
-        collateralShutdown.rate = _rate;
-        // oracle will return last good price
-        (collateralShutdown.price, ) = priceFeed.fetchPrice();
-        collateralShutdown.oracleFailure = _oracleFailure;
-        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
-    }
-
-
-// External view wrapper
+    // External view wrapper
     function calcAccumulatedRate(uint256 accRate, uint256 interestRate, uint256 secondsPassed) external pure returns (uint256) {
         return _calcAccumulatedRate(accRate, interestRate, secondsPassed);
     }
@@ -1137,29 +1127,31 @@ function redeemCollateralForShutdown(
         "TroveManager: not BO or Rewards");
     }
 
-    // function _requireCallerIsLiquidations() internal view {
-    //     require(msg.sender == address(getContractsStorage().liquidations), "TM: Caller is not Liq");
-    // }
+    /** removed to reduce contract size
+    function _requireCallerIsLiquidations() internal view {
+        require(msg.sender == address(getContractsStorage().liquidations), "TM: Caller is not Liq");
+    }
 
-    // function _requireCallerIsRewards() internal view {
-    //     require(msg.sender == address(getContractsStorage().rewards), "TMr: Caller is not Rewards");
-    // }
+    function _requireCallerIsRewards() internal view {
+        require(msg.sender == address(getContractsStorage().rewards), "TMr: Caller is not Rewards");
+    }
 
-    // function _requireLUSDBalanceCoversRedemption(ILUSDToken _lusdToken, address _redeemer, uint _amount) internal view {
-    //     require(_lusdToken.balanceOf(_redeemer) >= _amount, "TM:  must be <= user's balance");
-    // }
+    function _requireLUSDBalanceCoversRedemption(ILUSDToken _lusdToken, address _redeemer, uint _amount) internal view {
+        require(_lusdToken.balanceOf(_redeemer) >= _amount, "TM:  must be <= user's balance");
+    }
 
-    // function _requireMoreThanOneTroveInSystem() internal view {
-    //     ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
-    //     // original check
-    //     //require (TroveOwnersArrayLength > 1 && sortedTroves.getSize() > 1, "TroveManager: Only one trove in the system");
-    //     uint total = contractsCache.sortedTroves.getSize() + contractsCache.sortedShieldedTroves.getSize();
-    //     require(total > 1, "Only one trove");
-    // }
+    function _requireMoreThanOneTroveInSystem() internal view {
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
+        // original check
+        //require (TroveOwnersArrayLength > 1 && sortedTroves.getSize() > 1, "TroveManager: Only one trove in the system");
+        uint total = contractsCache.sortedTroves.getSize() + contractsCache.sortedShieldedTroves.getSize();
+        require(total > 1, "Only one trove");
+    }
 
-    // function _requireTCRoverMCR(uint _price) internal view {
-    //     require(_getTCR(_price) >= MCR, "TM: TCR < MCR");
-    // }
+    function _requireTCRoverMCR(uint _price) internal view {
+        require(_getTCR(_price) >= MCR, "TM: TCR < MCR");
+    }
+    */
 
     function _requireAfterBootstrapPeriod() internal view {
         uint systemDeploymentTime = getContractsStorage().lqtyToken.getDeploymentStartTime();
@@ -1171,13 +1163,9 @@ function redeemCollateralForShutdown(
             "maxFee% out of [0.5,100]");
     }
 
-    // function _requireNotShutdown() internal view {
-    //     require(!_isShutdown(), "TM: Collateral is shutdown");
-    // }
-
-    // function _requireShutdown() internal view {
-    //     require(_isShutdown(), "TM: not shutdown");
-    // }
+    function isShutdown() external view returns (bool) {
+        return _isShutdown();
+    }
 
     function _isShutdown() internal view returns (bool) {
         return collateralShutdown.shutdownTime != 0;
