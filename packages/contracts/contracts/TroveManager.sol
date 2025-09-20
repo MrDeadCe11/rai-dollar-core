@@ -269,13 +269,17 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
             // do not take fee during shutdown
             uint256 discount = _calcDiscount();
             if(discount == DECIMAL_PRECISION) {
-                // denominator is zero → only allow full redemption to take all collateral
+                // denominator is zero and LUSD amount is equal to debt amount → full redemption to take all collateral
                 if (singleRedemption.LUSDLot == _actualDebt(t.debt, _shielded)) {
                     singleRedemption.collateralLot = t.coll;
                 } else {
-                    // partial redemption impossible at 100% discount; skip this trove
-                     singleRedemption.cancelledPartial = true; // stop here, leave remaining LUSD unused
-                    return singleRedemption;
+                    singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
+                    if(singleRedemption.collateralLot > t.coll) {
+                        // redeem all collateral amount in trove
+                        singleRedemption.collateralLot = t.coll;
+                        //calculate collateral => LUSD with discount
+                        singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
+                    }
                 }
             } else {
                 singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
