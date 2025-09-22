@@ -262,29 +262,22 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         RedemptionFromTroveLocals memory troveLocals;
         
         // singleRedemption = _calculateSingleRedemptionValues(singleRedemption, _maxLUSDAmount, _shielded, _redemptionLocals, _redemptionRate); 
-           Trove storage t = getTroveStorage().Troves[_redemptionLocals.currentBorrower];
+        Trove storage t = getTroveStorage().Troves[_redemptionLocals.currentBorrower];
         // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
         if(_redemptionLocals.shutdown) {
-            singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
-            // do not take fee during shutdown
-            uint256 discount = _calcDiscount();
-            if(discount == DECIMAL_PRECISION) {
-                // denominator is zero and LUSD amount is equal to debt amount → full redemption to take all collateral
-                if (singleRedemption.LUSDLot == _actualDebt(t.debt, _shielded)) {
-                    singleRedemption.collateralLot = t.coll;
-                } else {
-                    singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
-                    if(singleRedemption.collateralLot > t.coll) {
-                        // redeem all collateral amount in trove
-                        singleRedemption.collateralLot = t.coll;
-                        //calculate collateral => LUSD with discount
-                        singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
-                    }
-                }
-            } else {
+                singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
+                // do not take fee during shutdown
+                uint256 discount = _calcDiscount();
+                // calculate collateral with discount
                 singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
+                // if collateral lot is greater than trove collateral, redeem all collateral amount in trove
+            if(singleRedemption.collateralLot > t.coll) {
+                // cap collateral at trove amount
+                singleRedemption.collateralLot = t.coll;
+                //calculate collateral => LUSD with discount
+                singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
             }
-                     
+               
         } else {
             singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
             singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).div(_redemptionLocals.price);
@@ -299,6 +292,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         if (_actualDebt(troveLocals.normDebt, _shielded) < _actualDebt(singleRedemption.LUSDLot, _shielded)) {
             troveLocals.normDebt += 1;
         }
+
         Trove storage ts = getTroveStorage().Troves[_redemptionLocals.currentBorrower];
         // Decrease the debt and collateral of the current Trove according to the LUSD lot and corresponding collateral to send
         troveLocals.newDebt = (ts.debt).sub(troveLocals.normDebt);
