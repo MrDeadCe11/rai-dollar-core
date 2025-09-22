@@ -326,7 +326,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
 
-        (vars.price,) = priceFeed.fetchPrice();
+        (vars.price, ) = priceFeed.fetchPrice();
 
         contractsCache.rewards.applyPendingRewards(_borrower);
 

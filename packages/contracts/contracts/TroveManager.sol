@@ -73,7 +73,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         // shutdown discount parameters
     uint256 constant public SEVENTY_TWO_HOURS = 259200; // 72 hours in seconds
     uint256 constant public BASE_DISCOUNT = 2e16; // 2%
-    uint256 constant public MAX_DISCOUNT_ORACLE_FAILURE = DECIMAL_PRECISION; // 100%
+    uint256 constant public MAX_DISCOUNT_ORACLE_FAILURE = DECIMAL_PRECISION * 99999 / 100000; // 99.999% to prevent divide by zero
     uint256 constant public MAX_DISCOUNT_TCR_BELOW_SCR = DECIMAL_PRECISION / 100 * 10; // 10%
     uint256 constant public MULTIPLIER = 125e16; // 1.25 * 1e18
     
@@ -276,8 +276,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 singleRedemption.collateralLot = t.coll;
                 //calculate collateral => LUSD with discount
                 singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
-                // leave 1 LUSD of debt to avoid re-insertion issues.
-                singleRedemption.LUSDLot = LiquityMath._max(singleRedemption.LUSDLot, DECIMAL_PRECISION);
+
             }
                
         } else {
