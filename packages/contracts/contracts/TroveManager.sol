@@ -272,10 +272,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
                 // if collateral lot is greater than trove collateral, redeem all collateral amount in trove
             if(singleRedemption.collateralLot > t.coll) {
-                // cap collateral at trove amount
+                // cap collateral at trove
                 singleRedemption.collateralLot = t.coll;
                 //calculate collateral => LUSD with discount
                 singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
+                // leave 1 LUSD of debt to avoid re-insertion issues.
+                singleRedemption.LUSDLot = LiquityMath._max(singleRedemption.LUSDLot, DECIMAL_PRECISION);
             }
                
         } else {
