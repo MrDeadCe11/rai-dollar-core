@@ -2483,7 +2483,7 @@ contract('TroveManager', async accounts => {
       assert.isTrue(supplyPlusVirtual.sub(trove_debt_sum).lte(toBN('4')))
     }
   })
-
+/////////////////////////////////////////////// SHUTOWN COPY
   it("drip(): debt equals supply, SP empty", async () => {
     // Whale provides LUSD to SP
     const spDeposit = toBN(dec(100, 24))
