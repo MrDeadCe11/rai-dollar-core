@@ -6,6 +6,7 @@ const TroveManagerLib = artifacts.require("./Dependencies/TroveManagerLib.sol")
 const LiquidationsTester = artifacts.require("LiquidationsTester")
 const LUSDToken = artifacts.require("LUSDToken")
 const RateControlTester = artifacts.require("RateControlTester")
+const { BigNumber } = require("ethers");
 
 const th = testHelpers.TestHelper
 const dec = th.dec
@@ -65,7 +66,8 @@ contract('TroveManager - Shutdown', async accounts => {
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee)
   const openTrove = async (params) => th.openTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
-
+  const driveICRToTarget = async (borrower, targetICR) => th.driveICRToTarget(contracts, borrower, targetICR)
+  const calculateParTarget = async (price, coll, debt, targetICR) => th.calculateParTarget(price, coll, debt, targetICR)
 
   before(async () => {
     lib = await TroveManagerLib.new();
@@ -794,14 +796,14 @@ contract('TroveManager - Shutdown', async accounts => {
         const { collateral: A_collateral, totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(8, 18)), extraParams: { from: alice } })
         const { collateral: B_collateral, totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: bob } })
         const { collateral: C_collateral, totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(111, 16)), extraParams: { from: carol } })
-    
+
         // --- TEST ---
     
         // price drops to 1CollateralToken:100LUSD, reducing Carols's ICR below MCR
         await priceFeed.setPrice('100000000000000000000');
         assert.isFalse(await th.checkRecoveryMode(contracts))
         // price keeps droping to drop collateral and debt
-        await tcrShutdown()
+        const tcrPrice =await tcrShutdown()
 
         assert.isTrue(await th.checkRecoveryMode(contracts))
         const L_Coll_BeforeCarolLiquidated = await rewards.L_Coll()
@@ -839,12 +841,19 @@ contract('TroveManager - Shutdown', async accounts => {
         */
     
         // Bob now withdraws LUSD, bringing his ICR to 1.11
-        const { increasedTotalDebt: B_increasedTotalDebt } = await withdrawLUSD({ ICR: toBN(dec(111, 16)), extraParams: { from: bob } })
-        assert.isFalse(await th.checkRecoveryMode(contracts))
-    
+        const price = await priceFeed.getPrice();
+        const res = await troveManager.getEntireDebtAndColl(bob);
+        const collEff = res[1].add(res[3]);    
+        const debtActual = await troveManager.getTroveActualDebt(bob);
+
+        const targetICR = toBN(dec(111,16)); // 1.11e18
+        const parTarget = await calculateParTarget(price, collEff, debtActual, targetICR);
+
+        await driveICRToTarget(bob, parTarget);
+
         // price drops to 1CollateralToken:50LUSD, reducing Bob's ICR below MCR
-        await priceFeed.setPrice(dec(50, 18));
-        const price = await priceFeed.getPrice()
+        // await priceFeed.setPrice(dec(50, 18));
+        // const price = await priceFeed.getPrice()
     
         assert.isTrue(await sortedTroves.contains(bob))
         tx = await liquidations.liquidate(bob, { from: owner });
@@ -863,7 +872,8 @@ contract('TroveManager - Shutdown', async accounts => {
         const L_Coll_AfterBobLiquidated = await rewards.L_Coll()
         const L_LUSDDebt_AfterBobLiquidated = await rewards.L_LUSDDebt()
     
-    
+        const B_increasedTotalDebt = toBN('0'); // no borrow; par/price only
+
         const L_Coll_expected_2 = L_Coll_expected_1.add(th.applyLiquidationFee(B_collateral.add(B_collateral.mul(L_Coll_expected_1).div(mv._1e18BN))).mul(mv._1e18BN).div(A_collateral))
         const L_LUSDDebt_expected_2 = L_LUSDDebt_expected_1.add(B_totalDebt.add(B_increasedTotalDebt).add(B_collateral.mul(L_LUSDDebt_expected_1).div(mv._1e18BN)).mul(mv._1e18BN).div(A_collateral))
     

@@ -26,7 +26,7 @@ const MoneyValues = {
   _ICR100: web3.utils.toBN('1000000000000000000'),
   _CCR: web3.utils.toBN('1500000000000000000'),
 }
-
+const MAX_DELTA_PER_HOUR = web3.utils.toBN("1000000000000000"); // 1e15
 const TimeValues = {
   SECONDS_IN_ONE_MINUTE:  60,
   SECONDS_IN_ONE_HOUR:    60 * 60,
@@ -324,6 +324,90 @@ class TestHelper {
   static async getTCR(contracts) {
     const price = await contracts.priceFeedTestnet.getPrice()
     return contracts.troveManager.getTCR(price)
+  }
+
+  static calculateParTarget(price, coll, debt, targetICR) {
+    coll.mul(price).mul(this.toBN(MoneyValues._1e18BN.toString())).div(debt.mul(targetICR));
+    return coll.mul(price).div(debt.mul(targetICR));
+  }
+
+  static async driveICRToTarget(contracts, borrower, targetICR) {
+    const { priceFeedTestnet: priceFeed, relayer, marketOracleTestnet: oracle, troveManager } = contracts;
+    const res = await troveManager.getEntireDebtAndColl(borrower);
+    // res[0]=debtBase, res[1]=collBase, res[2]=debtPending, res[3]=collPending
+    const collEff = res[1].add(res[3]);                 // include pending collateral
+    const debtActual = await troveManager.getTroveActualDebt(borrower); // applies rate
+    
+    if (collEff.isZero() || debtActual.isZero()) {
+      throw new Error("zero coll/debt for borrower");
+    }
+    
+    // par* = collEff * price / (debtActual * targetICR)
+    const price = await contracts.priceFeedTestnet.getPrice();
+    const parNow = await relayer.par();
+  
+    // par needed for exact target ICR: par* = coll*price/(debt*targetICR)
+    let parTarget = collEff.mul(price).div(debtActual.mul(targetICR));
+    let priceTarget = price;
+    // clamp and recompute price to hit target if needed
+    const PAR_MIN = this.toBN('850000000000000000');   // 0.85e18
+    const PAR_MAX = this.toBN('1250000000000000000');  // 1.25e18
+    const ONE_HOUR = this.toBN(TimeValues.SECONDS_IN_ONE_HOUR.toString());
+
+    // If par* is out of controller bounds, clamp and solve price to still hit target
+    if (parTarget.lt(PAR_MIN) || parTarget.gt(PAR_MAX)) {
+      parTarget = parTarget.lt(PAR_MIN) ? PAR_MIN : PAR_MAX;
+      // price* = targetICR * debtActual * parTarget / collEff
+      priceTarget = targetICR.mul(debtActual).mul(parTarget).div(collEff);
+    }
+  
+    // Set oracle to feasible price target (int256)
+    await oracle.setPrice(priceTarget);
+  
+    // Move par incrementally (max 1e-3 per hour). Choose directional market price (<1 to raise, >1 to lower).
+    const nudgePrice = parTarget.gt(parNow) ? this.toBN(this.dec(95,16)) : this.toBN(this.dec(105,16)); // 0.95 or 1.05
+    // Initialize controller if needed
+    await relayer.updatePar();
+  
+    let par = await relayer.par();
+    let steps = 0;
+    while (par.sub(parTarget).abs().gt(MAX_DELTA_PER_HOUR) && steps < 256) {
+      const delta = parTarget.sub(par); // desired change this step
+      const dirUp = delta.gt(this.toBN(0));  // need to increase par?
+      const stepSize = MAX_DELTA_PER_HOUR; // 1e-3 per hour
+    
+      // Choose directional nudge
+      const nudge = dirUp ? this.toBN(this.dec(95,16)) : this.toBN(this.dec(105,16)); // 0.95 or 1.05
+      await oracle.setPrice(nudge);
+    
+      // Compute hours to move: ceil(|delta|/stepSize), but cap to 1 for steady progress
+      const absDelta = delta.abs();
+      const hours = absDelta.lte(stepSize) ? this.toBN(1) : absDelta.add(stepSize.sub(this.toBN(1))).div(stepSize);
+
+      // Only fast-forward a bounded number of hours per iteration (prevents huge jumps)
+      const boundedHours = hours.gt(this.toBN(6)) ? this.toBN(6) : hours; // at most 6 hours per iter
+      await this.fastForwardTime(boundedHours.mul(ONE_HOUR).toString(), web3.currentProvider);
+    
+      await relayer.updatePar();
+      par = await relayer.par();
+      steps++;
+    }
+    
+    // Final correction within 1 step
+    if (!par.eq(parTarget)) {
+      const delta = parTarget.sub(par);
+      const dirUp = delta.gt(this.toBN(0));
+      await oracle.setPrice(dirUp ? this.toBN(this.dec(95,16)) : this.toBN(this.dec(105,16)));
+      // exact needed hours: ceil(|delta|/stepSize)
+      const hours = delta.abs().add(MAX_DELTA_PER_HOUR.sub(this.toBN(1))).div(MAX_DELTA_PER_HOUR);
+      if (hours.gt(this.toBN(0))) {
+        await this.fastForwardTime(hours.mul(ONE_HOUR).toString(), web3.currentProvider);
+        await relayer.updatePar();
+        par = await relayer.par();
+      }
+    }
+    // Final snap to target tolerance
+    return { par, steps, priceUsed: priceTarget };
   }
 
   // --- Gas compensation calculation functions ---
