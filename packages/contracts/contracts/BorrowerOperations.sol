@@ -39,6 +39,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     bool public isShutdown;
     // TODO: for now we hard code it, when more collateral types are added, we will need to set it on deployment
+    // shutdown collateral ratio
     uint256 public immutable SCR = 1100000000000000000;
     
     /* --- Variable container structs  ---

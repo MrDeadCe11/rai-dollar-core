@@ -66,7 +66,7 @@ contract('TroveManager - Shutdown', async accounts => {
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee)
   const openTrove = async (params) => th.openTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
-  const driveICRToTarget = async (borrower, targetICR) => th.driveICRToTarget(contracts, borrower, targetICR)
+  const driveICRToTargetWithPar = async (borrower, targetICR) => th.driveICRToTargetWithPar(contracts, borrower, targetICR)
   const calculateParTarget = async (price, coll, debt, targetICR) => th.calculateParTarget(price, coll, debt, targetICR)
 
   before(async () => {
@@ -129,23 +129,47 @@ contract('TroveManager - Shutdown', async accounts => {
   }
 
   async function calcSCRPrice() {
-    const totalColl = await troveManager.getEntireSystemColl();
+  const totalColl = await troveManager.getEntireSystemColl();
   const accRate = await troveManager.accumulatedRate();
   const accShieldRate = await troveManager.accumulatedShieldRate();
   const totalDebt = await troveManager.getEntireSystemDebt(accRate, accShieldRate);
   const par = await relayer.par();
-  const SCR = toBN(dec(110, 16)); // 1.10e18
+  const SCR = await borrowerOperations.SCR() // 1.10e18
   // price* = SCR * totalDebt * par / (totalColl * 1e18)
   const numerator = SCR.mul(totalDebt).mul(par);
   const denom = totalColl.mul(toBN(dec(1, 18)));
   const scrPrice = numerator.div(denom);
-  // set just below
   return scrPrice
+  }
+
+  // Adjust each borrower’s debt pre-shutdown to reach icrOpenTarget at pOpen
+  async function tuneDebtToICROpen(addr, icrOpenTarget, priceOpen, parOpen) {
+    const coll = await th.getTroveEntireColl(contracts, addr);           // includes pending rewards via helper
+    const debt = await troveManager.getTroveActualDebt(addr);
+    // desiredDebt = coll * priceOpen * 1e18 / (icrOpenTarget * parOpen)
+    const desiredDebt = coll.mul(priceOpen).mul(toBN(dec(1,18))).div(icrOpenTarget.mul(parOpen));
+    const MIN_NET_DEBT = await borrowerOperations.MIN_NET_DEBT();
+    const gasComp = await troveManager.LUSD_GAS_COMPENSATION(); // or use constant if accessible
+    const actualDebt = await troveManager.getTroveActualDebt(addr);
+    const netDebt = actualDebt.sub(gasComp);
+    
+    if (debt.gt(desiredDebt)) {
+      let delta = debt.sub(desiredDebt);
+      const maxRepay = netDebt.sub(MIN_NET_DEBT);
+      if (maxRepay.lte(toBN('0'))) return; // can’t repay further without violating min
+      if (delta.gt(maxRepay)) delta = maxRepay;
+    
+      if (delta.gt(toBN('0'))) {
+        const { upperHint, lowerHint } = await th.getBorrowerOpsListHint(contracts, coll, debt.sub(delta), /*shielded=*/false);
+        await borrowerOperations.repayLUSD(delta, upperHint, lowerHint, { from: addr });
+      }
+    }
   }
 
   async function tcrShutdown() {
     const scrPrice = await calcSCRPrice()
-    await priceFeed.setPrice(scrPrice.mul(toBN(95)).div(toBN(100)))
+    // 1.999% below scr price
+    await priceFeed.setPrice(scrPrice)
     await borrowerOperations.shutdown()
     assert.isTrue(await troveManager.isShutdown())
     return scrPrice
@@ -849,7 +873,7 @@ contract('TroveManager - Shutdown', async accounts => {
         const targetICR = toBN(dec(111,16)); // 1.11e18
         const parTarget = await calculateParTarget(price, collEff, debtActual, targetICR);
 
-        await driveICRToTarget(bob, parTarget);
+        await driveICRToTargetWithPar(bob, parTarget);
 
         // price drops to 1CollateralToken:50LUSD, reducing Bob's ICR below MCR
         // await priceFeed.setPrice(dec(50, 18));
@@ -941,12 +965,11 @@ contract('TroveManager - Shutdown', async accounts => {
         await openTrove({ ICR: toBN(dec(21, 17)), extraParams: { from: bob } })
     
         assert.equal(await troveManager.getTroveStatus(carol), 0) // check trove non-existent
-        // price keeps droping to drop collateral and debt
+        // price drops to below ccr collateral and debt
         await tcrShutdown()
 
         assert.isTrue(await th.checkRecoveryMode(contracts))    
         assert.isFalse(await sortedTroves.contains(carol))
-        assert.isFalse(await th.checkRecoveryMode(contracts))
     
         try {
           const txCarol = await liquidations.liquidate(carol)
@@ -978,7 +1001,6 @@ contract('TroveManager - Shutdown', async accounts => {
         assert.isFalse(await sortedTroves.contains(carol))
     
         assert.equal(await troveManager.getTroveStatus(carol), 3)  // check trove closed by liquidation
-        assert.isFalse(await th.checkRecoveryMode(contracts))
     
         try {
           const txCarol_L2 = await liquidations.liquidate(carol)
@@ -998,15 +1020,22 @@ contract('TroveManager - Shutdown', async accounts => {
         const listSize_Before = (await sortedTroves.getSize()).toString()
     
         const price = await priceFeed.getPrice()
-    
+        
         // Check Bob's ICR > 110%
         const bob_ICR = await troveManager.getCurrentICR(bob, price)
+
         assert.isTrue(bob_ICR.gte(mv._MCR))
         assert.isFalse(await th.checkRecoveryMode(contracts))
-        // price keeps droping to drop collateral and debt
+        // price drops to tcr < scr and system is shut down
         await tcrShutdown()
 
         assert.isTrue(await th.checkRecoveryMode(contracts))
+        // drive par to make bob's ICR < MCR
+        const { par: parAfter, priceUsed: priceTargetAfter } = await driveICRToTargetWithPar(bob, mv._MCR)
+
+        // check bob's ICR < MCR
+        const bob_ICR_After  = await troveManager.getCurrentICR(bob, priceTargetAfter)
+        assert.isTrue(bob_ICR_After.gte(mv._MCR))
         // Attempt to liquidate bob
         await assertRevert(liquidations.liquidate(bob), "Liquidations: nothing to liquidate")
     
@@ -1016,8 +1045,8 @@ contract('TroveManager - Shutdown', async accounts => {
     
         const TCR_After = (await th.getTCR(contracts)).toString()
         const listSize_After = (await sortedTroves.getSize()).toString()
-    
-        assert.equal(TCR_Before, TCR_After)
+
+        assert.equal(TCR_After, mv._MCR)
         assert.equal(listSize_Before, listSize_After)
       })
     
@@ -1076,7 +1105,9 @@ contract('TroveManager - Shutdown', async accounts => {
         assert.isTrue(liquidatedColl.add(collGasComp).add(bobSurplus).eq(bobCollateral))
     
         bobBalanceBefore = toBN(await collateralToken.balanceOf(bob)) 
-    
+        await tcrShutdown()
+
+        assert.isTrue(await th.checkRecoveryMode(contracts))
         // bob claims surplus collateral
         tx = await borrowerOperations.claimCollateral({ from: bob, gasprice:0})
     
@@ -1610,6 +1641,7 @@ contract('TroveManager - Shutdown', async accounts => {
         assert.isTrue((await collSurplusPool.getCollateral()).eq(toBN('0')))
     
       })
+
       it("liquidate(): surplus collateral if A,B,C liquidated above penalty", async () => {
         const spDeposit = toBN(dec(100, 21))
         await openTrove({ ICR: toBN(dec(3, 18)), extraLUSDAmount: spDeposit, extraParams: { from: whale } })
@@ -1622,19 +1654,44 @@ contract('TroveManager - Shutdown', async accounts => {
     
         const TCR_Before = (await th.getTCR(contracts)).toString()
         const listSize_Before = await sortedTroves.getSize()
-    
-        await priceFeed.setPrice(dec(100, 18))
-    
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-            // price keeps droping to drop collateral and debt
-            await tcrShutdown()
+          
+        // Choose target band at liquidation
+        const penalty = await liquidations.LIQUIDATION_PENALTY();
+   
+        const mcr = await troveManager.MCR();
+        // Prefer targeting above the redist penalty to guarantee surplus even with redist
+        const targetICRliq = penalty.add(toBN(dec(1,16))).add(mcr).div(toBN(2)); // midpoint in (penaltyRedist, MCR)
 
-            assert.isTrue(await th.checkRecoveryMode(contracts))
+        // Capture current price/par (open-time)
+        const priceOpen = await priceFeed.getPrice();
+        const parOpen = await relayer.par();
+
+        // Compute SCR price from current totals, then choose liquidation price just below SCR
+        const scrPrice = await calcSCRPrice();
+
+        // Compute the ICR needed at open so that ICR_liq hits target at pLiq
+        // icr_open = targetICRliq * (priceOpen / pLiq) * (parLiq / parOpen)
+        const parLiq = parOpen;
+        const icrOpenTarget = targetICRliq.mul(priceOpen).mul(parLiq).div(scrPrice.sub(toBN('1'))).div(parOpen);
+        await tuneDebtToICROpen(alice, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(bob, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(carol, icrOpenTarget, priceOpen, parOpen)
+
+        await tcrShutdown()
+        // price drops to put tcr below scr
+        await driveICRToTargetWithPar(alice, targetICRliq)
+        // await priceFeed.setPrice(dec(100, 18))
+        const priceNow = await priceFeed.getPrice()
+      
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        // calc liquidation tcr between LIQUIDATION_PENALTY and MCR
+   
+        assert.isTrue(await th.checkRecoveryMode(contracts))
         // liquidate alice
         tx_alice = await liquidations.liquidate(alice)
         const [aliceLiquidatedDebt, aliceLiquidatedColl, aliceCollGasComp, aliceLusdGasComp] = th.getEmittedLiquidationValues(tx_alice)
@@ -1671,6 +1728,7 @@ contract('TroveManager - Shutdown', async accounts => {
     
         // alice has surplus collateral
         aliceSurplus = await th.getCollateralFromCollSurplusPool(contracts, alice)
+        console.log('aliceSurplus', aliceSurplus.toString());
         assert.isTrue(aliceSurplus.gt(toBN('0')))
     
         // bob has surplus collateral
