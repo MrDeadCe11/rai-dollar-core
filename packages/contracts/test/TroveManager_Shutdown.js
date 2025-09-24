@@ -1809,18 +1809,43 @@ contract('TroveManager - Shutdown', async accounts => {
     
         const TCR_Before = (await th.getTCR(contracts)).toString()
         const listSize_Before = await sortedTroves.getSize()
-    
-        await priceFeed.setPrice(dec(100, 18))
-            // price keeps droping to drop collateral and debt
-            await tcrShutdown()
+          
+        // Choose target band at liquidation
+        const penalty = await liquidations.LIQUIDATION_PENALTY();
+   
+        const mcr = await troveManager.MCR();
+        // Prefer targeting above the redist penalty to guarantee surplus even with redist
+        const targetICRliq = penalty.add(toBN(dec(1,16))).add(mcr).div(toBN(2)); // midpoint in (penaltyRedist, MCR)
+
+        // Capture current price/par (open-time)
+        const priceOpen = await priceFeed.getPrice();
+        const parOpen = await relayer.par();
+
+        // Compute SCR price from current totals, then choose liquidation price just below SCR
+        const scrPrice = await calcSCRPrice();
+
+        // Compute the ICR needed at open so that ICR_liq hits target at pLiq
+        // icr_open = targetICRliq * (priceOpen / pLiq) * (parLiq / parOpen)
+        const parLiq = parOpen;
+        const icrOpenTarget = targetICRliq.mul(priceOpen).mul(parLiq).div(scrPrice.sub(toBN('1'))).div(parOpen);
+        await tuneDebtToICROpen(alice, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(bob, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(carol, icrOpenTarget, priceOpen, parOpen)
+
+        await tcrShutdown()
+        // price drops to put tcr below scr
+        await driveICRToTargetWithPar(alice, targetICRliq)
+        await driveICRToTargetWithPar(bob, targetICRliq)
+        // await priceFeed.setPrice(dec(100, 18))
+        const priceNow = await priceFeed.getPrice()
 
             assert.isTrue(await th.checkRecoveryMode(contracts))
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
     
         // liquidate all
         tx_liq = await liquidations.liquidateTroves(3)
@@ -1921,23 +1946,47 @@ contract('TroveManager - Shutdown', async accounts => {
         const {collateral: bobCollateral} = await openTrove({ ICR: toBN(dec(215, 16)), extraParams: { from: bob } })
         const {collateral: carolCollateral} = await openTrove({ ICR: toBN(dec(215, 16)), extraParams: { from: carol } })
     
-    
         await stabilityPool.provideToSP(spDeposit, ZERO_ADDRESS, { from: whale })
     
         const TCR_Before = (await th.getTCR(contracts)).toString()
         const listSize_Before = await sortedTroves.getSize()
-    
-        await priceFeed.setPrice(dec(100, 18))
-            // price keeps droping to drop collateral and debt
-            await tcrShutdown()
+          
+        // Choose target band at liquidation
+        const penalty = await liquidations.LIQUIDATION_PENALTY();
+   
+        const mcr = await troveManager.MCR();
+        // Prefer targeting above the redist penalty to guarantee surplus even with redist
+        const targetICRliq = penalty.add(toBN(dec(1,16))).add(mcr).div(toBN(2)); // midpoint in (penaltyRedist, MCR)
+
+        // Capture current price/par (open-time)
+        const priceOpen = await priceFeed.getPrice();
+        const parOpen = await relayer.par();
+
+        // Compute SCR price from current totals, then choose liquidation price just below SCR
+        const scrPrice = await calcSCRPrice();
+
+        // Compute the ICR needed at open so that ICR_liq hits target at pLiq
+        // icr_open = targetICRliq * (priceOpen / pLiq) * (parLiq / parOpen)
+        const parLiq = parOpen;
+        const icrOpenTarget = targetICRliq.mul(priceOpen).mul(parLiq).div(scrPrice.sub(toBN('1'))).div(parOpen);
+        await tuneDebtToICROpen(alice, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(bob, icrOpenTarget, priceOpen, parOpen)
+        await tuneDebtToICROpen(carol, icrOpenTarget, priceOpen, parOpen)
+
+        await tcrShutdown()
+        // price drops to put tcr below scr
+        await driveICRToTargetWithPar(alice, targetICRliq)
+        await driveICRToTargetWithPar(bob, targetICRliq)
+        // await priceFeed.setPrice(dec(100, 18))
+        const priceNow = await priceFeed.getPrice()
 
             assert.isTrue(await th.checkRecoveryMode(contracts))
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(alice, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(bob, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).lt((await troveManager.MCR())))
-        assert.isTrue((await troveManager.getCurrentICR(carol, dec(100, 18))).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(alice, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(bob, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).lt((await troveManager.MCR())))
+        assert.isTrue((await troveManager.getCurrentICR(carol, priceNow)).gt((await liquidations.LIQUIDATION_PENALTY())))
     
         // liquidate all
         //tx_liq = await liquidations.liquidateTroves(3)
