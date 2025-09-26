@@ -435,11 +435,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         returns (bool ok, bool isShieldedList)
     {
         if (_first == address(0)) return (false, false);
-
+        bool isShutdown = _isShutdown();
         // if hint is in base list
         if (_contractsCache.sortedTroves.contains(_first)) {
             uint256 icr = _getCurrentICR(_contractsCache, _first, _price, _par);
-            if (icr < MCR) return (false, false);
+            if (isShutdown || icr < MCR) return (false, false);
 
             // hint is redeemable, but is it first?
             address next = _contractsCache.sortedTroves.getNext(_first); // next => lower ICR
@@ -452,7 +452,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         if (_contractsCache.sortedShieldedTroves.contains(_first)) {
             uint256 icr = _getCurrentICR(_contractsCache, _first, _price, _par);
             // shielded redeemable only in [MCR, HCR)
-            if (icr < MCR || icr >= HCR) return (false, true);
+            if (isShutdown || icr < MCR || icr >= HCR) return (false, true);
 
             // hint is redeemable, but is it first?
             address next = _contractsCache.sortedShieldedTroves.getNext(_first);
@@ -603,7 +603,7 @@ function redeemCollateralForShutdown(
             address n = contractsCache.sortedTroves.getLast();
             while (n != address(0)) {
                 uint256 icr = _getCurrentICR(contractsCache, n, locals.price, locals.par);
-                if (icr >= MCR) { locals.curBase = n; break; }
+                if (locals.shutdown || icr >= MCR) { locals.curBase = n; break; }
                 n = contractsCache.sortedTroves.getPrev(n); // prev => larger ICR
             }
         }
@@ -613,7 +613,7 @@ function redeemCollateralForShutdown(
             address n = contractsCache.sortedShieldedTroves.getLast();
             while (n != address(0)) {
                 uint256 icr = _getCurrentICR(contractsCache, n, locals.price, locals.par);
-                if (icr >= MCR) { locals.curSh = (icr < HCR) ? n : address(0); break; }
+                if (locals.shutdown || icr >= MCR) { locals.curSh = (icr < HCR) ? n : address(0); break; }
                 n = contractsCache.sortedShieldedTroves.getPrev(n); // prev => larger ICR
             }
         }
@@ -863,12 +863,12 @@ function redeemCollateralForShutdown(
 
             if (locals.curBase != address(0)) {
                 uint b = _getCurrentICR(_contractsCache, locals.curBase, locals.price, locals.par);
-                if (b >= MCR) icrB = b; // else no longer redeemable
+                if (locals.shutdown || b >= MCR) icrB = b; // else no longer redeemable
             }
 
             if (locals.curSh != address(0)) {
                 uint s = _getCurrentICR(_contractsCache, locals.curSh, locals.price, locals.par);
-                if (s >= MCR && s < HCR) icrS = s; // shielded only in [MCR, HCR)
+                if (locals.shutdown || (s >= MCR && s < HCR)) icrS = s; // shielded only in [MCR, HCR)
             }
     }
 

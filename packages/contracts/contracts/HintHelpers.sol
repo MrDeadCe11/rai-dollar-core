@@ -144,8 +144,12 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             return (address(0), 0, 0);
         }
         firstRedemptionHint = (icrB <= icrS) ? vars.curBase : vars.curSh;
-
-        vars.parUsed = troveManager.isShutdown() ? troveManager.collateralShutdown().par() : relayer.par();
+        // Get the correct par value for shutdown mode
+        if(troveManager.isShutdown()) {
+            (,vars.parUsed,,)  = troveManager.collateralShutdown();
+        } else {
+            vars.parUsed = relayer.par();
+        }
         vars.accRateUsed = troveManager.accumulatedRate();
         vars.accShieldRateUsed = troveManager.accumulatedShieldRate();
 
@@ -384,7 +388,12 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     }
 
     function computeCR(uint _coll, uint _debt, uint _price) external view returns (uint) {
-        uint par = troveManager.isShutdown() ? troveManager.collateralShutdown().par() : relayer.par();
+        uint par;
+        if(troveManager.isShutdown()) {
+            (, par,,)  = troveManager.collateralShutdown();
+        } else {
+            par = relayer.par();
+        }
         return LiquityMath._computeCR(_coll, _debt, _price, par);
     }
 }
