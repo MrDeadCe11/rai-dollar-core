@@ -84,7 +84,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         bool oracleFailure;
     }
 
-    CollateralShutdown public collateralShutdown;
+    CollateralShutdown internal _collateralShutdown;
 
 
     // Store the necessary data for a trove
@@ -570,7 +570,7 @@ function redeemCollateralForShutdown(
         // if oracle is shut down it will return last good price
         (locals.price, ) = priceFeed.fetchPrice();
         //(, locals.par) = relayer.updateRateAndPar();
-        locals.par = locals.shutdown ? collateralShutdown.par : relayer.par();
+        locals.par = locals.shutdown ? _collateralShutdown.par : relayer.par();
 
         // _requireTCRoverMCR(locals.price);
         if(!locals.shutdown) {
@@ -628,7 +628,7 @@ function redeemCollateralForShutdown(
         RedemptionHints memory _hints,
         uint _maxIterations
     ) internal returns (RedemptionTotals memory, RedemptionLocals memory) {
-        uint256 _redemptionRate = _redemptionLocals.shutdown ? collateralShutdown.rate : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
+        uint256 _redemptionRate = _redemptionLocals.shutdown ? _collateralShutdown.rate : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
             if (_maxIterations == 0) { _maxIterations = uint(-1); }
             while (_totals.remainingLUSD > 0 && _maxIterations > 0 && (_redemptionLocals.curBase != address(0) || _redemptionLocals.curSh != address(0))) {
                 _maxIterations--;
@@ -724,11 +724,11 @@ function redeemCollateralForShutdown(
        if(_isShutdown()) return;
        (uint256 _rate, uint256 _par) = relayer.updateRateAndPar();
         drip();
-        collateralShutdown.shutdownTime = block.timestamp;
-        collateralShutdown.par = _par;
-        collateralShutdown.rate = _rate;
-        collateralShutdown.oracleFailure = _oracleFailure;
-        emit Shutdown(_oracleFailure, _rate, _par, collateralShutdown.shutdownTime);
+        _collateralShutdown.shutdownTime = block.timestamp;
+        _collateralShutdown.par = _par;
+        _collateralShutdown.rate = _rate;
+        _collateralShutdown.oracleFailure = _oracleFailure;
+        emit Shutdown(_oracleFailure, _rate, _par, _collateralShutdown.shutdownTime);
     }
 
     // --- Helper functions ---
@@ -1078,9 +1078,9 @@ function redeemCollateralForShutdown(
 
     function _calcDiscount() internal view returns (uint) {
         
-        uint timePassed = block.timestamp.sub(collateralShutdown.shutdownTime);
+        uint timePassed = block.timestamp.sub(_collateralShutdown.shutdownTime);
         
-        uint256 maxDiscount = collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
+        uint256 maxDiscount = _collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
 
         if (timePassed >= SEVENTY_TWO_HOURS) {
             return maxDiscount;
@@ -1173,12 +1173,12 @@ function redeemCollateralForShutdown(
             "maxFee% out of [0.5,100]");
     }
 
-    function isShutdown() external view returns (bool) {
+    function isShutdown() external view override returns (bool) {
         return _isShutdown();
     }
 
     function _isShutdown() internal view returns (bool) {
-        return collateralShutdown.shutdownTime != 0;
+        return _collateralShutdown.shutdownTime != 0;
     }
 
     function getEntireSystemDebt() public view override returns (uint) {
@@ -1305,5 +1305,9 @@ function redeemCollateralForShutdown(
     {
     Trove storage t = getTroveStorage().Troves[_borrower];
     return (t.debt, t.coll, t.stake, uint8(t.status), t.arrayIndex);
+    }
+    
+    function collateralShutdown() external view override returns (uint256 shutdownTime, uint256 par, uint256 rate, bool oracleFailure) {
+        return (_collateralShutdown.shutdownTime, _collateralShutdown.par, _collateralShutdown.rate, _collateralShutdown.oracleFailure);
     }
 }

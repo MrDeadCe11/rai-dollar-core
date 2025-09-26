@@ -12,6 +12,7 @@ import "./ILQTYStaking.sol";
 import "./IRelayer.sol";
 import "./ICollSurplusPool.sol";
 
+
 // Common interface for the Trove Manager.
 interface ITroveManager is ILiquityBase {
     
@@ -158,6 +159,7 @@ interface ITroveManager is ILiquityBase {
     function checkRecoveryMode(uint _price) external view returns (bool);
 
     function shutdown(bool _oracleFailure) external;
+    function isShutdown() external view returns (bool);
 
     function redeemCollateralForShutdown(
         uint _LUSDamount,
@@ -170,4 +172,6 @@ interface ITroveManager is ILiquityBase {
         uint _maxIterations,
         uint _maxFeePercentage
     ) external;
+
+    function collateralShutdown() external view returns (uint256 shutdownTime, uint256 par, uint256 rate, bool oracleFailure);
 }
