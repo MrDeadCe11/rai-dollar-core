@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.11;
+pragma experimental ABIEncoderV2;
 
 import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/IRewards.sol";
@@ -263,9 +264,9 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         
         // singleRedemption = _calculateSingleRedemptionValues(singleRedemption, _maxLUSDAmount, _shielded, _redemptionLocals, _redemptionRate); 
         Trove storage t = getTroveStorage().Troves[_redemptionLocals.currentBorrower];
-        // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the liquidation reserve
+        // Determine the remaining amount (lot) to be redeemed, capped by the entire debt of the Trove minus the gas compensation
         if(_redemptionLocals.shutdown) {
-                singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded));
+                singleRedemption.LUSDLot = LiquityMath._min(_maxLUSDAmount, _actualDebt(t.debt, _shielded).sub(LUSD_GAS_COMPENSATION));
                 // do not take fee during shutdown
                 uint256 discount = _calcDiscount();
                 // calculate collateral with discount
@@ -306,17 +307,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         if (_actualDebt(troveLocals.newDebt, _shielded) <= LUSD_GAS_COMPENSATION) {
             // No debt left in the Trove (except for the liquidation reserve), therefore the trove gets closed
             _contractsCache.rewards.removeStake(_redemptionLocals.currentBorrower);
-            if(!_redemptionLocals.shutdown) {
-                _closeTrove(_contractsCache, _redemptionLocals.currentBorrower, Status.closedByRedemption);
-            } else {
-                // full redemption in shutdown: keep trove open and reinsert at head
-                troveLocals.newNICR = LiquityMath._computeNominalCR(troveLocals.newColl, troveLocals.newDebt); // newDebt is 0
-                // persist new state
-                ts.debt = troveLocals.newDebt; // 0
-                ts.coll = troveLocals.newColl;
-                // reinsert with zero hints → head
-                _reInsertTroves(_contractsCache, troveLocals, RedemptionHints(address(0), address(0), address(0), address(0), 0), _shielded, _redemptionLocals.currentBorrower);
-            }
+
+            _closeTrove(_contractsCache, _redemptionLocals.currentBorrower, Status.closedByRedemption);
             _redeemCloseTrove(_contractsCache, _redemptionLocals.currentBorrower, LUSD_GAS_COMPENSATION, troveLocals.newColl, _shielded);
             
             emit TroveUpdated(_redemptionLocals.currentBorrower, 0, 0, 0, TroveManagerOperation.redeemCollateral);
@@ -1075,7 +1067,10 @@ function redeemCollateralForShutdown(
 
          _contractsCache.feeRouter.allocateFees(newInterest);
     }
-
+    function getDiscount() external view returns (uint) {
+        require(_isShutdown(), "TM: Not shutdown");
+        return _calcDiscount();
+    }
     function _calcDiscount() internal view returns (uint) {
         
         uint timePassed = block.timestamp.sub(_collateralShutdown.shutdownTime);

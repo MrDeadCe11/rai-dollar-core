@@ -330,7 +330,47 @@ class TestHelper {
     // par = coll * price * 1e18 / (debt * targetICR)
     return coll.mul(price).mul(MoneyValues._1e18BN).div(debt.mul(targetICR));
   }
+  
+static computeShutdownRedemptionForTrove(totalLUSD, troves, par, price, discount) {
+  let remaining = this.toBN(totalLUSD)
+  let totalCollateral = this.toBN(0);
+  let totalLUSDConsumed = this.toBN(0);
+  const DEC = MoneyValues._1e18BN;
 
+  for (const trove of troves) {
+    const coll = trove[1]
+    const actualDebt = trove[0]
+    if (remaining == this.toBN("0")) break;
+    if (coll == this.toBN("0") || actualDebt == this.toBN("0")) continue;
+
+    // LUSD lot for this trove (cap by debt)
+    let lusdLot = remaining.gt(this.toBN(actualDebt)) ? this.toBN(actualDebt) : remaining;
+
+    // collateralLot = floor(lusdLot * par * 1e18 / ((1e18 - discount) * price))
+    const numer = lusdLot.mul(par).mul(DEC);
+    const denom = DEC.sub(discount).mul(price);
+    let collateralLot = numer.div(denom);
+
+    // Cap by available collateral, recompute lusdLot if capped
+    if (collateralLot.gt(this.toBN(coll))) {
+      collateralLot = coll;
+      const numer2 = collateralLot.mul(DEC.sub(discount)).mul(price);
+      const denom2 = par.mul(DEC);
+      lusdLot = numer2.div(denom2);
+    }
+
+    if (collateralLot == this.toBN("0") || lusdLot == this.toBN("0")) continue;
+
+    totalCollateral = totalCollateral.add(collateralLot);
+    totalLUSDConsumed = totalLUSDConsumed.add(lusdLot);
+    remaining = remaining.sub(lusdLot);
+  }
+
+  return { totalCollateral, totalLUSDConsumed };
+}
+
+  // for use during shutdown since troves cannot be modified, lowers collateral price to hit target ICR with par
+  // does it over time so as to not exceed the max delta per hour
   static async driveICRToTargetWithPar(contracts, borrower, targetICR) {
     const { priceFeedTestnet: priceFeed, relayer, marketOracleTestnet: oracle, troveManager } = contracts;
     const res = await troveManager.getEntireDebtAndColl(borrower);
@@ -344,7 +384,6 @@ class TestHelper {
     
     // par* = collEff * price / (debtActual * targetICR)
     const price = await contracts.priceFeedTestnet.getPrice();
-    const parNow = await relayer.par();
   
     // par needed for exact target ICR: par* = coll*price*1e18/(debt*targetICR)
     let parTarget = collEff.mul(price).mul(MoneyValues._1e18BN).div(debtActual.mul(targetICR));
@@ -413,7 +452,6 @@ class TestHelper {
       priceFinal = priceFinal.add(this.toBN('1'));
     }
     // set oracle so subsequent logic sees consistent price
-    await oracle.setPrice(priceFinal);
     await priceFeed.setPrice(priceFinal);
     return { par, steps, priceUsed: priceFinal };
   }
@@ -1007,7 +1045,6 @@ class TestHelper {
       })
 
       return gainsSum.concat(deposits2)
-
   }
 
   static async depositorValuesAfterThreeLiquidations(contracts, tx1, tx2, tx3, startDeposits, totalDeposits = null, totalDeposits1 = null, totalDeposits2 = null) {
