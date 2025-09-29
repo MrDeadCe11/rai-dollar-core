@@ -827,7 +827,9 @@ function redeemCollateralForShutdown(
 
         // _requireMoreThanOneTroveInSystem();
         uint total = _contractsCache.sortedTroves.getSize() + _contractsCache.sortedShieldedTroves.getSize();
+        if(!_isShutdown()) {
         require(total > 1, "Only one trove");
+        }
         Trove storage t = ts.Troves[_borrower];
 
         t.status = closedStatus;
