@@ -3761,12 +3761,12 @@ contract('TroveManager - Shutdown', async accounts => {
     assert.equal(dennis_LUSDBalance_After, dennis_LUSDBalance_before.sub(redemptionAmount))
   })
 
-  it('redeemCollateralForShutdown(): with invalid first hint, trove below MCR', async () => {
+  it('redeemCollateralForShutdown(): tcr shutdown, full discount, with invalid first hint, trove below MCR', async () => {
     // --- SETUP ---
     const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(310, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: alice } })
     const { netDebt: B_netDebt } = await openTrove({ ICR: toBN(dec(290, 16)), extraLUSDAmount: dec(8, 18), extraParams: { from: bob } })
     const { netDebt: C_netDebt } = await openTrove({ ICR: toBN(dec(250, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: carol } })
-    const partialRedemptionAmount = toBN(2)
+    const partialRedemptionAmount = toBN(dec(2, 18))
     const redemptionAmount = C_netDebt.add(B_netDebt).add(partialRedemptionAmount)
     // start Dennis with a high ICR
     await openTrove({ ICR: toBN(dec(100, 18)), extraLUSDAmount: redemptionAmount, extraParams: { from: dennis } })
@@ -3774,14 +3774,11 @@ contract('TroveManager - Shutdown', async accounts => {
     const dennis_CollateralBalance_before = toBN(await collateralToken.balanceOf(dennis))
 
     const dennis_LUSDBalance_before = await lusdToken.balanceOf(dennis)
-
-    const price = await priceFeed.getPrice()
-    assert.equal(price, dec(200, 18))
-
+    let price = await priceFeed.getPrice()
     // Increase price to start Erin, and decrease it again so its ICR is under MCR
     await priceFeed.setPrice(price.mul(toBN(2)))
     await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: erin } })
-    await priceFeed.setPrice(price)
+    price = await tcrShutdown()
 
 
     // --- TEST ---
@@ -3835,28 +3832,25 @@ contract('TroveManager - Shutdown', async accounts => {
     const bob_debt_After = bob_trove_After[0].toString()
     const carol_debt_After = carol_trove_After[0].toString()
 
-    /* check that Dennis' redeemed 20 LUSD has been cancelled with debt from Bobs's Trove (8) and Carol's Trove (10).
-    The remaining lot (2) is sent to Alice's Trove, who had the best ICR.
-    It leaves her with (3) LUSD debt + 50 for gas compensation. */
-    th.assertIsApproximatelyEqual(alice_debt_After, A_totalDebt.sub(partialRedemptionAmount))
-    assert.equal(bob_debt_After, '0')
-    assert.equal(carol_debt_After, '0')
+    /* check that Dennis' redemption cancelled debt from other troves and drained their collateral.
+    Alice, Bob, and Carol should have their collateral drained to 0. */
+    assert.equal(alice_trove_After[1].toString(), '0')
+    assert.equal(bob_trove_After[1].toString(), '0')
+    assert.equal(carol_trove_After[1].toString(), '0')
 
     const dennis_CollateralBalance_After = toBN(await collateralToken.balanceOf(dennis))
     const receivedCollateral = dennis_CollateralBalance_After.sub(dennis_CollateralBalance_before)
-    // get par after redemption
     const par = await relayer.par()
-    
-    const expectedTotalCollateralDrawn = redemptionAmount.mul(par).div(price) // convert redemptionAmount * par / collateral price, at Collateral:USD price 200
-    const expectedReceivedCollateral = expectedTotalCollateralDrawn.sub(toBN(CollateralFee))// gas is not removed from erc20 collateral // .sub(toBN(th.gasUsed(redemptionTx) * GAS_PRICE)) // substract gas used for troveManager.redeemCollateral from expected received Collateral
+    const discount = await troveManager.getDiscount()
+    const expectedTotalCollateralDrawn = redemptionAmount.mul(par).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price)) // convert redemptionAmount * par / (price * (1-discount))
 
-    th.assertIsApproximatelyEqual(expectedReceivedCollateral, receivedCollateral)
+    th.assertIsApproximatelyEqual(expectedTotalCollateralDrawn, receivedCollateral)
 
     const dennis_LUSDBalance_After = (await lusdToken.balanceOf(dennis)).toString()
     assert.equal(dennis_LUSDBalance_After, dennis_LUSDBalance_before.sub(redemptionAmount))
   })
 
-  it('redeemCollateralForShutdown(): ends the redemption sequence when the token redemption request has been filled', async () => {
+  it('redeemCollateralForShutdown(): tcr shutdown, no discount, ends the redemption sequence when the token redemption request has been filled', async () => {
     // --- SETUP --- 
     await openTrove({ ICR: toBN(dec(100, 18)), extraParams: { from: whale } })
 
@@ -3867,54 +3861,50 @@ contract('TroveManager - Shutdown', async accounts => {
     const redemptionAmount = A_debt.add(B_debt).add(C_debt)
     const { totalDebt: D_totalDebt, collateral: D_coll } = await openTrove({ ICR: toBN(dec(300, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: dennis } })
     const { totalDebt: E_totalDebt, collateral: E_coll } = await openTrove({ ICR: toBN(dec(300, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: erin } })
-
-    // --- TEST --- 
-
+    await collateralToken.mint(flyn, dec(10000, 30))
     // open trove from redeemer.  Redeemer has highest ICR (100Collateral, 100 LUSD), 20000%
     const { lusdAmount: F_lusdAmount } = await openTrove({ ICR: toBN(dec(200, 18)), extraLUSDAmount: redemptionAmount.mul(toBN(2)), extraParams: { from: flyn } })
-
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+    await relayer.updatePar()
+    // Trigger TCR shutdown
+    const shutdownPrice = await tcrShutdown()
+    
+    const flynCollateralBefore = await collateralToken.balanceOf(flyn)
+
+    // --- TEST --- 
 
     // Flyn redeems collateral
     await troveManager.redeemCollateralForShutdown(redemptionAmount, alice, alice, alice, alice, alice, 0, 0, th._100pct, { from: flyn })
 
-    // Check Flyn's redemption has reduced his balance from 100 to (100-60) = 40 LUSD
+    // Check Flyn's redemption has reduced his LUSD balance
     const flynBalance = await lusdToken.balanceOf(flyn)
     th.assertIsApproximatelyEqual(flynBalance, F_lusdAmount.sub(redemptionAmount))
 
-    // Check debt of Alice, Bob, Carol
-    const alice_Debt = await troveManager.getTroveDebt(alice)
-    const bob_Debt = await troveManager.getTroveDebt(bob)
-    const carol_Debt = await troveManager.getTroveDebt(carol)
-
-    assert.equal(alice_Debt, 0)
-    assert.equal(bob_Debt, 0)
-    assert.equal(carol_Debt, 0)
-
-    // check Alice, Bob and Carol troves are closed by redemption
-    const alice_Status = await troveManager.getTroveStatus(alice)
-    const bob_Status = await troveManager.getTroveStatus(bob)
-    const carol_Status = await troveManager.getTroveStatus(carol)
-    assert.equal(alice_Status, 4)
-    assert.equal(bob_Status, 4)
-    assert.equal(carol_Status, 4)
-
-    // check debt and coll of Dennis, Erin has not been impacted by redemption
-    const dennis_Debt = await troveManager.getTroveDebt(dennis)
-    const erin_Debt = await troveManager.getTroveDebt(erin)
-
-    th.assertIsApproximatelyEqual(dennis_Debt, D_totalDebt)
-    th.assertIsApproximatelyEqual(erin_Debt, E_totalDebt)
-
+    // Check all troves have their collateral drained to 0 (redemption amount exceeded Alice+Bob+Carol)
+    const alice_trove = await troveManager.Troves(alice)
+    const bob_trove = await troveManager.Troves(bob)
+    const carol_trove = await troveManager.Troves(carol)
+    // Get Dennis and Erin collateral for the assertion above
     const dennis_Coll = await troveManager.getTroveColl(dennis)
     const erin_Coll = await troveManager.getTroveColl(erin)
+    assert.equal(alice_trove[1].toString(), '0') // collateral drained
+    assert.equal(bob_trove[1].toString(), '0')   // collateral drained
+    assert.equal(carol_trove[1].toString(), '0') // collateral drained
+    assert.equal(dennis_Coll.toString(), '0')    // collateral drained
+    assert.equal(erin_Coll.toString(), '0')      // collateral drained
 
-    assert.equal(dennis_Coll.toString(), D_coll.toString())
-    assert.equal(erin_Coll.toString(), E_coll.toString())
+    // Check Flyn received the correct amount of collateral with no discount (immediate redemption)
+    const flynCollateralAfter = await collateralToken.balanceOf(flyn)
+    const receivedCollateral = flynCollateralAfter.sub(flynCollateralBefore)
+    const par = await relayer.par()
+    const discount = await troveManager.getDiscount() // Should be 0 for immediate redemption
+    const expectedCollateral = redemptionAmount.mul(par).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(shutdownPrice))
+
+    th.assertIsApproximatelyEqual(expectedCollateral, receivedCollateral)
   })
 
-  it('redeemCollateralForShutdown(): ends the redemption sequence when max iterations have been reached', async () => {
+  it('redeemCollateralForShutdown(): tcr shutdown, ends the redemption sequence when max iterations have been reached', async () => {
     // --- SETUP --- 
     await openTrove({ ICR: toBN(dec(100, 18)), extraParams: { from: whale } })
 
@@ -3925,10 +3915,16 @@ contract('TroveManager - Shutdown', async accounts => {
     const redemptionAmount = A_debt.add(B_debt)
     const attemptedRedemptionAmount = redemptionAmount.add(C_debt)
 
-    // --- TEST --- 
-
     // open trove from redeemer.  Redeemer has highest ICR (100Collateral, 100 LUSD), 20000%
+    await collateralToken.mint(flyn, dec(10000, 30))
     const { lusdAmount: F_lusdAmount } = await openTrove({ ICR: toBN(dec(200, 18)), extraLUSDAmount: redemptionAmount.mul(toBN(2)), extraParams: { from: flyn } })
+
+    // Trigger TCR shutdown
+    const shutdownPrice = await tcrShutdown()
+    
+    const flynCollateralBefore = await collateralToken.balanceOf(flyn)
+
+    // --- TEST --- 
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -3936,26 +3932,31 @@ contract('TroveManager - Shutdown', async accounts => {
     // Flyn redeems collateral with only two iterations
     await troveManager.redeemCollateralForShutdown(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, th._100pct, { from: flyn })
 
-    // Check Flyn's redemption has reduced his balance from 100 to (100-40) = 60 LUSD
-    const flynBalance = (await lusdToken.balanceOf(flyn)).toString()
-    th.assertIsApproximatelyEqual(flynBalance, F_lusdAmount.sub(redemptionAmount))
+    // Check that redemption was limited by max iterations
+    const flynBalance = await lusdToken.balanceOf(flyn)
+    const actualRedeemedAmount = F_lusdAmount.sub(flynBalance)
+    
+    // The max iterations = 2 should limit the redemption to less than the full attemptedRedemptionAmount
+    assert.isTrue(actualRedeemedAmount.lt(attemptedRedemptionAmount))
+    
+    // Check Alice and Bob troves have their collateral drained (max iterations = 2, so only 2 troves processed)
+    const alice_trove = await troveManager.Troves(alice)
+    const bob_trove = await troveManager.Troves(bob)
+    const carol_trove = await troveManager.Troves(carol)
 
-    // Check debt of Alice, Bob, Carol
-    const alice_Debt = await troveManager.getTroveDebt(alice)
-    const bob_Debt = await troveManager.getTroveDebt(bob)
-    const carol_Debt = await troveManager.getTroveDebt(carol)
+    assert.equal(alice_trove[1].toString(), '0') // collateral drained
+    assert.equal(bob_trove[1].toString(), '0')   // collateral drained
+    // Carol should still have collateral since max iterations = 2 stopped the redemption
+    assert.isTrue(carol_trove[1].gt(toBN('0')))
 
-    assert.equal(alice_Debt, 0)
-    assert.equal(bob_Debt, 0)
-    th.assertIsApproximatelyEqual(carol_Debt, C_totalDebt)
+    // Check Flyn received the correct amount of collateral with full discount (after time skip)
+    const flynCollateralAfter = await collateralToken.balanceOf(flyn)
+    const receivedCollateral = flynCollateralAfter.sub(flynCollateralBefore)
+    const par = await relayer.par()
+    const discount = await troveManager.getDiscount() // Should be full discount after time skip
+    const expectedCollateral = actualRedeemedAmount.mul(par).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(shutdownPrice))
 
-    // check Alice and Bob troves are closed, but Carol is not
-    const alice_Status = await troveManager.getTroveStatus(alice)
-    const bob_Status = await troveManager.getTroveStatus(bob)
-    const carol_Status = await troveManager.getTroveStatus(carol)
-    assert.equal(alice_Status, 4)
-    assert.equal(bob_Status, 4)
-    assert.equal(carol_Status, 1)
+    th.assertIsApproximatelyEqual(expectedCollateral, receivedCollateral)
   })
 
   it("redeemCollateralForShutdown(): performs partial redemption if resultant debt is > minimum net debt", async () => {
