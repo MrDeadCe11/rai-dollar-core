@@ -5822,9 +5822,9 @@ contract('TroveManager - Shielded', async accounts => {
     // --- SETUP ---
 
     const amount = await getOpenTroveLUSDAmount(dec(210, 18))
-    await openShieldedTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: alice } })
-    await openShieldedTrove({ ICR: toBN(dec(133, 16)), extraLUSDAmount: amount, extraParams: { from: bob } })
-    await openShieldedTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: dennis } })
+    await openTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: alice } })
+    await openTrove({ ICR: toBN(dec(133, 16)), extraLUSDAmount: amount, extraParams: { from: bob } })
+    await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: dennis } })
 
     await lusdToken.transfer(carol, amount, { from: bob })
 
