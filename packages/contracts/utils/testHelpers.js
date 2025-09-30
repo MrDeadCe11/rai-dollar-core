@@ -1801,6 +1801,54 @@ static computeShutdownRedemptionForTrove(totalLUSD, troves, par, price, discount
 
     return tx
   }
+
+  static async redeemCollateralForShutdown(redeemer, contracts, LUSDAmount, gasPrice = 0, maxFee = this._100pct) {
+    const price = await contracts.priceFeedTestnet.getPrice()
+    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee, gasPrice)
+    const gas = await this.gasUsed(tx)
+    return gas
+  }
+
+  static async redeemCollateralForShutdownAndGetTxObject(redeemer, contracts, LUSDAmount, gasPrice, maxFee = this._100pct) {
+    if (gasPrice == undefined){
+      gasPrice = 0;
+    }
+    const price = await contracts.priceFeedTestnet.getPrice()
+    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee, gasPrice)
+    return tx
+  }
+
+  static async performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee = 0, gasPrice_toUse = 0) {
+    const {
+      firstRedemptionHint,
+      partialRedemptionHintNICR
+    } = await contracts.hintHelpers.getRedemptionHints(LUSDAmount, price, gasPrice_toUse)
+
+    const { 0: upperPartialRedemptionHint, 1: lowerPartialRedemptionHint } = await contracts.sortedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      redeemer,
+      redeemer
+    )
+    const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await contracts.sortedShieldedTroves.findInsertPosition(
+      partialRedemptionHintNICR,
+      redeemer,
+      redeemer
+    )
+
+    const tx = await contracts.troveManager.redeemCollateralForShutdown(
+      LUSDAmount,
+      firstRedemptionHint,
+      upperPartialRedemptionHint,
+      lowerPartialRedemptionHint,
+      upperShieldedPartialRedemptionHint,
+      lowerShieldedPartialRedemptionHint,
+      partialRedemptionHintNICR,
+      0, maxFee,
+      { from: redeemer, gasPrice: gasPrice_toUse}
+    )
+
+    return tx
+  }
   static async getEntireSystemDebt(contracts) {
     const rate = await contracts.troveManager.accumulatedRate()
     const shieldRate = await contracts.troveManager.accumulatedShieldRate()
