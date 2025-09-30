@@ -52,6 +52,8 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
     // --- Connected contract declarations ---
 
+    IAggregator public aggregator;
+
     uint internal constant REDEMPTION_FEE_FLOOR = DECIMAL_PRECISION / 1000 * 5; // 0.5%
 
     uint internal constant DRIP_STALENESS_THRESHOLD = 1 hours;
@@ -821,7 +823,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
       
     }
 
-    function dripIsStale() external view returns (bool) {
+    function dripIsStale() external view override returns (bool) {
         return block.timestamp - lastAccRateUpdateTime > DRIP_STALENESS_THRESHOLD;
     }
 
@@ -831,6 +833,13 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         uint interestRate = relayer.getRate();
         uint shieldedInterestRate = interestRate.sub(RATE_PRECISION).mul(kappa).div(DECIMAL_PRECISION).add(RATE_PRECISION);
         _drip(contractsCache, interestRate, shieldedInterestRate);
+    }
+
+    function aggDrip(uint256 _interestRate) public override {
+        // _requireCallerIsAggregator();
+        uint shieldedInterestRate = _interestRate.sub(RATE_PRECISION).mul(kappa).div(DECIMAL_PRECISION).add(RATE_PRECISION);
+        ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
+        _drip(contractsCache, _interestRate, shieldedInterestRate);
     }
 
     function _updateAccRates(uint256 newAccRate, uint256 newAccShieldRate) internal {
@@ -1089,4 +1098,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     Trove storage t = getTroveStorage().Troves[_borrower];
     return (t.debt, t.coll, t.stake, uint8(t.status), t.arrayIndex);
     }
+
+    // --- 'require' wrapper functions ---
+
+    // function _requireCallerIsAggregator() internal view {
+    //     require(msg.sender == address(aggregator), "TM: Caller is not Aggregator contract");
+    // }   
 }

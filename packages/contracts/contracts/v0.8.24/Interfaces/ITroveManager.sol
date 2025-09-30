@@ -110,6 +110,10 @@ interface ITroveManager is ILiquityBase {
 
     function drip() external;
 
+    function aggDrip(uint256 _interestRate) external;
+
+    function dripIsStale() external view returns (bool);
+
     function closeTrove(address _borrower) external;
 
     function removeStake(address _borrower) external;

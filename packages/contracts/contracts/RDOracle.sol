@@ -11,7 +11,7 @@ import {IHooks} from "./Vendor/@balancer-labs/v3-interfaces/contracts/vault/IHoo
 import {IVault} from "./Vendor/@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 
 import {VaultGuard} from "./Vendor/@balancer-labs/v3-vault/contracts/VaultGuard.sol";
-import {HookFlags, TokenConfig, LiquidityManagement, AfterSwapParams, AddLiquidityKind, RemoveLiquidityKind} from "./Vendor/@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import {HookFlags, TokenConfig, LiquidityManagement, AddLiquidityKind, RemoveLiquidityKind, PoolSwapParams} from "./Vendor/@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 import {BasePoolFactory} from "./Vendor/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol";
 import {StablePool, Rounding} from "./Vendor/@balancer-labs/v3-pool-stable/contracts/StablePool.sol";
@@ -19,12 +19,20 @@ import {StablePool, Rounding} from "./Vendor/@balancer-labs/v3-pool-stable/contr
 import {Oracle} from "./Vendor/@uniswap/v3-core/contracts/libraries/Oracle.sol";
 import {TickMath} from "./Vendor/@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
+import {IRelayer} from "./v0.8.24/Interfaces/IRelayer.sol";
+import {IAggregator} from "./v0.8.24/Interfaces/IAggregator.sol";
+import {ILUSDToken} from "./v0.8.24/Interfaces/ILUSDToken.sol";
+import {Ownable} from "./v0.8.24/Dependencies/Ownable.sol";
+import {CheckContract} from "./v0.8.24/Dependencies/CheckContract.sol";
+
+import {IERC20} from "./v0.8.24/Dependencies/IERC20.sol";
+
 import {IRDOracle} from "./Interfaces/IRDOracle.sol";
 
 // Note: If > 50% of tokens in pool are yield bearing must use rate provider for token
 //  https://docs.balancer.fi/partner-onboarding/onboarding-overview/rate-providers.html
 
-contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
+contract RDOracle is IRDOracle, BaseHooks, VaultGuard, Ownable, CheckContract {
     using FixedPoint for uint256;
     using Math for uint256;
     using Arrays for uint256[];
@@ -34,6 +42,11 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
     OracleState public override oracleState;
 
     // --- Constants ---
+
+    /**
+     * @notice Name of the contract
+     */
+    string public constant NAME = "RDOracle";
 
     /**
      * @notice The constant WAD.
@@ -56,6 +69,12 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
     /// @inheritdoc IRDOracle
     address public rdToken;
 
+    /// @inheritdoc IRDOracle
+    address public relayer;
+
+    /// @inheritdoc IRDOracle
+    address public aggregator;
+
     address[] internal _stablecoinBasket;
 
     /**
@@ -77,6 +96,9 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
     /// @inheritdoc IRDOracle
     uint8 public rdTokenIndex;
 
+    /// @inheritdoc IRDOracle
+    uint256 public pendingLocalReward;
+
     uint8[] internal _stablecoinBasketIndices;
 
     /**
@@ -97,9 +119,6 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
     /// @inheritdoc IRDOracle
     string public symbol = "RD / USD";
 
-    /// @inheritdoc IRDOracle
-    uint32 public override minObservationDelta;
-
     // --- Init ---
 
     /**
@@ -108,15 +127,13 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
      * @param  _quotePeriodSlow Length in seconds of the TWAP used to consult the pool
      * @param  _quotePeriodFast Length in seconds of the TWAP used to consult the pool
      * @param  _stablecoins Array of addresses of the stablecoins in the pool
-     * @param  _minObservationDelta The minimum observation delta
      */
     constructor(
         address _vault,
         address _rdToken,
         uint32 _quotePeriodFast,
         uint32 _quotePeriodSlow,
-        address[] memory _stablecoins,
-        uint32 _minObservationDelta
+        address[] memory _stablecoins
     ) VaultGuard(IVault(_vault)) {
         if (_quotePeriodFast >= _quotePeriodSlow) {
             revert Oracle_PeriodMismatch();
@@ -140,7 +157,6 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
         _stablecoinBasket = _stablecoins;
         quotePeriodFast = _quotePeriodFast;
         quotePeriodSlow = _quotePeriodSlow;
-        minObservationDelta = _minObservationDelta;
         // Initialize oracle state with price of 1 RD/USD
         _initialize(2 ** 96);
         // _initialize(_convertPriceToSqrtPriceX96(_WAD));
@@ -207,48 +223,47 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
 
     /// @inheritdoc BaseHooks
     function getHookFlags() public pure override returns (HookFlags memory hookFlags_) {
-        hookFlags_.shouldCallAfterSwap = true;
-        hookFlags_.shouldCallAfterAddLiquidity = true;
-        hookFlags_.shouldCallAfterRemoveLiquidity = true;
+        hookFlags_.shouldCallBeforeSwap = true;
+        hookFlags_.shouldCallBeforeAddLiquidity = true;
+        hookFlags_.shouldCallBeforeRemoveLiquidity = true;
         return hookFlags_;
     }
 
     /// @inheritdoc BaseHooks
-    function onAfterSwap(
-        AfterSwapParams calldata _params
-    ) public override onlyVault returns (bool _success, uint256 _hookAdjustedAmountCalculatedRaw) {
-        _onHookCalled(_params.pool);
-        return (true, 0);
+    function onBeforeSwap(
+        PoolSwapParams calldata,
+        address _pool
+    ) public override onlyVault returns (bool _success) {
+        _onHookCalled(_pool);
+        return (true);
     }
 
     /// @inheritdoc BaseHooks
-    function onAfterAddLiquidity(
+    function onBeforeAddLiquidity(
         address,
         address _pool,
         AddLiquidityKind,
         uint256[] memory,
-        uint256[] memory _amountsInRaw,
         uint256,
         uint256[] memory,
         bytes memory
-    ) public override onlyVault returns (bool, uint256[] memory) {
+    ) public override onlyVault returns (bool) {
         _onHookCalled(_pool);
-        return (true, _amountsInRaw);
+        return (true);
     }
 
     /// @inheritdoc BaseHooks
-    function onAfterRemoveLiquidity(
+    function onBeforeRemoveLiquidity(
         address,
         address _pool,
         RemoveLiquidityKind,
         uint256,
         uint256[] memory,
-        uint256[] memory _amountsOutRaw,
         uint256[] memory,
         bytes memory
-    ) public override onlyVault returns (bool, uint256[] memory) {
+    ) public override onlyVault returns (bool) {
         _onHookCalled(_pool);
-        return (true, _amountsOutRaw);
+        return (true);
     }
 
     /**
@@ -257,44 +272,134 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
      */
     function _onHookCalled(address _pool) internal {
         // If time since last observation > minDelta then update price in observations
-        bool _shouldUpdate = true;
+        bool _shouldUpdateOracle = false;
+
+        uint32 _now = _blockTimestamp();
 
         uint16 _observationIndex = oracleState.observationIndex;
         (uint32 _lastUpdateTime, , , ) = this.observations(_observationIndex);
 
-        uint32 _timeSinceLastUpdate = _blockTimestamp() - _lastUpdateTime;
+        uint32 _timeSinceLastUpdate = _now - _lastUpdateTime;
 
-        if (_timeSinceLastUpdate < minObservationDelta) {
-            _shouldUpdate = false;
+        if (_now > _lastUpdateTime) {
+            _shouldUpdateOracle = true;
         }
 
         // Emit event for debugging
-        emit OracleHookCalled(_pool, _shouldUpdate, _timeSinceLastUpdate, minObservationDelta);
+        emit OracleHookCalled(_pool, _shouldUpdateOracle, _timeSinceLastUpdate);
 
-        if (_shouldUpdate) {
+        if (_shouldUpdateOracle) {
             // Get last balances of all tokens in the pool
             (, , , uint256[] memory _lastBalancesWad) = IVault(vault).getPoolTokenInfo(_pool);
             _updateSyntheticRDPrice(_lastBalancesWad);
+
+            if (relayer != address(0)) {
+                _checkAndUpdateRelayer();
+            }
+
+            if (aggregator != address(0)) {
+                _checkAndUpdateAggregator();
+            }
         }
+    }
+
+    /**
+     * @notice Check and update the aggregator
+     */
+    function _checkAndUpdateAggregator() internal {
+        (bool shouldOracleDrip, uint256 oracleDripReward) = IAggregator(aggregator)
+            .shouldOracleDrip();
+
+        bool _didDrip = false;
+
+        if (shouldOracleDrip) {
+            IAggregator(aggregator).drip();
+            _didDrip = true;
+        }
+
+        if (_didDrip) {
+            pendingLocalReward += oracleDripReward;
+        }
+    }
+
+    /**
+     * @notice Check and update the relayer
+     */
+    function _checkAndUpdateRelayer() internal {
+        (bool shouldUpdateRate, bool shouldUpdatePar, uint256 updateReward) = IRelayer(relayer)
+            .shouldUpdateRateAndPar();
+
+        (uint256 fastVal, bool fastOk, uint256 slowVal, bool slowOk) = this
+            .getFastSlowResultWithValidity();
+
+        bool _didUpdate = false;
+
+        // Update the relayer - Rate control uses the fast TWAP, Par control uses the slow TWAP
+        if (shouldUpdateRate && shouldUpdatePar && fastOk && slowOk) {
+            IRelayer(relayer).updateRateAndParWithMarket(fastVal, slowVal);
+            _didUpdate = true;
+        } else if (shouldUpdateRate && fastOk) {
+            IRelayer(relayer).updateRateWithMarket(fastVal);
+            _didUpdate = true;
+        } else if (shouldUpdatePar && slowOk) {
+            IRelayer(relayer).updateParWithMarket(slowVal);
+            _didUpdate = true;
+        }
+
+        if (_didUpdate) {
+            pendingLocalReward += updateReward;
+        }
+    }
+
+    /**
+     * @notice Send the caller reward
+     */
+    function claimLocalReward() external {
+        uint256 owed = pendingLocalReward;
+        if (owed == 0) return;
+
+        uint256 bal = IERC20(rdToken).balanceOf(address(this));
+        uint256 pay = bal < owed ? bal : owed;
+        if (pay == 0) return;
+
+        pendingLocalReward = owed - pay; // keep the remaining owed amount
+        bool ok = IERC20(rdToken).transfer(msg.sender, pay);
+        if (!ok) revert Oracle_ClaimRewardTransferFailed();
+
+        emit OracleRewardClaimed(msg.sender, pay);
+    }
+
+    // --- Dependency setter ---
+
+    /// @inheritdoc IRDOracle
+    function setAddresses(address _relayerAddress, address _aggregatorAddress) external onlyOwner {
+        checkContract(_relayerAddress);
+        checkContract(_aggregatorAddress);
+
+        relayer = _relayerAddress;
+        aggregator = _aggregatorAddress;
+
+        emit RelayerAddressChanged(_relayerAddress);
+        emit AggregatorAddressChanged(_aggregatorAddress);
+
+        _renounceOwnership();
     }
 
     // --- Methods ---
 
     /// @inheritdoc IRDOracle
     function getFastResultWithValidity() public view returns (uint256 _result, bool _validity) {
-        // If the pool doesn't have enough history return false
-
         uint32[] memory secondsAgos = new uint32[](2);
         secondsAgos[0] = quotePeriodFast;
         secondsAgos[1] = _MIN_PRICE_AGE;
-        (int56[] memory tickCumulatives, ) = this.observe(secondsAgos);
-        int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
-        int24 arithmeticMeanTick = int24(
-            tickCumulativesDelta / int56(int32(quotePeriodFast - _MIN_PRICE_AGE))
-        );
-        uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
-        _result = _convertSqrtPriceX96ToPrice(sqrtPriceX96);
-        _validity = true;
+        try this.observe(secondsAgos) returns (int56[] memory tickCumulatives, uint160[] memory) {
+            int56 delta = tickCumulatives[1] - tickCumulatives[0];
+            int24 meanTick = int24(delta / int56(int32(quotePeriodFast - _MIN_PRICE_AGE)));
+            uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(meanTick);
+            return (_convertSqrtPriceX96ToPrice(sqrtPriceX96), true);
+        } catch {
+            return (0, false);
+        }
     }
 
     /// @inheritdoc IRDOracle
@@ -308,19 +413,17 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
 
     /// @inheritdoc IRDOracle
     function getSlowResultWithValidity() public view returns (uint256 _result, bool _validity) {
-        // If the pool doesn't have enough history return false
-
         uint32[] memory secondsAgos = new uint32[](2);
         secondsAgos[0] = quotePeriodSlow;
         secondsAgos[1] = _MIN_PRICE_AGE;
-        (int56[] memory tickCumulatives, ) = this.observe(secondsAgos);
-        int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
-        int24 arithmeticMeanTick = int24(
-            tickCumulativesDelta / int56(int32(quotePeriodSlow - _MIN_PRICE_AGE))
-        );
-        uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
-        _result = _convertSqrtPriceX96ToPrice(sqrtPriceX96);
-        _validity = true;
+        try this.observe(secondsAgos) returns (int56[] memory tickCumulatives, uint160[] memory) {
+            int56 delta = tickCumulatives[1] - tickCumulatives[0];
+            int24 meanTick = int24(delta / int56(int32(quotePeriodSlow - _MIN_PRICE_AGE)));
+            uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(meanTick);
+            return (_convertSqrtPriceX96ToPrice(sqrtPriceX96), true);
+        } catch {
+            return (0, false);
+        }
     }
 
     /// @inheritdoc IRDOracle
@@ -354,6 +457,20 @@ contract RDOracle is IRDOracle, BaseHooks, VaultGuard {
         return (_fastResult, _slowResult);
     }
 
+    /// @inheritdoc IRDOracle
+    function price() external view returns (uint256 _price) {
+        (uint256 value, bool ok) = this.getFastResultWithValidity();
+        if (!ok) {
+            // fallback to current stored sqrtPrice (or 1e18 if uninitialized)
+            return
+                oracleState.sqrtPriceX96 == 0
+                    ? 1e18
+                    : _convertSqrtPriceX96ToPrice(oracleState.sqrtPriceX96);
+        }
+        return value;
+    }
+
+    /// @inheritdoc IRDOracle
     function getLastUpdateTime() external view returns (uint32 _updateTime) {
         uint16 _observationIndex = oracleState.observationIndex;
         (uint32 _lastUpdateTime, , , ) = this.observations(_observationIndex);

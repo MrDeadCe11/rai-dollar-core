@@ -12,14 +12,8 @@ interface IRDOracle {
      * @param _pool The pool address
      * @param _shouldUpdate Whether the oracle should update
      * @param _timeSinceLastUpdate Time since last update
-     * @param _minDelta Minimum observation delta
      */
-    event OracleHookCalled(
-        address indexed _pool,
-        bool _shouldUpdate,
-        uint32 _timeSinceLastUpdate,
-        uint32 _minDelta
-    );
+    event OracleHookCalled(address indexed _pool, bool _shouldUpdate, uint32 _timeSinceLastUpdate);
 
     /**
      * @notice Emitted when the oracle price is updated
@@ -36,6 +30,25 @@ interface IRDOracle {
         uint160 _newSqrtPriceX96,
         uint16 _observationIndex
     );
+
+    /**
+     * @notice Emitted when the relayer address is changed
+     * @param _relayerAddress The new relayer address
+     */
+    event RelayerAddressChanged(address _relayerAddress);
+
+    /**
+     * @notice Emitted when the aggregator address is changed
+     * @param _aggregatorAddress The new aggregator address
+     */
+    event AggregatorAddressChanged(address _aggregatorAddress);
+
+    /**
+     * @notice Emitted when the local reward is claimed
+     * @param _sender The sender of the claim
+     * @param _amount The amount of the claim
+     */
+    event OracleRewardClaimed(address _sender, uint256 _amount);
 
     // --- Errors ---
 
@@ -100,6 +113,11 @@ interface IRDOracle {
      */
     error Oracle_RDTokenNotFound();
 
+    /**
+     * @notice Error thrown when the claim reward transfer fails
+     */
+    error Oracle_ClaimRewardTransferFailed();
+
     // --- Structs ---
 
     /**
@@ -139,6 +157,18 @@ interface IRDOracle {
     function rdToken() external view returns (address _rdToken);
 
     /**
+     * @notice Getter for the relayer address
+     * @return _relayer The relayer address
+     */
+    function relayer() external view returns (address _relayer);
+
+    /**
+     * @notice Getter for the aggregator address
+     * @return _aggregator The aggregator address
+     */
+    function aggregator() external view returns (address _aggregator);
+
+    /**
      * @notice Getter for the stablecoin basket
      * @return _stablecoinBasket The stablecoin basket
      */
@@ -165,6 +195,12 @@ interface IRDOracle {
     function rdTokenIndex() external view returns (uint8 _rdTokenIndex);
 
     /**
+     * @notice Getter for the pending local reward
+     * @return _pendingLocalReward The pending local reward
+     */
+    function pendingLocalReward() external view returns (uint256 _pendingLocalReward);
+
+    /**
      * @notice The fast(shorter) length of the TWAP used to consult the pool
      * @return _quotePeriod The length of the TWAP used to consult the pool
      */
@@ -181,12 +217,6 @@ interface IRDOracle {
      * @return _symbol The symbol of the quote
      */
     function symbol() external view returns (string memory _symbol);
-
-    /**
-     * @notice The minimum observation delta
-     * @return _minObservationDelta The minimum observation delta
-     */
-    function minObservationDelta() external view returns (uint32 _minObservationDelta);
 
     /**
      * @notice Getter for the stablecoin basket indices
@@ -244,6 +274,13 @@ interface IRDOracle {
     // --- Methods ---
 
     /**
+     * @notice Set the relayer address
+     * @param _relayerAddress The relayer address
+     * @param _aggregatorAddress The aggregator address
+     */
+    function setAddresses(address _relayerAddress, address _aggregatorAddress) external;
+
+    /**
      * @notice Fetch the latest fast oracle result and whether it is valid or not
      * @dev    This method should never revert
      * @return _result The latest fast oracle result
@@ -293,6 +330,14 @@ interface IRDOracle {
      * @return _slowValue The latest slow oracle result
      */
     function readFastSlow() external view returns (uint256 _fastValue, uint256 _slowValue);
+
+
+    /**
+     * @notice Fetch the price
+     * @dev    Will revert if is the price feed is invalid
+     * @return _price The price
+     */
+    function price() external view returns (uint256 _price);
 
     /**
      * @notice Fetch the last update time
