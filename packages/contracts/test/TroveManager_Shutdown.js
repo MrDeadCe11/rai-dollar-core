@@ -44,6 +44,7 @@ contract('TroveManager - Shutdown', async accounts => {
   let aggregator
   let nameRegistry
   let activePool
+  let activeShieldedPool
   let stabilityPool
   let defaultPool
   let functionCaller
@@ -74,6 +75,7 @@ contract('TroveManager - Shutdown', async accounts => {
   const getActualDebtFromComposite = async (compositeDebt) => th.getActualDebtFromComposite(compositeDebt, contracts)
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee)
   const openTrove = async (params) => th.openTrove(contracts, params)
+  const openShieldedTrove = async (params) => th.openShieldedTrove(contracts, params)
   const withdrawLUSD = async (params) => th.withdrawLUSD(contracts, params)
   const driveICRToTargetWithPar = async (borrower, targetICR) => th.driveICRToTargetWithPar(contracts, borrower, targetICR)
   const calculateParTarget = async (price, coll, debt, targetICR) => th.calculateParTarget(price, coll, debt, targetICR)
@@ -108,6 +110,7 @@ contract('TroveManager - Shutdown', async accounts => {
     rewards = contracts.rewards
     nameRegistry = contracts.nameRegistry
     activePool = contracts.activePool
+    activeShieldedPool = contracts.activeShieldedPool
     stabilityPool = contracts.stabilityPool
     defaultPool = contracts.defaultPool
     functionCaller = contracts.functionCaller
@@ -4064,13 +4067,13 @@ contract('TroveManager - Shutdown', async accounts => {
 
       const { 0: upperPartialRedemptionHint, 1: lowerPartialRedemptionHint } = await sortedTroves.findInsertPosition(
         partialRedemptionHintNICR,
-        dennis,
-        dennis
+        firstRedemptionHint,
+        firstRedemptionHint
       )
       const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
         partialRedemptionHintNICR,
-        dennis,
-        dennis
+        firstRedemptionHint,
+        firstRedemptionHint
       )
 
       // skip bootstrapping phase
@@ -6137,5 +6140,265 @@ console.log("penalty", penalty.toString())
        assert.isTrue(actualRedeemedAmount.lt(attemptedRedemptionAmount))
      })
    })
+  })
+
+  // Shielded troves during shutdown - mirror liquidation behavior for TCR and oracle shutdown
+  describe('liquidations - TCR < SCR (shielded)', async () => {
+    beforeEach(async () => {
+      await setup()
+    })
+
+    it('liquidate(): closes a Shielded Trove when trove has 0 debt', async () => {
+      await openShieldedTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
+      await openShieldedTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
+
+      const price = await priceFeed.getPrice()
+      assert.equal(dec(1, 18), await relayer.par())
+
+      const MCR = await troveManager.MCR()
+      assert.equal(MCR.toString(), '1100000000000000000')
+
+      // Trigger shutdown, then raise par so Alice's ICR falls below MCR
+      const parBeforeShutdown = await relayer.par()
+      await tcrShutdown()
+      assert.isTrue(await th.checkRecoveryMode(contracts))
+      await marketOracle.setPrice(ONE_DOLLAR.sub(ONE_CENT))
+      await relayer.updateRateAndPar()
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_HOUR, web3.currentProvider)
+      await relayer.updateRateAndPar()
+      const parAfterShutdown = await relayer.par()
+      assert.isTrue(parAfterShutdown.gt(parBeforeShutdown))
+      const priceNow = await priceFeed.getPrice()
+      const icrNow = await troveManager.getCurrentICR(alice, priceNow)
+      const mcrNow = await troveManager.MCR()
+      assert.isTrue(icrNow.lt(mcrNow))
+
+      await liquidations.liquidate(alice, { from: owner });
+
+      const status = (await troveManager.Troves(alice))[3]
+      assert.equal(status, 3)
+      const aliceDebtAfter = await troveManager.getTroveActualDebt(alice)
+      assert.equal(aliceDebtAfter.toString(), '0')
+      const alice_trove_isInSortedList = await sortedShieldedTroves.contains(alice)
+      assert.isFalse(alice_trove_isInSortedList)
+    })
+
+    it('liquidate(): decreases ActiveShieldedPool Collateral and LUSDDebt by correct amounts', async () => {
+      const { collateral: A_collateral, totalDebt: A_totalDebt } = await openShieldedTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
+      const { collateral: B_collateral, totalDebt: B_totalDebt } = await openShieldedTrove({ ICR: toBN(dec(21, 17)), extraParams: { from: bob } })
+
+      const activeShieldedPool_Collateral_before = (await activeShieldedPool.getCollateral()).toString()
+      const activeShieldedPool_RawCollateral_before = (await collateralToken.balanceOf(activeShieldedPool.address)).toString()
+      const activeShieldedPool_LUSDDebt_before = (await activeShieldedPool.getLUSDDebt()).toString()
+
+      assert.equal(activeShieldedPool_Collateral_before, A_collateral.add(B_collateral))
+      assert.equal(activeShieldedPool_RawCollateral_before, A_collateral.add(B_collateral))
+      th.assertIsApproximatelyEqual(activeShieldedPool_LUSDDebt_before, A_totalDebt.add(B_totalDebt))
+
+      await priceFeed.setPrice('100000000000000000000');
+      await tcrShutdown()
+      assert.isTrue(await th.checkRecoveryMode(contracts))
+
+      await liquidations.liquidate(bob, { from: owner });
+
+      const activeShieldedPool_Collateral_After = await activeShieldedPool.getCollateral()
+      const activeShieldedPool_RawCollateral_After= await collateralToken.balanceOf(activeShieldedPool.address)
+      const activeShieldedPool_LUSDDebt_After = await activeShieldedPool.getLUSDDebt()
+
+      assert.isAtMost(th.getDifference(activeShieldedPool_Collateral_After, A_collateral), 1)
+      assert.isAtMost(th.getDifference(activeShieldedPool_RawCollateral_After, A_collateral), 1)
+      th.assertIsApproximatelyEqual(activeShieldedPool_LUSDDebt_After, A_totalDebt)
+    })
+  })
+
+  describe('liquidations - oracle shutdown (shielded)', async () => {
+    beforeEach(async () => {
+      await setup()
+    })
+
+   
+
+    it('liquidate(): decreases ActiveShieldedPool Collateral and LUSDDebt by correct amounts (oracle)', async () => {
+      const { collateral: A_collateral, totalDebt: A_totalDebt } = await openShieldedTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
+      const { collateral: B_collateral, totalDebt: B_totalDebt } = await openShieldedTrove({ ICR: toBN(dec(21, 17)), extraParams: { from: bob } })
+
+      const activeShieldedPool_Collateral_before = (await activeShieldedPool.getCollateral()).toString()
+      const activeShieldedPool_RawCollateral_before = (await collateralToken.balanceOf(activeShieldedPool.address)).toString()
+      const activeShieldedPool_LUSDDebt_before = (await activeShieldedPool.getLUSDDebt()).toString()
+
+      assert.equal(activeShieldedPool_Collateral_before, A_collateral.add(B_collateral))
+      assert.equal(activeShieldedPool_RawCollateral_before, A_collateral.add(B_collateral))
+      th.assertIsApproximatelyEqual(activeShieldedPool_LUSDDebt_before, A_totalDebt.add(B_totalDebt))
+
+      await priceFeed.setPrice('100000000000000000000')
+      await priceFeed.fetchPrice()
+      await priceFeed.setOracleFailure(true)
+      await priceFeed.fetchPrice()
+      assert.isTrue(await troveManager.isShutdown())
+
+      await liquidations.liquidate(bob, { from: owner })
+
+      const activeShieldedPool_Collateral_After = await activeShieldedPool.getCollateral()
+      const activeShieldedPool_RawCollateral_After= await collateralToken.balanceOf(activeShieldedPool.address)
+      const activeShieldedPool_LUSDDebt_After = await activeShieldedPool.getLUSDDebt()
+
+      assert.isAtMost(th.getDifference(activeShieldedPool_Collateral_After, A_collateral), 1)
+      assert.isAtMost(th.getDifference(activeShieldedPool_RawCollateral_After, A_collateral), 1)
+      th.assertIsApproximatelyEqual(activeShieldedPool_LUSDDebt_After, A_totalDebt)
+    })
+  })
+
+  describe('TroveManager - TCR Shutdown - RedeemCollateral (shielded)', () => {
+    beforeEach(async () => {
+      await setup()
+    })
+    it('redeemCollateralForShutdown(): closes a Shielded Trove when trove has 0 debt (oracle shutdown)', async () => {
+      await openShieldedTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
+      const { totalDebt: aliceDebtBefore } = await openShieldedTrove({ ICR: toBN(dec(4, 18)), extraParams: { from: alice } })
+    // Set a low price and commit it as last good price before failing oracle
+      await priceFeed.setPrice('100000000000000000000')
+      const priceLow = await priceFeed.getPrice()
+      // Fund redeemer with enough LUSD by opening an unshielded trove
+      await openTrove({ ICR: toBN(dec(200, 18)), extraLUSDAmount: aliceDebtBefore, extraParams: { from: dennis } })
+      const redemptionAmount = aliceDebtBefore
+      // skip bootstrapping phase to ensure par/price settled
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+       
+      await priceFeed.fetchPrice()
+      await priceFeed.setOracleFailure(true)
+      await priceFeed.fetchPrice()
+      assert.isTrue(await troveManager.isShutdown())
+
+      // Redeem against highest ICR trove first (dennis) until his debt is 0
+      const priceSticky = await priceFeed.getPrice()
+      const dennisDebtBefore = await troveManager.getTroveActualDebt(dennis)
+      let dennisBal = await lusdToken.balanceOf(dennis)
+      if (dennisBal.lt(dennisDebtBefore)) {
+        const diff = dennisDebtBefore.sub(dennisBal)
+        await lusdToken.unprotectedMint(dennis, diff)
+        dennisBal = await lusdToken.balanceOf(dennis)
+      }
+      const redemptionAmountAdj = dennisDebtBefore
+
+      const {
+        firstRedemptionHint,
+        partialRedemptionHintNICR
+      } = await hintHelpers.getRedemptionHints(redemptionAmountAdj, priceSticky, 0)
+
+      const { 0: upperPartialRedemptionHint, 1: lowerPartialRedemptionHint } = await sortedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        firstRedemptionHint,
+        firstRedemptionHint
+      )
+
+      const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        firstRedemptionHint,
+        firstRedemptionHint
+      )
+
+      await troveManager.redeemCollateralForShutdown(
+        redemptionAmountAdj,
+        firstRedemptionHint,
+        upperPartialRedemptionHint,
+        lowerPartialRedemptionHint,
+        upperShieldedPartialRedemptionHint,
+        lowerShieldedPartialRedemptionHint,
+        partialRedemptionHintNICR,
+        0, th._100pct,
+        { from: dennis, gasPrice: GAS_PRICE }
+      )
+
+      const dennisDebtAfter = await troveManager.getTroveActualDebt(dennis)
+      assert.equal(dennisDebtAfter.toString(), '0')
+      const dennis_trove_isInSortedList = await sortedTroves.contains(dennis)
+      assert.isFalse(dennis_trove_isInSortedList)
+    })
+
+    it('redeemCollateralForShutdown(): shielded troves, tcr shutdown, no discount', async () => {
+      const { totalDebt: A_totalDebt } = await openShieldedTrove({ ICR: toBN(dec(310, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: alice } })
+      const { netDebt: B_netDebt } = await openShieldedTrove({ ICR: toBN(dec(290, 16)), extraLUSDAmount: dec(8, 18), extraParams: { from: bob } })
+      const { netDebt: C_netDebt } = await openShieldedTrove({ ICR: toBN(dec(250, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: carol } })
+      const denisLusdAmount = C_netDebt.add(B_netDebt).add(A_totalDebt)
+      await openTrove({ ICR: toBN(dec(200, 18)), extraLUSDAmount: denisLusdAmount, extraParams: { from: dennis } })
+
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+      await relayer.updatePar()
+      const priceAfterShutdown = await tcrShutdown()
+
+      const {
+        firstRedemptionHint,
+        partialRedemptionHintNICR
+      } = await hintHelpers.getRedemptionHints(denisLusdAmount, priceAfterShutdown, 0)
+
+      const { 0: upperPartialRedemptionHint, 1: lowerPartialRedemptionHint } = await sortedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        dennis,
+        dennis
+      )
+
+      const { 0: upperShieldedPartialRedemptionHint, 1: lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
+        partialRedemptionHintNICR,
+        dennis,
+        dennis
+      )
+
+      const dennisCollBefore = await collateralToken.balanceOf(dennis)
+      const dennisLUSDBefore = await lusdToken.balanceOf(dennis)
+
+      const redemptionTx = await troveManager.redeemCollateralForShutdown(
+        denisLusdAmount,
+        firstRedemptionHint,
+        upperPartialRedemptionHint,
+        lowerPartialRedemptionHint,
+        upperShieldedPartialRedemptionHint,
+        lowerShieldedPartialRedemptionHint,
+        partialRedemptionHintNICR,
+        0, th._100pct,
+        {
+          from: dennis,
+          gasPrice: GAS_PRICE
+        }
+      )
+
+      const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+      const cs = await troveManager.collateralShutdown();
+      const shutdownPar = toBN(cs.par.toString());
+      const priceNow = await priceFeed.getPrice()
+      const dennisCollAfter = await collateralToken.balanceOf(dennis)
+      const dennisLUSDAfter = await lusdToken.balanceOf(dennis)
+      assert.isTrue(denisLusdAmount.eq(totalRedeemed))
+      const expectedDelta = denisLusdAmount.mul(shutdownPar.mul(mv._1e18BN)).div(mv._1e18BN).div(priceNow)
+      // Allow slightly larger tolerance due to shielded accounting rounding across multiple troves
+      assert.isAtMost(th.getDifference(dennisCollAfter.sub(dennisCollBefore), expectedDelta), 1500000000000000)
+      assert.isTrue(dennisLUSDAfter.lt(dennisLUSDBefore))
+    })
+
+    it('redeemCollateralForShutdown(): tcr shutdown, redeems across shielded and unshielded troves', async () => {
+      // --- SETUP --- open one unshielded and one shielded trove
+ await openTrove({ ICR: toBN(dec(300, 16)), extraLUSDAmount: dec(20, 18), extraParams: { from: bob } })
+await openShieldedTrove({ ICR: toBN(dec(290, 16)), extraLUSDAmount: dec(22, 18), extraParams: { from: carol } })
+const bobDebt = await lusdToken.balanceOf(bob)
+const carolDebt = await lusdToken.balanceOf(carol)
+      // Redeemer funds
+      const redeemAmount = bobDebt.add(carolDebt)
+      await openShieldedTrove({ ICR: toBN(dec(200, 18)), extraLUSDAmount: redeemAmount, extraParams: { from: dennis } })
+
+      // Enter shutdown
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+      await relayer.updatePar()
+      const priceAfterShutdown = await tcrShutdown()
+      // redeem bob and carol
+
+      await th.redeemCollateralForShutdown(bob, contracts, bobDebt)
+      await th.redeemCollateralForShutdown(carol, contracts, carolDebt)
+      // redeem dennis
+      const dennisDebt = await lusdToken.balanceOf(dennis)
+      await th.redeemCollateralForShutdown(dennis, contracts, dennisDebt)
+      
+      // highest icr trove should be closed regardless of shielded/unshielded
+      const dennisStatus = (await troveManager.Troves(dennis))[3]
+      assert.equal(dennisStatus, 4)
+    })
   })
 })
