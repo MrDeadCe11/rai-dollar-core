@@ -5732,6 +5732,108 @@ console.log("penalty", penalty.toString())
       th.assertIsApproximatelyEqual(expected, received)
     })
 
+    it("redeemCollateralForShutdown(): oracle shutdown, succeeds with any max fee percentage (no fees)", async () => {
+      const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(9500, 18), extraParams: { from: A } })
+      const { totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(395, 16)), extraLUSDAmount: dec(9000, 18), extraParams: { from: B } })
+      const { totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(390, 16)), extraLUSDAmount: dec(10000, 18), extraParams: { from: C } })
+      const expectedTotalSupply = A_totalDebt.add(B_totalDebt).add(C_totalDebt)
+
+      await oracleShutdown()
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+
+      const attempted = expectedTotalSupply.div(toBN(10))
+
+      const tx1 = await troveManager.redeemCollateralForShutdown(
+        attempted.div(toBN(5)),
+        ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
+        0, 0, dec(5, 15), { from: A }
+      )
+      assert.isTrue(tx1.receipt.status)
+
+      const tx2 = await troveManager.redeemCollateralForShutdown(
+        attempted.div(toBN(5)),
+        ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
+        0, 0, dec(1, 17), { from: B }
+      )
+      assert.isTrue(tx2.receipt.status)
+
+      const tx3 = await troveManager.redeemCollateralForShutdown(
+        attempted.div(toBN(5)),
+        ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
+        0, 0, dec(5, 17), { from: C }
+      )
+      assert.isTrue(tx3.receipt.status)
+
+      const tx4 = await troveManager.redeemCollateralForShutdown(
+        attempted.div(toBN(5)),
+        ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
+        0, 0, dec(1, 18), { from: A }
+      )
+      assert.isTrue(tx4.receipt.status)
+
+      const r1 = th.getEventArgByName(tx1, "Redemption", "_collateralFee")
+      const r2 = th.getEventArgByName(tx2, "Redemption", "_collateralFee")
+      const r3 = th.getEventArgByName(tx3, "Redemption", "_collateralFee")
+      const r4 = th.getEventArgByName(tx4, "Redemption", "_collateralFee")
+      assert.equal(r1.toString(), '0')
+      assert.equal(r2.toString(), '0')
+      assert.equal(r3.toString(), '0')
+      assert.equal(r4.toString(), '0')
+    })
+
+    it("redeemCollateralForShutdown(): oracle shutdown, doesn't affect SP deposits or depositor gains", async () => {
+      await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
+
+      const { totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(50, 18), extraParams: { from: bob } })
+      const { totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(395, 16)), extraLUSDAmount: dec(100, 18), extraParams: { from: carol } })
+      const { totalDebt: D_totalDebt } = await openTrove({ ICR: toBN(dec(390, 16)), extraLUSDAmount: dec(150, 18), extraParams: { from: dennis } })
+
+      const redemptionAmount = B_totalDebt.add(C_totalDebt).add(D_totalDebt)
+      await openTrove({ ICR: toBN(dec(500, 16)), extraLUSDAmount: redemptionAmount, extraParams: { from: alice } })
+      await lusdToken.transfer(erin, redemptionAmount, { from: alice })
+
+      await stabilityPool.provideToSP(dec(25, 18), ZERO_ADDRESS, { from: bob })
+      await stabilityPool.provideToSP(dec(50, 18), ZERO_ADDRESS, { from: carol })
+      await stabilityPool.provideToSP(dec(75, 18), ZERO_ADDRESS, { from: dennis })
+
+      const LUSDinSP_before = await stabilityPool.getTotalLUSDDeposits()
+      const bobDep_before = await stabilityPool.getCompoundedLUSDDeposit(bob)
+      const carolDep_before = await stabilityPool.getCompoundedLUSDDeposit(carol)
+      const dennisDep_before = await stabilityPool.getCompoundedLUSDDeposit(dennis)
+      const bobGain_before = await stabilityPool.getDepositorCollateralGain(bob)
+      const carolGain_before = await stabilityPool.getDepositorCollateralGain(carol)
+      const dennisGain_before = await stabilityPool.getDepositorCollateralGain(dennis)
+
+      await oracleShutdown()
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+
+      const tx = await troveManager.redeemCollateralForShutdown(
+        redemptionAmount.div(toBN(2)),
+        ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
+        0, 0, th._100pct,
+        { from: erin }
+      )
+      assert.isTrue(tx.receipt.status)
+
+      const LUSDinSP_after = await stabilityPool.getTotalLUSDDeposits()
+      const bobDep_after = await stabilityPool.getCompoundedLUSDDeposit(bob)
+      const carolDep_after = await stabilityPool.getCompoundedLUSDDeposit(carol)
+      const dennisDep_after = await stabilityPool.getCompoundedLUSDDeposit(dennis)
+      const bobGain_after = await stabilityPool.getDepositorCollateralGain(bob)
+      const carolGain_after = await stabilityPool.getDepositorCollateralGain(carol)
+      const dennisGain_after = await stabilityPool.getDepositorCollateralGain(dennis)
+
+      th.assertIsApproximatelyEqual(LUSDinSP_before, LUSDinSP_after, 1)
+      th.assertIsApproximatelyEqual(bobDep_before, bobDep_after, 1)
+      th.assertIsApproximatelyEqual(carolDep_before, carolDep_after, 1)
+      th.assertIsApproximatelyEqual(dennisDep_before, dennisDep_after, 1)
+      assert.isTrue(bobGain_before.eq(bobGain_after))
+      assert.isTrue(carolGain_before.eq(carolGain_after))
+      assert.isTrue(dennisGain_before.eq(dennisGain_after))
+      const fee = th.getEventArgByName(tx, "Redemption", "_collateralFee")
+      assert.equal(fee.toString(), '0')
+    })
+
     it('redeemCollateralForShutdown(): oracle shutdown, with invalid first hint, zero address', async () => {
       const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(310, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: alice } })
       const { netDebt: B_netDebt } = await openTrove({ ICR: toBN(dec(290, 16)), extraLUSDAmount: dec(8, 18), extraParams: { from: bob } })
