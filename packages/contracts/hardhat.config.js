@@ -77,6 +77,7 @@ module.exports = {
       {
         version: "0.8.30",
         settings: {
+          evmVersion: "cancun",
           optimizer: {
             enabled: true,
             runs: 100
