@@ -72,11 +72,10 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
 
     uint public lastAccRateUpdateTime = block.timestamp;
         // shutdown discount parameters
-    uint256 constant public SEVENTY_TWO_HOURS = 259200; // 72 hours in seconds
+    uint256 constant public MAX_DISCOUNT_TIME_FAILURE = 604800; // 7 days in seconds
     uint256 constant public BASE_DISCOUNT = 2e16; // 2%
     uint256 constant public MAX_DISCOUNT_ORACLE_FAILURE = DECIMAL_PRECISION * 99999 / 100000; // 99.999% to prevent divide by zero
     uint256 constant public MAX_DISCOUNT_TCR_BELOW_SCR = DECIMAL_PRECISION / 100 * 10; // 10%
-    uint256 constant public MULTIPLIER = 125e16; // 1.25 * 1e18
     
     struct CollateralShutdown {
         uint256 shutdownTime;
@@ -272,11 +271,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 // calculate collateral with discount
                 singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
                 // if collateral lot is greater than trove collateral, redeem all collateral amount in trove
+                // this check is required because during shutdown, you can redeem below MCR
             if(singleRedemption.collateralLot > t.coll) {
                 // cap collateral at trove
                 singleRedemption.collateralLot = t.coll;
                 //calculate collateral => LUSD with discount
-                singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(DECIMAL_PRECISION.sub(discount)).mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
+                singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
 
             }
                
@@ -605,7 +605,12 @@ function redeemCollateralForShutdown(
             address n = contractsCache.sortedShieldedTroves.getLast();
             while (n != address(0)) {
                 uint256 icr = _getCurrentICR(contractsCache, n, locals.price, locals.par);
-                if (locals.shutdown || icr >= MCR) { locals.curSh = (icr < HCR) ? n : address(0); break; }
+                if(locals.shutdown) {
+                    if(icr > 0) {
+                        locals.curSh = n;
+                        break;
+                    }
+                } else if(icr >= MCR) { locals.curSh = (icr < HCR) ? n : address(0); break; }
                 n = contractsCache.sortedShieldedTroves.getPrev(n); // prev => larger ICR
             }
         }
@@ -620,7 +625,7 @@ function redeemCollateralForShutdown(
         RedemptionHints memory _hints,
         uint _maxIterations
     ) internal returns (RedemptionTotals memory, RedemptionLocals memory) {
-        uint256 _redemptionRate = _redemptionLocals.shutdown ? _collateralShutdown.rate : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
+        uint256 _redemptionRate = _redemptionLocals.shutdown ? 0 : _contractsCache.aggregator.calcRateForRedemption(_totals.remainingLUSD, _redemptionLocals.totalLUSDSupplyAtStart);
             if (_maxIterations == 0) { _maxIterations = uint(-1); }
             while (_totals.remainingLUSD > 0 && _maxIterations > 0 && (_redemptionLocals.curBase != address(0) || _redemptionLocals.curSh != address(0))) {
                 _maxIterations--;
@@ -664,17 +669,18 @@ function redeemCollateralForShutdown(
     }
 
     function _finalizeRedemption(RedemptionLocals memory _locals, RedemptionTotals memory _totals, uint _LUSDAmount, uint _maxFeePercentage)  internal {
-      _locals.totalRedeemed = _totals.totalBaseLUSDToRedeem.add(_totals.totalShieldedLUSDToRedeem);
+        _locals.totalRedeemed = _totals.totalBaseLUSDToRedeem.add(_totals.totalShieldedLUSDToRedeem);
         _locals.totalCollateralDrawn = _totals.totalBaseCollateralDrawn.add(_totals.totalShieldedCollateralDrawn);
         _locals.grossCollateralDrawn = _locals.totalCollateralDrawn.add(_locals.totalCollateralFee);
 
-      ContractsStorage memory _contractsCache = getContractsStorage();
-
+        ContractsStorage memory _contractsCache = getContractsStorage();
+      
+        if(!_locals.shutdown && _locals.totalRedeemed > 0 && _locals.totalLUSDSupplyAtStart > 0) {
         // Base rate update
         _contractsCache.aggregator.updateBaseRateFromRedemption(
             _locals.totalRedeemed, _locals.totalLUSDSupplyAtStart
         );
-
+    }
         // Fees
         _requireUserAcceptsFee(_locals.totalCollateralFee, _locals.grossCollateralDrawn, _maxFeePercentage);
 
@@ -1079,11 +1085,11 @@ function redeemCollateralForShutdown(
         
         uint256 maxDiscount = _collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
 
-        if (timePassed >= SEVENTY_TWO_HOURS) {
+        if (timePassed >= MAX_DISCOUNT_TIME_FAILURE) {
             return maxDiscount;
         }
 
-        return timePassed.mul(maxDiscount).div(SEVENTY_TWO_HOURS);
+        return timePassed.mul(maxDiscount).div(MAX_DISCOUNT_TIME_FAILURE);
     }
 
     // External view wrapper

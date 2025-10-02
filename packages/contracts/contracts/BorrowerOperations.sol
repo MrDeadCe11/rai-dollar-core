@@ -440,7 +440,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         uint256 par = relayer.getPar();
 
         (uint price, bool oracleFailure) = priceFeed.fetchPrice();
-        // shutdown should be called by oracle contract
+        // in the case of an oracle failure, oracle shutdown will be called by oracle contract
         if(oracleFailure) return;
 
         uint TCR = LiquityMath._computeCR(totalCollateral, totalDebt, price, par);
