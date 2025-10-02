@@ -387,9 +387,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         );
     }
     
-    // we don't close troves during shutdown, empty troves are moved to the head of the sorted list
     function closeTrove() external override {
-        _requireNotShutdown();
         ITroveManager troveManagerCached = troveManager;
         IRewards rewardsCached = rewards;
         ILUSDToken lusdTokenCached = lusdToken;

@@ -73,6 +73,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
     uint public lastAccRateUpdateTime = block.timestamp;
         // shutdown discount parameters
     uint256 constant public MAX_DISCOUNT_TIME_FAILURE = 604800; // 7 days in seconds
+    uint256 constant public MAX_DISCOUNT_TIME_SCR = 86400; // 1 day in seconds
     uint256 constant public BASE_DISCOUNT = 2e16; // 2%
     uint256 constant public MAX_DISCOUNT_ORACLE_FAILURE = DECIMAL_PRECISION * 99999 / 100000; // 99.999% to prevent divide by zero
     uint256 constant public MAX_DISCOUNT_TCR_BELOW_SCR = DECIMAL_PRECISION / 100 * 10; // 10%
@@ -1084,12 +1085,12 @@ function redeemCollateralForShutdown(
         uint timePassed = block.timestamp.sub(_collateralShutdown.shutdownTime);
         
         uint256 maxDiscount = _collateralShutdown.oracleFailure ? MAX_DISCOUNT_ORACLE_FAILURE : MAX_DISCOUNT_TCR_BELOW_SCR;
-
-        if (timePassed >= MAX_DISCOUNT_TIME_FAILURE) {
+        uint256 maxTime = _collateralShutdown.oracleFailure ? MAX_DISCOUNT_TIME_FAILURE : MAX_DISCOUNT_TIME_SCR;
+        if (timePassed >= maxTime) {
             return maxDiscount;
         }
 
-        return timePassed.mul(maxDiscount).div(MAX_DISCOUNT_TIME_FAILURE);
+        return timePassed.mul(maxDiscount).div(maxTime);
     }
 
     // External view wrapper
