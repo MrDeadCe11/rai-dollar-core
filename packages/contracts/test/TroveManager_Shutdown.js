@@ -95,58 +95,61 @@ contract('TroveManager - Shutdown', async accounts => {
     const discount = await troveManager.getDiscount()
     const price = await priceFeed.getPrice()
     
+    // console.log('Helper using: par=' + shutdownPar.toString() + ', discount=' + discount.toString() + ', price=' + price.toString())
+    
     // Get initial trove states (need both normalized and actual debt)
     const trovesBeforeMap = new Map()
     const accumulatedRate = await troveManager.accumulatedRate()
     const accumulatedShieldRate = await troveManager.accumulatedShieldRate()
+    const RATE_PREC = toBN('1000000000000000000000000000')
     
     for (const owner of troveOwners) {
-      const actualDebt = await troveManager.getTroveActualDebt(owner)
-      const normDebt = await troveManager.getTroveDebt(owner)
-      const coll = await troveManager.getTroveColl(owner)
+      // Use on-chain helper that includes pending rewards in normalized units
+      const { 0: normDebt, 1: coll } = await troveManager.getEntireDebtAndColl(owner)
       const isShielded = await troveManager.shielded(owner)
+      const rate = isShielded ? accumulatedShieldRate : accumulatedRate
+      const actualDebt = toBN(normDebt.toString()).mul(rate).div(RATE_PREC)
+      
       const icr = await troveManager.getCurrentICR(owner, price)
       trovesBeforeMap.set(owner, {
         owner: owner,
         icr: icr,
         actualDebt: actualDebt,
-        normDebt: normDebt,
-        coll: coll,
+        normDebt: toBN(normDebt.toString()),
+        coll: toBN(coll.toString()),
         isShielded: isShielded,
-        rate: isShielded ? accumulatedShieldRate : accumulatedRate
+        rate: rate
       })
     }
 
     
     // Include redeemer's trove if not already in the list
     if (!trovesBeforeMap.has(redeemer)) {
-      const actualDebt = await troveManager.getTroveActualDebt(redeemer)
-      const normDebt = await troveManager.getTroveDebt(redeemer)
-      const coll = await troveManager.getTroveColl(redeemer)
+      const { 0: normDebt, 1: coll } = await troveManager.getEntireDebtAndColl(redeemer)
       const isShielded = await troveManager.shielded(redeemer)
+      const rate = isShielded ? accumulatedShieldRate : accumulatedRate
+      const actualDebt = toBN(normDebt.toString()).mul(rate).div(RATE_PREC)
+      
       const icr = await troveManager.getCurrentICR(redeemer, price)
       trovesBeforeMap.set(redeemer, {
         owner: redeemer,
         icr: icr,
         actualDebt: actualDebt,
-        normDebt: normDebt,
-        coll: coll,
+        normDebt: toBN(normDebt.toString()),
+        coll: toBN(coll.toString()),
         isShielded: isShielded,
-        rate: isShielded ? accumulatedShieldRate : accumulatedRate
+        rate: rate
       })
     }
     
-    // sort troves by icr lowest to highest
-    const trovesBefore = Array.from(trovesBeforeMap.values())
-    trovesBefore.sort((a, b) => a.icr.cmp(b.icr))
-
     let remainingLUSD = redemptionAmount
     let totalCollateral = toBN('0')
     let totalLUSDRedeemed = toBN('0')
     const LUSD_GAS_COMPENSATION = await troveManager.LUSD_GAS_COMPENSATION()
     
-    // Simulate redemption through each trove (sorted by ICR)
-    for (const trove of trovesBefore) {
+    // Process troves in the exact order provided (caller should sort by ICR)
+    for (const owner of troveOwners) {
+      const trove = trovesBeforeMap.get(owner)
       if (remainingLUSD.eq(toBN('0'))) break
       if (!trove) continue
       
@@ -161,71 +164,47 @@ contract('TroveManager - Shutdown', async accounts => {
       
       // Step 2: Calculate collateral with discount (line 273)
       // collateralLot = LUSDLot * par * DECIMAL_PRECISION / ((DECIMAL_PRECISION - discount) * price)
-      const collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
+      let collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
+      let actualLUSDRedeemed = lusdLot
       
       // Step 3: Check if collateral-capped (line 276)
       if (collateralLot.gt(trove.coll)) {
-        // Collateral-capped: redeemer uses ALL collateral, recalculate LUSD (line 280)
-        // LUSDLot = collateralLot * price / (par * DECIMAL_PRECISION)
-        // Note: using TROVE.COLL (all remaining coll) not collateralLot
-        const actualLUSDRedeemed = trove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
-        
-        // Now check if trove will close (debt drained to gas comp or below)
-        const RATE_PRECISION = toBN('1000000000000000000000000000')
-        let normDebtRedeemed = actualLUSDRedeemed.mul(RATE_PRECISION).div(trove.rate)
-        if (normDebtRedeemed.mul(trove.rate).div(RATE_PRECISION).lt(actualLUSDRedeemed)) {
-          normDebtRedeemed = normDebtRedeemed.add(toBN('1'))
-        }
-        const newNormDebt = trove.normDebt.sub(normDebtRedeemed)
-        const newActualDebt = newNormDebt.mul(trove.rate).div(RATE_PRECISION)
-        const newColl = trove.coll.sub(trove.coll) // zero
-        
-        // Redeemer gets all the collateral regardless of whether trove closes
-        totalCollateral = totalCollateral.add(trove.coll)
-        
-        totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
-        remainingLUSD = remainingLUSD.sub(actualLUSDRedeemed)
-      } else {
-        // Normal redemption: simulate the normalization cycle to determine if trove closes
-        // normDebt = lusdLot * RATE_PRECISION / rate
-        const RATE_PRECISION = toBN('1000000000000000000000000000')
-        let normDebtRedeemed = lusdLot.mul(RATE_PRECISION).div(trove.rate)
-        // Round up if needed (line 295-297)
-        if (normDebtRedeemed.mul(trove.rate).div(RATE_PRECISION).lt(lusdLot)) {
-          normDebtRedeemed = normDebtRedeemed.add(toBN('1'))
-        }
-        const newNormDebt = trove.normDebt.sub(normDebtRedeemed)
-        const newActualDebt = newNormDebt.mul(trove.rate).div(RATE_PRECISION)
-        
-        // Redeemer only gets collateralLot (surplus goes to CollSurplusPool if trove closes)
-        totalCollateral = totalCollateral.add(collateralLot)
-        totalLUSDRedeemed = totalLUSDRedeemed.add(lusdLot)
-        remainingLUSD = remainingLUSD.sub(lusdLot)
+        // Collateral-capped: cap collateralLot to trove.coll and recalculate LUSD (line 278-280)
+        collateralLot = trove.coll
+        actualLUSDRedeemed = trove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
       }
+      
+      // Contract subtracts LUSDLot from remainingLUSD (line 660), NOT the normalized value
+      // LUSDLot is the ORIGINAL lusdLot or the recalculated actualLUSDRedeemed
+      totalCollateral = totalCollateral.add(collateralLot)
+      totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
+      remainingLUSD = remainingLUSD.sub(actualLUSDRedeemed)
     }
     
-    // Check if redeemer's own trove gets redeemed (if not already in the list)
-    if (remainingLUSD.gt(toBN('0')) && !troveOwners.includes(redeemer)) {
-      const redeemerTrove = trovesBeforeMap.get(redeemer)
-      if (redeemerTrove) {
-        const maxRedeemableDebt = redeemerTrove.actualDebt.sub(LUSD_GAS_COMPENSATION)
+    // If there is still LUSD remaining, process the redeemer's trove next using the same on-chain logic
+    if (remainingLUSD.gt(toBN('0'))) {
+      const trove = trovesBeforeMap.get(redeemer)
+      if (trove) {
+        const maxRedeemableDebt = trove.actualDebt.sub(LUSD_GAS_COMPENSATION)
         if (maxRedeemableDebt.gt(toBN('0'))) {
           const lusdLot = remainingLUSD.lt(maxRedeemableDebt) ? remainingLUSD : maxRedeemableDebt
-          const collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
-          
-          if (collateralLot.gt(redeemerTrove.coll)) {
-            // Collateral-capped: redeemer gets all collateral
-            const actualLUSDRedeemed = redeemerTrove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
-            totalCollateral = totalCollateral.add(redeemerTrove.coll)
-            totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
-          } else {
-            // Redeemer only gets collateralLot regardless of whether trove closes
-            totalCollateral = totalCollateral.add(collateralLot)
-            totalLUSDRedeemed = totalLUSDRedeemed.add(lusdLot)
+          let collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
+          let actualLUSDRedeemed = lusdLot
+          if (collateralLot.gt(trove.coll)) {
+            collateralLot = trove.coll
+            actualLUSDRedeemed = trove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
           }
+          totalCollateral = totalCollateral.add(collateralLot)
+          totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
+          remainingLUSD = remainingLUSD.sub(actualLUSDRedeemed)
         }
       }
     }
+        
+    // console.log(`\nHelper summary:`)
+    // console.log(`  Total collateral to redeemer: ${totalCollateral.toString()} (${totalCollateral.div(toBN('1000000000000000000')).toString()} ETH)`)
+    // console.log(`  Total LUSD redeemed: ${totalLUSDRedeemed.toString()} (${totalLUSDRedeemed.div(toBN('1000000000000000000')).toString()} LUSD)`)
+    // console.log(`  Redemption amount requested: ${redemptionAmount.toString()} (${redemptionAmount.div(toBN('1000000000000000000')).toString()} LUSD)`)
     
     return {
       expectedLUSDRedeemed: totalLUSDRedeemed,
@@ -3461,7 +3440,8 @@ contract('TroveManager - Shutdown', async accounts => {
     const carol_trove_before = await troveManager.Troves(carol)
     const dennis_trove_before = await troveManager.Troves(dennis)
     const aliceCollBefore = await collateralToken.balanceOf(alice)
-
+    // calculate expected collateral received
+    const {expectedLUSDRedeemed, expectedCollateralReceived} = await calculateExpectedShutdownRedemption([alice, bob, carol, dennis], alice, alice_redemptionAmount)
     // alice redeems her balance
     // Don't pay for gas, as it makes it easier to calculate the received Ether
     const redemptionTx = await troveManager.redeemCollateralForShutdown(
@@ -3519,6 +3499,8 @@ contract('TroveManager - Shutdown', async accounts => {
     // assert the collateral delta is equal to the expected collateral delta
     // expectedDelta = (LUSDAmount * par * 1e18) / ((1e18 - discount) * price)
     const expectedDelta = alice_redemptionAmount.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(priceAfterRedemption))
+    console.log("expectedDelta", expectedDelta.toString())
+    console.log("aliceCollAfter.sub(aliceCollBefore)", aliceCollAfter.sub(aliceCollBefore).toString())
     assert.isAtMost(th.getDifference(aliceCollAfter.sub(aliceCollBefore), expectedDelta), 100
   )
 
@@ -4059,12 +4041,10 @@ contract('TroveManager - Shutdown', async accounts => {
     
     const flynCollateralBefore = await collateralToken.balanceOf(flyn)
 
-    // Calculate expected redemption values
-    // ICR order: Alice/Bob/Carol (290%), Dennis/Erin (300%), Whale (10000%), Flyn (20000%)
-    // Redemption drains alice, bob, carol, dennis, erin, whale fully, then partially redeems from flyn
-    const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [alice, bob, carol, dennis, erin, whale, flyn], // troves in redemption order (lowest ICR first)
-      flyn, // redeemer
+    // Use shared helper to compute expected values during shutdown
+    const { expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
+      [alice, bob, carol, dennis, erin, whale],
+      flyn,
       redemptionAmount
     )
 
@@ -4093,10 +4073,9 @@ contract('TroveManager - Shutdown', async accounts => {
     assert.equal(erin_Coll.toString(), '0')      // collateral drained
 
     // Check Flyn received the correct amount of collateral
-   // todo high tolerance
     const flynCollateralAfter = await collateralToken.balanceOf(flyn)
     const receivedCollateral = flynCollateralAfter.sub(flynCollateralBefore)
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 1e16)
+    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 5e15)
   })
 
   it('redeemCollateralForShutdown(): tcr shutdown, ends the redemption sequence when max iterations have been reached', async () => {
@@ -6660,14 +6639,11 @@ contract('TroveManager - Shutdown', async accounts => {
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
       await relayer.updatePar()
       const priceAfterShutdown = await tcrShutdown()
-      // get expected redemption values
-      // Redemption order: Carol (250% ICR), Bob (290% ICR), Alice (310% ICR), Dennis (20000% ICR)
-      // During shutdown with price drop, earlier troves may be collateral-capped, requiring redemption from Dennis
-      const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-        [carol, bob, alice, dennis],
-        dennis,
-        denisLusdAmount
-      )
+      
+      // Calculate expected collateral using simple formula (no discount during shutdown)
+      const shutdownPar = toBN(cs.par.toString())
+      const discount = await troveManager.getDiscount()
+      const expectedCollateralReceived = denisLusdAmount.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(priceAfterShutdown))
       const {
         firstRedemptionHint,
         partialRedemptionHintNICR
@@ -6714,9 +6690,8 @@ contract('TroveManager - Shutdown', async accounts => {
       // Check LUSD redeemed matches expectation
       th.assertIsApproximatelyEqual(totalRedeemed, denisLusdAmount, 1e10)
       
-      // Check collateral received matches expectation
-      // Allow for rounding from normalize/denormalize cycles across multiple troves
-      th.assertIsApproximatelyEqual(receivedCollateral, expectedCollateralReceived, 5e15)
+      // Check collateral received matches expectation (tight tolerance for simple redemption)
+      th.assertIsApproximatelyEqual(receivedCollateral, expectedCollateralReceived, 1000)
       
       assert.isTrue(dennisLUSDAfter.lt(dennisLUSDBefore))
     })

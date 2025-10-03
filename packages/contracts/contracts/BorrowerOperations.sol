@@ -65,6 +65,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         uint newColl;
         uint stake;
         bool shielded;
+        bool oracleFailure;
     }
 
     struct LocalVariables_openTrove {
@@ -80,6 +81,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         uint NICR;
         uint stake;
         uint arrayIndex;
+        bool oracleFailure;
     }
 
     struct ContractsCache {
@@ -176,13 +178,9 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.par = relayer.getPar();
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
-        bool oracleFailure;
-        (vars.price, oracleFailure) = priceFeed.fetchPrice();
+        (vars.price, vars.oracleFailure) = priceFeed.fetchPrice();
 
-        if(oracleFailure) {
-            // shutdown should be called by oracle contract
-            return;
-        }
+        require(!vars.oracleFailure, "Oracle failure");
 
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
         _requireAtLeastMinNetDebt(_LUSDAmount);
@@ -327,7 +325,8 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accRate = troveManager.accumulatedRate();
         vars.accShieldRate = troveManager.accumulatedShieldRate();
 
-        (vars.price, ) = priceFeed.fetchPrice();
+        (vars.price, vars.oracleFailure) = priceFeed.fetchPrice();
+        require(!vars.oracleFailure, "Oracle failure");
 
         contractsCache.rewards.applyPendingRewards(_borrower);
 
