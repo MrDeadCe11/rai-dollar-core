@@ -180,7 +180,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accShieldRate = troveManager.accumulatedShieldRate();
         (vars.price, vars.oracleFailure) = priceFeed.fetchPrice();
 
-        require(!vars.oracleFailure, "Oracle failure");
+        require(!vars.oracleFailure, "BO: Oracle failure");
 
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
         _requireAtLeastMinNetDebt(_LUSDAmount);
@@ -326,7 +326,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         vars.accShieldRate = troveManager.accumulatedShieldRate();
 
         (vars.price, vars.oracleFailure) = priceFeed.fetchPrice();
-        require(!vars.oracleFailure, "Oracle failure");
+        require(!vars.oracleFailure, "BO: Oracle failure");
 
         contractsCache.rewards.applyPendingRewards(_borrower);
 
