@@ -272,13 +272,12 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 // calculate collateral with discount
                 singleRedemption.collateralLot = singleRedemption.LUSDLot.mul(_redemptionLocals.par).mul(DECIMAL_PRECISION).div(DECIMAL_PRECISION.sub(discount).mul(_redemptionLocals.price));
                 // if collateral lot is greater than trove collateral, redeem all collateral amount in trove
-                // this check is required because during shutdown, you can redeem below MCR
+                // this check is required because during shutdown, you can redeem when ICR < 100
             if(singleRedemption.collateralLot > t.coll) {
                 // cap collateral at trove
                 singleRedemption.collateralLot = t.coll;
                 //calculate collateral => LUSD with discount
                 singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
-
             }
                
         } else {
@@ -681,10 +680,10 @@ function redeemCollateralForShutdown(
         _contractsCache.aggregator.updateBaseRateFromRedemption(
             _locals.totalRedeemed, _locals.totalLUSDSupplyAtStart
         );
-    }
-        // Fees
+             // Fees
         _requireUserAcceptsFee(_locals.totalCollateralFee, _locals.grossCollateralDrawn, _maxFeePercentage);
-
+        }
+   
         emit Redemption(_LUSDAmount, _locals.totalRedeemed,
                         _locals.totalCollateralDrawn, _locals.totalCollateralFee);
 

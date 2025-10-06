@@ -29,6 +29,17 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
     event RewardsAddressChanged(address _rewardsAddress);
     event RelayerAddressChanged(address _relayerAddress);
 
+    struct ListLocals {
+        uint icrB;
+        uint icrS;
+        uint netLUSDDebt;
+        uint collateralGross;
+        uint projectedRedemptionRate;
+        uint collateralFee;
+        uint collateralNet;
+        bool pickBase;
+        address who;
+    }
     struct HintLocals {
         uint coll;
         uint newColl;
@@ -146,7 +157,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             vars.curSh = sortedShieldedTroves.getPrev(vars.curSh);
         }
         } else {
-            // if shutdown look for first redeemable shielded trove with ICR > 0, MCR is no longer relevant
+            // if shutdown look for first redeemable shielded trove with ICR > 0, MCR/HCR is no longer relevant
             while(vars.curSh != address(0) && troveManager.getCurrentICR(vars.curSh, _price) == 0){
                 vars.curSh = sortedShieldedTroves.getPrev(vars.curSh); // prev => larger ICR
             }
@@ -170,97 +181,12 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         vars.accRateUsed = troveManager.accumulatedRate();
         vars.accShieldRateUsed = troveManager.accumulatedShieldRate();
 
-        // // walk through both lists in total NICR order
-        // while (vars.remainingLUSD > 0 && _maxIterations-- > 0 && (vars.curBase != address(0) || vars.curSh != address(0))) {
-        //     // compute eligible ICRs for current heads
-        //     icrB = type(uint).max;
-        //     icrS = type(uint).max;
-
-        //     // get next redeemable base ICR
-        //     if (vars.curBase != address(0)) {
-        //         uint b = troveManager.getCurrentICR(vars.curBase, _price);
-        //         if (b >= MCR) icrB = b;
-        //     }
-
-        //     // get next redeemable shielded ICR
-        //     if (vars.curSh != address(0)) {
-        //         uint s = troveManager.getCurrentICR(vars.curSh, _price);
-        //         if (s >= MCR && s < HCR) icrS = s;
-        //     }
-
-        //     // if no redeemable, stop
-        //     if (icrB == type(uint).max && icrS == type(uint).max) { break; }
-
-        //     // pick lowest ICR of both lists for next trove
-        //     bool pickBase = (icrB <= icrS);
-        //     address who = pickBase ? vars.curBase : vars.curSh;
-
-        //     // add pending rewards to get total actual net debt
-        //     uint netLUSDDebt = _getNetDebt(troveManager.getTroveActualDebt(who))
-        //         .add(troveManager.getPendingActualLUSDDebtReward(who));
-
-        //     // TODO; make the rounding here match TM
-        //     if (netLUSDDebt > vars.remainingLUSD) {
-        //         // this is the partial trove (if any)
-        //         if (netLUSDDebt > MIN_NET_DEBT) {
-        //             vars.maxRedeemableLUSD = LiquityMath._min(vars.remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
-
-        //             vars.coll = troveManager.getTroveColl(who)
-        //                 .add(rewards.getPendingCollateralReward(who));
-
-        //             // Compute gross collateral equivalent for this redemption lot
-        //             uint collateralGross = vars.maxRedeemableLUSD.mul(vars.parUsed).div(_price);
-        //             // Apply redemption fee so that the fee remains in the trove, matching TroveManager logic
-        //             uint projectedRedemptionRate = aggregator.calcRateForRedemption(_LUSDamount, vars.totalLUSDSupplyAtStart);
-        //             // Cap at 100%
-        //             projectedRedemptionRate = LiquityMath._min(projectedRedemptionRate, DECIMAL_PRECISION);
-                    
-        //             uint collateralFee = projectedRedemptionRate.mul(collateralGross).div(DECIMAL_PRECISION);
-        //             uint collateralNet = collateralGross.sub(collateralFee);
-
-        //             vars.newColl = vars.coll.sub(collateralNet);
-        //             vars.newDebt = netLUSDDebt.sub(vars.maxRedeemableLUSD);
-        //             vars.compositeDebt = _getCompositeDebt(vars.newDebt);
-
-        //             // pick the right accumulator for this trove’s class
-        //             bool isSh = troveManager.shielded(who);
-        //             vars.nCompositeDebt = isSh
-        //                 ? _normalizedDebt(vars.compositeDebt, vars.accShieldRateUsed)
-        //                 : _normalizedDebt(vars.compositeDebt, vars.accRateUsed);
-
-        //             partialRedemptionHintNICR = LiquityMath._computeNominalCR(vars.newColl, vars.nCompositeDebt);
-
-        //             vars.remainingLUSD = vars.remainingLUSD.sub(vars.maxRedeemableLUSD);
-        //         }
-        //         break; // done: either we consumed all or we found partial and exit
-        //     } else {
-        //         // full redemption of this trove
-        //         vars.remainingLUSD = vars.remainingLUSD.sub(netLUSDDebt);
-
-        //         // advance only the chosen list
-        //         if (pickBase) {
-        //             vars.curBase = sortedTroves.getPrev(who);
-        //         } else {
-        //             vars.curSh   = sortedShieldedTroves.getPrev(who);
-        //         }
-        //     }
-        // }
-
         (vars, partialRedemptionHintNICR) = _walkThroughBothLists(vars, _maxIterations, _LUSDamount, icrB, icrS, _price, isShutdown);
 
         truncatedLUSDamount = _LUSDamount.sub(vars.remainingLUSD);
     }
-    struct ListLocals {
-        uint icrB;
-        uint icrS;
-        uint netLUSDDebt;
-        uint collateralGross;
-        uint projectedRedemptionRate;
-        uint collateralFee;
-        uint collateralNet;
-        bool pickBase;
-        address who;
-    }
+
+
     function _walkThroughBothLists( HintLocals memory vars, uint256 _maxIterations, uint256 _LUSDamount, uint256 icrB, uint256 icrS, uint _price, bool isShutdown) internal view returns (HintLocals memory _vars, uint partialRedemptionHintNICR) {
         ListLocals memory listLocals;
         // walk through both lists in total NICR order
