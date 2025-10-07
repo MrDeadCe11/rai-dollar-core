@@ -204,7 +204,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             // get next redeemable shielded ICR
             if (vars.curSh != address(0)) {
                 uint s = troveManager.getCurrentICR(vars.curSh, _price);
-                if (s >= MCR && s < HCR) icrS = s;
+                if (s >= MCR && s < HCR) listLocals.icrS = s;
             }
 
             // if no redeemable, stop
