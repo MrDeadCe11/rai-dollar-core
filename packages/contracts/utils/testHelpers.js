@@ -1802,23 +1802,23 @@ static computeShutdownRedemptionForTrove(totalLUSD, troves, par, price, discount
     return tx
   }
 
-  static async redeemCollateralForShutdown(redeemer, contracts, LUSDAmount, gasPrice = 0, maxFee = this._100pct) {
+  static async redeemCollateralForShutdown(redeemer, contracts, LUSDAmount, gasPrice = 0) {
     const price = await contracts.priceFeedTestnet.getPrice()
-    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee, gasPrice)
+    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, gasPrice)
     const gas = await this.gasUsed(tx)
     return gas
   }
 
-  static async redeemCollateralForShutdownAndGetTxObject(redeemer, contracts, LUSDAmount, gasPrice, maxFee = this._100pct) {
+  static async redeemCollateralForShutdownAndGetTxObject(redeemer, contracts, LUSDAmount, gasPrice) {
     if (gasPrice == undefined){
       gasPrice = 0;
     }
     const price = await contracts.priceFeedTestnet.getPrice()
-    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee, gasPrice)
+    const tx = await this.performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, gasPrice)
     return tx
   }
 
-  static async performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, maxFee = 0, gasPrice_toUse = 0) {
+  static async performRedemptionForShutdownTx(redeemer, price, contracts, LUSDAmount, gasPrice_toUse = 0) {
     const {
       firstRedemptionHint,
       partialRedemptionHintNICR
@@ -1843,7 +1843,7 @@ static computeShutdownRedemptionForTrove(totalLUSD, troves, par, price, discount
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, maxFee,
+      0,
       { from: redeemer, gasPrice: gasPrice_toUse}
     )
 

@@ -94,8 +94,7 @@ interface ITroveManager is ILiquityBase {
         address _upperShieldedPartialRedemptionHint,
         address _lowerShieldedPartialRedemptionHint,
         uint _partialRedemptionHintNICR,
-        uint _maxIterations,
-        uint _maxFeePercentage
+        uint _maxIterations
     ) external;
 
     function updateStakeAndTotalStakes(address _borrower) external returns (uint);

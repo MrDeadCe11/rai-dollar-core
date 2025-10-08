@@ -277,7 +277,11 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
                 // cap collateral at trove
                 singleRedemption.collateralLot = t.coll;
                 //calculate collateral => LUSD with discount
-                singleRedemption.LUSDLot = singleRedemption.collateralLot.mul(_redemptionLocals.price).div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
+
+                singleRedemption.LUSDLot = singleRedemption.collateralLot
+                    .mul(DECIMAL_PRECISION.sub(discount))
+                    .mul(_redemptionLocals.price)
+                    .div((_redemptionLocals.par).mul(DECIMAL_PRECISION));
             }
                
         } else {
@@ -472,7 +476,7 @@ contract TroveManager is LiquityBase, Ownable, CheckContract, ITroveManager, ITr
         external
         override
     {
-        require(!_isShutdown(), "TM: shutdown");
+        require(!_isShutdown(), "TM:shutdown");
         RedemptionHints memory redemptionHints = RedemptionHints(
         _upperPartialRedemptionHint,
         _lowerPartialRedemptionHint,
@@ -513,16 +517,15 @@ function redeemCollateralForShutdown(
         address _upperShieldedPartialRedemptionHint,
         address _lowerShieldedPartialRedemptionHint,
         uint _partialRedemptionHintNICR,
-        uint _maxIterations,
-        uint _maxFeePercentage
+        uint _maxIterations
     ) external override {
-        require(_isShutdown(), "TM: not shutdown");
+        require(_isShutdown(), "TM:not shutdown");
 
         (ContractsStorage memory contractsCache,
         RedemptionTotals memory totals,
         RedemptionLocals memory locals
         ) = 
-          _initializeRedemption(_LUSDamount, _firstRedemptionHint, _maxIterations, _maxFeePercentage);
+          _initializeRedemption(_LUSDamount, _firstRedemptionHint, _maxIterations, 0);
 
         RedemptionHints memory redemptionHints = RedemptionHints(
         _upperPartialRedemptionHint,
@@ -539,7 +542,7 @@ function redeemCollateralForShutdown(
             redemptionHints,
             _maxIterations);
 
-        _finalizeRedemption(locals, totals, _LUSDamount, _maxFeePercentage);
+        _finalizeRedemption(locals, totals, _LUSDamount, 0);
 
     }
 
@@ -566,10 +569,10 @@ function redeemCollateralForShutdown(
 
         // _requireTCRoverMCR(locals.price);
         if(!locals.shutdown) {
-        require(_getTCR(locals.price) >= MCR, "TM: TCR < MCR");
+        require(_getTCR(locals.price) >= MCR, "TM:TCR < MCR");
         }
 
-        require(_LUSDamount > 0, "TM: must be gt than zero");
+        require(_LUSDamount > 0, "TM:req gt than zero");
 
         // _requireLUSDBalanceCoversRedemption(contractsCache.lusdToken, msg.sender, _LUSDamount);
         require(contractsCache.lusdToken.balanceOf(msg.sender) >= _LUSDamount, "TM: must be <= user's balance");
@@ -834,7 +837,7 @@ function redeemCollateralForShutdown(
         // _requireMoreThanOneTroveInSystem();
         uint total = _contractsCache.sortedTroves.getSize() + _contractsCache.sortedShieldedTroves.getSize();
         if(!_isShutdown()) {
-        require(total > 1, "Only one trove");
+        require(total > 1, "one trove");
         }
         Trove storage t = ts.Troves[_borrower];
 
@@ -1076,7 +1079,7 @@ function redeemCollateralForShutdown(
          _contractsCache.feeRouter.allocateFees(newInterest);
     }
     function getDiscount() external view returns (uint) {
-        require(_isShutdown(), "TM: Not shutdown");
+        require(_isShutdown(), "TM:Not shutdown");
         return _calcDiscount();
     }
     function _calcDiscount() internal view returns (uint) {
@@ -1131,13 +1134,13 @@ function redeemCollateralForShutdown(
     // --- 'require' wrapper functions ---
 
     function _requireCallerIsBorrowerOperations() internal view {
-        require(msg.sender == getContractsStorage().borrowerOperationsAddress, "TM: Caller is not BO");
+        require(msg.sender == getContractsStorage().borrowerOperationsAddress, "TM: not BO");
     }
 
     function _requireCallerIsBorrowerOperationsOrRewards() internal view {
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
         require(msg.sender == contractsCache.borrowerOperationsAddress || msg.sender == address(contractsCache.rewards),
-        "TroveManager: not BO or Rewards");
+        "TroveManager:not BO or rewards");
     }
 
     /** removed to reduce contract size

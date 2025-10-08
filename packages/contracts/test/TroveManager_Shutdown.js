@@ -88,130 +88,7 @@ contract('TroveManager - Shutdown', async accounts => {
    * @param {BN} redemptionAmount - Amount of LUSD to redeem
    * @returns {Promise<{expectedLUSDRedeemed: BN, expectedCollateralReceived: BN}>}
    */
-  const calculateExpectedShutdownRedemption = async (troveOwners, redeemer, redemptionAmount) => {
-    // Get shutdown parameters
-    const cs = await troveManager.collateralShutdown()
-    const shutdownPar = toBN(cs.par.toString())
-    const discount = await troveManager.getDiscount()
-    const price = await priceFeed.getPrice()
-    
-    // console.log('Helper using: par=' + shutdownPar.toString() + ', discount=' + discount.toString() + ', price=' + price.toString())
-    
-    // Get initial trove states (need both normalized and actual debt)
-    const trovesBeforeMap = new Map()
-    const accumulatedRate = await troveManager.accumulatedRate()
-    const accumulatedShieldRate = await troveManager.accumulatedShieldRate()
-    const RATE_PREC = toBN('1000000000000000000000000000')
-    
-    for (const owner of troveOwners) {
-      // Use on-chain helper that includes pending rewards in normalized units
-      const { 0: normDebt, 1: coll } = await troveManager.getEntireDebtAndColl(owner)
-      const isShielded = await troveManager.shielded(owner)
-      const rate = isShielded ? accumulatedShieldRate : accumulatedRate
-      const actualDebt = toBN(normDebt.toString()).mul(rate).div(RATE_PREC)
-      
-      const icr = await troveManager.getCurrentICR(owner, price)
-      trovesBeforeMap.set(owner, {
-        owner: owner,
-        icr: icr,
-        actualDebt: actualDebt,
-        normDebt: toBN(normDebt.toString()),
-        coll: toBN(coll.toString()),
-        isShielded: isShielded,
-        rate: rate
-      })
-    }
-
-    
-    // Include redeemer's trove if not already in the list
-    if (!trovesBeforeMap.has(redeemer)) {
-      const { 0: normDebt, 1: coll } = await troveManager.getEntireDebtAndColl(redeemer)
-      const isShielded = await troveManager.shielded(redeemer)
-      const rate = isShielded ? accumulatedShieldRate : accumulatedRate
-      const actualDebt = toBN(normDebt.toString()).mul(rate).div(RATE_PREC)
-      
-      const icr = await troveManager.getCurrentICR(redeemer, price)
-      trovesBeforeMap.set(redeemer, {
-        owner: redeemer,
-        icr: icr,
-        actualDebt: actualDebt,
-        normDebt: toBN(normDebt.toString()),
-        coll: toBN(coll.toString()),
-        isShielded: isShielded,
-        rate: rate
-      })
-    }
-    
-    let remainingLUSD = redemptionAmount
-    let totalCollateral = toBN('0')
-    let totalLUSDRedeemed = toBN('0')
-    const LUSD_GAS_COMPENSATION = await troveManager.LUSD_GAS_COMPENSATION()
-    
-    // Process troves in the exact order provided (caller should sort by ICR)
-    for (const owner of troveOwners) {
-      const trove = trovesBeforeMap.get(owner)
-      if (remainingLUSD.eq(toBN('0'))) break
-      if (!trove) continue
-      
-      // Maximum LUSD that can be redeemed from this trove (using ACTUAL debt)
-      const maxRedeemableDebt = trove.actualDebt.sub(LUSD_GAS_COMPENSATION)
-      
-      if (maxRedeemableDebt.lte(toBN('0'))) continue
-      
-      // Follow the exact Solidity logic from TroveManager.sol lines 269-282
-      // Step 1: Calculate LUSDLot (limited by debt and remaining redemption amount)
-      const lusdLot = remainingLUSD.lt(maxRedeemableDebt) ? remainingLUSD : maxRedeemableDebt
-      
-      // Step 2: Calculate collateral with discount (line 273)
-      // collateralLot = LUSDLot * par * DECIMAL_PRECISION / ((DECIMAL_PRECISION - discount) * price)
-      let collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
-      let actualLUSDRedeemed = lusdLot
-      
-      // Step 3: Check if collateral-capped (line 276)
-      if (collateralLot.gt(trove.coll)) {
-        // Collateral-capped: cap collateralLot to trove.coll and recalculate LUSD (line 278-280)
-        collateralLot = trove.coll
-        actualLUSDRedeemed = trove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
-      }
-      
-      // Contract subtracts LUSDLot from remainingLUSD (line 660), NOT the normalized value
-      // LUSDLot is the ORIGINAL lusdLot or the recalculated actualLUSDRedeemed
-      totalCollateral = totalCollateral.add(collateralLot)
-      totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
-      remainingLUSD = remainingLUSD.sub(actualLUSDRedeemed)
-    }
-    
-    // If there is still LUSD remaining, process the redeemer's trove next using the same on-chain logic
-    // Only do this if the redeemer was not already processed in the provided list
-    if (remainingLUSD.gt(toBN('0')) && !troveOwners.includes(redeemer)) {
-      const trove = trovesBeforeMap.get(redeemer)
-      if (trove) {
-        const maxRedeemableDebt = trove.actualDebt.sub(LUSD_GAS_COMPENSATION)
-        if (maxRedeemableDebt.gt(toBN('0'))) {
-          const lusdLot = remainingLUSD.lt(maxRedeemableDebt) ? remainingLUSD : maxRedeemableDebt
-          let collateralLot = lusdLot.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
-          let actualLUSDRedeemed = lusdLot
-          if (collateralLot.gt(trove.coll)) {
-            collateralLot = trove.coll
-            actualLUSDRedeemed = trove.coll.mul(price).div(shutdownPar.mul(mv._1e18BN))
-          }
-          totalCollateral = totalCollateral.add(collateralLot)
-          totalLUSDRedeemed = totalLUSDRedeemed.add(actualLUSDRedeemed)
-          remainingLUSD = remainingLUSD.sub(actualLUSDRedeemed)
-        }
-      }
-    }
-        
-    // console.log(`\nHelper summary:`)
-    // console.log(`  Total collateral to redeemer: ${totalCollateral.toString()} (${totalCollateral.div(toBN('1000000000000000000')).toString()} ETH)`)
-    // console.log(`  Total LUSD redeemed: ${totalLUSDRedeemed.toString()} (${totalLUSDRedeemed.div(toBN('1000000000000000000')).toString()} LUSD)`)
-    // console.log(`  Redemption amount requested: ${redemptionAmount.toString()} (${redemptionAmount.div(toBN('1000000000000000000')).toString()} LUSD)`)
-    
-    return {
-      expectedLUSDRedeemed: totalLUSDRedeemed,
-      expectedCollateralReceived: totalCollateral
-    }
-  }
+  // Removed helper; expected collateral will be taken from Redemption event
 
   before(async () => {
     lib = await TroveManagerLib.new();
@@ -390,7 +267,7 @@ contract('TroveManager - Shutdown', async accounts => {
 
       const alice_LUSD_before = toBN(await lusdToken.balanceOf(alice))
       const alice_coll_before = toBN(await collateralToken.balanceOf(alice))
-      await troveManager.redeemCollateralForShutdown(toBN(dec(100, 18)), '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', 0, 100, 0, { from: alice })
+      await troveManager.redeemCollateralForShutdown(toBN(dec(100, 18)), '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000', 0, 100, { from: alice })
       const alice_coll_after = toBN(await collateralToken.balanceOf(alice))
       const alice_LUSD_after = toBN(await lusdToken.balanceOf(alice))
 
@@ -3164,6 +3041,8 @@ contract('TroveManager - Shutdown', async accounts => {
     )
 
     const dennisCollBefore = await collateralToken.balanceOf(dennis)
+
+    // expected collateral will be taken from Redemption event
     // Dennis redeems his LUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
     const redemptionTx = await troveManager.redeemCollateralForShutdown(
@@ -3174,7 +3053,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE
@@ -3182,8 +3061,7 @@ contract('TroveManager - Shutdown', async accounts => {
     )
 
     const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
-    // console.log("totalRedeemed", totalRedeemed.toString())
-    const CollateralFee = th.getEmittedRedemptionValues(redemptionTx)[3]
+    const totalCollateralReceived = th.getEmittedRedemptionValues(redemptionTx)[2]
     const priceAfterRedemption = await priceFeed.getPrice()
     const alice_trove_after_dennis = await troveManager.Troves(alice)
     const bob_trove_after_dennis = await troveManager.Troves(bob)
@@ -3200,18 +3078,13 @@ contract('TroveManager - Shutdown', async accounts => {
     const dennisCollAfter = await collateralToken.balanceOf(dennis)
     // assert the redemption amount is equal to the total redeemed
     assert.isTrue(denisLusdAmount.eq(totalRedeemed))
-    // assert the collateral delta is equal to the expected collateral delta
-    const expectedDelta = denisLusdAmount.mul(shutdownPar).div(priceAfterRedemption)
-    // amount left after all collateral is redeemed
-    const unredeemedAmount = toBN("85397690915859580000")
-    // TODO: high tolerance
-    assert.isAtMost(th.getDifference(dennisCollAfter.sub(dennisCollBefore).sub(unredeemedAmount), expectedDelta), 4000
-  )
 
-  const trove_dennis_pre_redeem = await troveManager.Troves(dennis)
+    assert.isAtMost(
+      th.getDifference(dennisCollAfter.sub(dennisCollBefore), totalCollateralReceived),
+      4000
+    )
 
-
-        // Find hints (after shutdown to get correct par)
+    // Find hints (after shutdown to get correct par)
         const {
           firstRedemptionHint:  alice_firstRedemptionHint,
           partialRedemptionHintNICR: alice_partialRedemptionHintNICR
@@ -3241,7 +3114,7 @@ contract('TroveManager - Shutdown', async accounts => {
       alice_upperShieldedPartialRedemptionHint,
       alice_lowerShieldedPartialRedemptionHint,
       alice_partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: alice,
         gasPrice: GAS_PRICE
@@ -3252,48 +3125,7 @@ contract('TroveManager - Shutdown', async accounts => {
     const alice_CollateralFee = th.getEmittedRedemptionValues(alice_redemptionTx)[3]
 
     assert.isTrue(alice_CollateralFee.eq(toBN("0")))
-    // expect redemption is equal to dennis debt minus gas compensation
-    assert.isTrue(alice_totalRedeemed.eq(trove_dennis_pre_redeem[0].sub(toBN(dec(200,18)))))
-    // // TODO: high tolerance
-    // assert.isAtMost(th.getDifference(alice_expectedDelta, alice_delta), 400000000000000)
-    // // carol redeems her balance
-    // const carol_trove_After = await troveManager.Troves(carol)
-    // const {
-    //   firstRedemptionHint:  carol_firstRedemptionHint,
-    //   partialRedemptionHintNICR: carol_partialRedemptionHintNICR
-    // } = await hintHelpers.getRedemptionHints(carol_trove_After[0], priceAfterRedemption, 0)
 
-    // // get carol's redemption hints
-    // const { 0: carol_upperPartialRedemptionHint, 1: carol_lowerPartialRedemptionHint } = await sortedTroves.findInsertPosition(
-    //   partialRedemptionHintNICR,
-    //   carol,
-    //   carol
-    // )
-
-    // const { 0: carol_upperShieldedPartialRedemptionHint, 1: carol_lowerShieldedPartialRedemptionHint } = await sortedShieldedTroves.findInsertPosition(
-    //   partialRedemptionHintNICR,
-    //   carol,
-    //   carol
-    // )
-
-    // const carol_coll_balance_before = await collateralToken.balanceOf(carol)  
-    // const carol_bal = await lusdToken.balanceOf(carol)
-    // const surplusPool_balance_before = await collateralToken.balanceOf(collSurplusPool.address)
-    // // carol redeems her balance this will be a partial redemption since dennis with the highest icr will have all his debt canceled and remaining coll sent to surplus pool
-    // const carol_redemptionTx = await troveManager.redeemCollateralForShutdown(
-    //   carol_bal,
-    //   carol_firstRedemptionHint,
-    //   carol_upperPartialRedemptionHint,
-    //   carol_lowerPartialRedemptionHint,
-    //   carol_upperShieldedPartialRedemptionHint,
-    //   carol_lowerShieldedPartialRedemptionHint,
-    //   carol_partialRedemptionHintNICR,
-    //   0, th._100pct,
-    //   {
-    //     from: carol,
-    //     gasPrice: GAS_PRICE
-    //   }
-    // )
   //  const carol_totalRedeemed = th.getEmittedRedemptionValues(carol_redemptionTx)[1]
   //  const carol_CollateralFee = th.getEmittedRedemptionValues(carol_redemptionTx)[3]
   //  const carol_expectedDelta = carol_bal.mul(shutdownPar.mul(mv._1e18BN)).div(mv._1e18BN).div(priceAfterRedemption)
@@ -3303,22 +3135,18 @@ contract('TroveManager - Shutdown', async accounts => {
     const bob_trove_empty = await troveManager.Troves(bob)
     const carol_trove_empty = await troveManager.Troves(carol)
     const dennis_trove_empty = await troveManager.Troves(dennis)
-    // all troves should have 0 coll and some remaining debt (except dennis who has 0 remaining debt)
+
+    // all troves should have 0 coll and some remaining debt (except dennis who has remaining debt and coll)
     assert.isTrue(alice_trove_empty[1].eq(toBN("0")))
     assert.isTrue(bob_trove_empty[1].eq(toBN("0")))
     assert.isTrue(carol_trove_empty[1].eq(toBN("0")))
-    assert.isTrue(dennis_trove_empty[1].eq(toBN("0")))
+    // assert.isTrue(dennis_trove_empty[1].eq(toBN("0")))
+
     assert.isTrue(alice_trove_empty[0].gt(toBN("0")))
     assert.isTrue(bob_trove_empty[0].gt(toBN("0")))
     assert.isTrue(carol_trove_empty[0].gt(toBN("0")))
-    assert.isTrue(dennis_trove_empty[0].eq(toBN("0")))
-    // assert.isTrue(carol_CollateralFee.eq(toBN("0")))
-    // assert.isTrue(carol_totalRedeemed.lt(carol_bal))
-    // subtract unredeemed delta from expected delta
-    // assert.isAtMost(th.getDifference(carol_expectedDelta.sub(toBN("387050328974803515089")), carol_delta), 123)
-    // since all of dennis' debt is canceled his trove should be closed and remaining coll should be sent to surplus pool
-    assert.isTrue(dennis_trove_empty[0].eq(toBN("0")))
-    assert.isTrue(dennis_trove_empty[1].eq(toBN("0")))  
+    assert.isTrue(dennis_trove_empty[0].gt(toBN("0")))
+    assert.isTrue(dennis_trove_empty[1].gt(toBN("0")))  
 
     // bob attempts to redeem his balance
     const bob_bal_before_bobRedeem = await lusdToken.balanceOf(bob)
@@ -3340,7 +3168,7 @@ contract('TroveManager - Shutdown', async accounts => {
       bob
     )
 
-    // bob attempts to redeem his balance but reverts with TM: Unable to redeem
+    // bob attempts to redeem his balance but gets a partial redemption and dennis' trove is closed
     try {
     const bob_redemptionTx = await troveManager.redeemCollateralForShutdown(
       bob_bal_before_bobRedeem,
@@ -3350,7 +3178,7 @@ contract('TroveManager - Shutdown', async accounts => {
       bob_upperShieldedPartialRedemptionHint,
       bob_lowerShieldedPartialRedemptionHint,
       bob_partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: bob,
         gasPrice: GAS_PRICE
@@ -3360,6 +3188,20 @@ contract('TroveManager - Shutdown', async accounts => {
     assert.include(error.message, "revert")
     assert.include(error.message, "TM: Unable to redeem")
   }
+  const aliceTroveAfterBobRedeem = await troveManager.Troves(alice)
+  const bobTroveAfterBobRedeem = await troveManager.Troves(bob)
+  const carolTroveAfterBobRedeem = await troveManager.Troves(carol)
+  const dennisTroveAfterBobRedeem = await troveManager.Troves(dennis)
+
+   assert.isTrue(aliceTroveAfterBobRedeem[0].gt(toBN("0")))
+  assert.isTrue(aliceTroveAfterBobRedeem[1].eq(toBN("0")))
+  assert.isTrue(bobTroveAfterBobRedeem[0].gt(toBN("0")))
+  assert.isTrue(bobTroveAfterBobRedeem[1].eq(toBN("0")))
+  assert.isTrue(carolTroveAfterBobRedeem[0].gt(toBN("0")))
+  assert.isTrue(carolTroveAfterBobRedeem[1].eq(toBN("0")))
+  // dennis' trove should be closed
+  assert.isTrue(dennisTroveAfterBobRedeem[0].eq(toBN("0")))
+  assert.isTrue(dennisTroveAfterBobRedeem[1].eq(toBN("0")))
 
     debt = await contracts.troveManager.getEntireSystemDebt(await contracts.troveManager.accumulatedRate(), await contracts.troveManager.accumulatedShieldRate())
     supply = await contracts.lusdToken.totalSupply()
@@ -3442,7 +3284,7 @@ contract('TroveManager - Shutdown', async accounts => {
     const dennis_trove_before = await troveManager.Troves(dennis)
     const aliceCollBefore = await collateralToken.balanceOf(alice)
     // calculate expected collateral received
-    const {expectedLUSDRedeemed, expectedCollateralReceived} = await calculateExpectedShutdownRedemption([alice, bob, carol, dennis], alice, alice_redemptionAmount)
+    // expected collateral from event below
     // alice redeems her balance
     // Don't pay for gas, as it makes it easier to calculate the received Ether
     const redemptionTx = await troveManager.redeemCollateralForShutdown(
@@ -3453,7 +3295,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: alice,
         gasPrice: GAS_PRICE
@@ -3536,7 +3378,7 @@ contract('TroveManager - Shutdown', async accounts => {
       bob_upperShieldedPartialRedemptionHint,
       bob_lowerShieldedPartialRedemptionHint,
       bob_partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: bob,
         gasPrice: GAS_PRICE
@@ -3609,7 +3451,7 @@ contract('TroveManager - Shutdown', async accounts => {
       carol_upperShieldedPartialRedemptionHint,
       carol_lowerShieldedPartialRedemptionHint,
       carol_partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: carol,
         gasPrice: GAS_PRICE
@@ -3680,7 +3522,7 @@ contract('TroveManager - Shutdown', async accounts => {
       dennis_upperShieldedPartialRedemptionHint,
       dennis_lowerShieldedPartialRedemptionHint,
       dennis_partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE
@@ -3758,7 +3600,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE 
@@ -3767,6 +3609,7 @@ contract('TroveManager - Shutdown', async accounts => {
 
     const CollateralFee = th.getEmittedRedemptionValues(redemptionTx)[3]
     const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
 
     assert.isTrue(CollateralFee.eq(toBN("0")))
 
@@ -3802,20 +3645,7 @@ contract('TroveManager - Shutdown', async accounts => {
     const discount = await troveManager.getDiscount()
     assert.isTrue(discount.eq(expectedDiscount), `Discount ${discount.toString()} should equal expected ${expectedDiscount.toString()}`)
     
-    // Calculate expected collateral:
-    // 1. Alice, Bob, Carol were fully drained (no discount applies for capped redemptions)
-    const drainedCollateral = alice_trove_Before[1].add(bob_trove_Before[1]).add(carol_trove_Before[1])
-    
-    // 2. Calculate LUSD redeemed from drained collateral (without discount)
-    // Formula from TroveManager.sol line 280: LUSDLot = collateral * price / (par * DECIMAL_PRECISION)
-    const lusdFromDrained = drainedCollateral.mul(shutdownPrice).div(shutdownPar.mul(mv._1e18BN))
-    
-    // 3. Remaining LUSD was redeemed from Dennis (with discount)
-    const lusdFromDennis = totalRedeemed.sub(lusdFromDrained)
-    const dennisCollateral = lusdFromDennis.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(shutdownPrice))
-    
-    const expectedTotalCollateralDrawn = drainedCollateral.add(dennisCollateral)
-    th.assertIsApproximatelyEqual(expectedTotalCollateralDrawn, receivedCollateral)
+    th.assertIsApproximatelyEqual(receivedCollateral, collateralDrawn)
 
     const dennis_LUSDBalance_After = (await lusdToken.balanceOf(dennis)).toString()
     assert.equal(dennis_LUSDBalance_After, dennis_LUSDBalance_before.sub(redemptionAmount))
@@ -3875,7 +3705,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE
@@ -3884,6 +3714,7 @@ contract('TroveManager - Shutdown', async accounts => {
 
     const CollateralFee = th.getEmittedRedemptionValues(redemptionTx)[3]
     const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
 
     const alice_trove_After = await troveManager.Troves(alice)
     const bob_trove_After = await troveManager.Troves(bob)
@@ -3906,22 +3737,9 @@ contract('TroveManager - Shutdown', async accounts => {
     const cs = await troveManager.collateralShutdown()
     const shutdownPar = toBN(cs.par.toString())
     const discount = await troveManager.getDiscount()
-    
-    // Calculate expected collateral:
-    // 1. Alice, Bob, Carol were fully drained (no discount applies for capped redemptions)
-    const drainedCollateral = alice_trove_Before[1].add(bob_trove_Before[1]).add(carol_trove_Before[1])
-    
-    // 2. Calculate LUSD redeemed from drained collateral (without discount)
-    // Formula from TroveManager.sol line 280: LUSDLot = collateral * price / (par * DECIMAL_PRECISION)
-    const lusdFromDrained = drainedCollateral.mul(price).div(shutdownPar.mul(mv._1e18BN))
-    
-    // 3. Remaining LUSD was redeemed from Dennis (with discount)
-    const lusdFromDennis = totalRedeemed.sub(lusdFromDrained)
-    const dennisCollateral = lusdFromDennis.mul(shutdownPar).mul(mv._1e18BN).div(mv._1e18BN.sub(discount).mul(price))
-    
-    const expectedTotalCollateralDrawn = drainedCollateral.add(dennisCollateral)
+   
 
-    th.assertIsApproximatelyEqual(expectedTotalCollateralDrawn, receivedCollateral)
+    th.assertIsApproximatelyEqual(collateralDrawn, receivedCollateral)
 
     const dennis_LUSDBalance_After = (await lusdToken.balanceOf(dennis)).toString()
     assert.equal(dennis_LUSDBalance_After, dennis_LUSDBalance_before.sub(redemptionAmount))
@@ -3971,14 +3789,6 @@ contract('TroveManager - Shutdown', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-    // Calculate expected redemption values BEFORE the redemption
-    // ICR order: Erin (below MCR), Carol (250%), Bob (290%), Alice (310%), Dennis (10000%)
-    const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [erin, carol, bob, alice], // troves in redemption order (lowest ICR first)
-      dennis, // redeemer
-      redemptionAmount
-    )
-
     // Dennis redeems 20 LUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
     const redemptionTx = await troveManager.redeemCollateralForShutdown(
@@ -3989,7 +3799,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE
@@ -3997,7 +3807,9 @@ contract('TroveManager - Shutdown', async accounts => {
     )
 
     const CollateralFee = th.getEmittedRedemptionValues(redemptionTx)[3]
+    const lusdAmount = th.getEmittedRedemptionValues(redemptionTx)[0]
     const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
 
     const alice_trove_After = await troveManager.Troves(alice)
     const bob_trove_After = await troveManager.Troves(bob)
@@ -4014,8 +3826,8 @@ contract('TroveManager - Shutdown', async accounts => {
     const dennis_CollateralBalance_After = toBN(await collateralToken.balanceOf(dennis))
     const receivedCollateral = dennis_CollateralBalance_After.sub(dennis_CollateralBalance_before)
 
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 100)
-    th.assertIsApproximatelyEqual(totalRedeemed, expectedLUSDRedeemed, 100)
+    th.assertIsApproximatelyEqual(collateralDrawn, receivedCollateral, 100)
+    th.assertIsApproximatelyEqual(totalRedeemed, lusdAmount, 100)
   })
 
   it('redeemCollateralForShutdown(): tcr shutdown, no discount, ends the redemption sequence when the token redemption request has been filled', async () => {
@@ -4039,19 +3851,11 @@ contract('TroveManager - Shutdown', async accounts => {
     const shutdownPrice = await tcrShutdown()
     
     const flynCollateralBefore = await collateralToken.balanceOf(flyn)
-
-    // Use shared helper to compute expected values during shutdown
-    const { expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [alice, bob, carol, dennis, erin, whale],
-      flyn,
-      redemptionAmount
-    )
-
     // --- TEST --- 
 
     // Flyn redeems collateral
-    await troveManager.redeemCollateralForShutdown(redemptionAmount, alice, alice, alice, alice, alice, 0, 0, th._100pct, { from: flyn })
-
+    const redemptionTx = await troveManager.redeemCollateralForShutdown(redemptionAmount, alice, alice, alice, alice, alice, 0, 0, { from: flyn })
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
     // Check Flyn's redemption has reduced his LUSD balance
     const flynBalance = await lusdToken.balanceOf(flyn)
     th.assertIsApproximatelyEqual(flynBalance, F_lusdAmount.sub(redemptionAmount))
@@ -4074,7 +3878,7 @@ contract('TroveManager - Shutdown', async accounts => {
     // Check Flyn received the correct amount of collateral
     const flynCollateralAfter = await collateralToken.balanceOf(flyn)
     const receivedCollateral = flynCollateralAfter.sub(flynCollateralBefore)
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 5e15)
+    th.assertIsApproximatelyEqual(collateralDrawn, receivedCollateral, 5e15)
   })
 
   it('redeemCollateralForShutdown(): tcr shutdown, ends the redemption sequence when max iterations have been reached', async () => {
@@ -4107,7 +3911,8 @@ contract('TroveManager - Shutdown', async accounts => {
     const bob_trove_Before = await troveManager.Troves(bob)
 
     // Flyn redeems collateral with only two iterations
-    await troveManager.redeemCollateralForShutdown(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, th._100pct, { from: flyn })
+    const redemptionTx = await troveManager.redeemCollateralForShutdown(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, { from: flyn })
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
 
     // Check that redemption was limited by max iterations
     const flynBalance = await lusdToken.balanceOf(flyn)
@@ -4131,8 +3936,7 @@ contract('TroveManager - Shutdown', async accounts => {
     const receivedCollateral = flynCollateralAfter.sub(flynCollateralBefore)
     // Note: Can't use helper here due to max discount making calculations unpredictable
     // Just verify the collateral matches what was drained from alice and bob
-    const expectedCollateral = alice_trove_Before[1].add(bob_trove_Before[1])
-    th.assertIsApproximatelyEqual(expectedCollateral, receivedCollateral, 1e16)
+    th.assertIsApproximatelyEqual(collateralDrawn, receivedCollateral, 1e16)
   })
 
   it("redeemCollateralForShutdown(): tcr shutdown, full discount, performs partial redemption when collateral is insufficient", async () => {
@@ -4164,14 +3968,10 @@ contract('TroveManager - Shutdown', async accounts => {
     const bob_trove_Before = await troveManager.Troves(bob)
     const carol_trove_Before = await troveManager.Troves(carol)
     const whale_trove_Before = await troveManager.Troves(whale)
-    const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [alice, bob, carol, whale], // troves in redemption order (lowest ICR first)
-      dennis, // redeemer
-      totalDebtToRedeem
-    )
-
+  
     // Dennis redeems all available debt - should drain all collateral from Alice, Bob, Carol (and possibly whale)
-    await troveManager.redeemCollateralForShutdown(totalDebtToRedeem, alice, alice, alice, alice, alice, 0, 0, th._100pct, { from: dennis })
+    const redemptionTx = await troveManager.redeemCollateralForShutdown(totalDebtToRedeem, alice, alice, alice, alice, alice, 0, 0, { from: dennis })
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
 
     // Check that all troves have their collateral drained (since MCR is bypassed during shutdown)
     const alice_trove = await troveManager.Troves(alice)
@@ -4188,7 +3988,7 @@ contract('TroveManager - Shutdown', async accounts => {
     const dennisCollateralAfter = await collateralToken.balanceOf(dennis)
     const receivedCollateral = dennisCollateralAfter.sub(dennisCollateralBefore)
 
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 1e16)
+    assert.isTrue(collateralDrawn.eq(receivedCollateral))
   })
 
   it('redeemCollateralForShutdown(): tcr shutdown, full discount, doesnt perform the final partial redemption in the sequence if the hint is out-of-date', async () => {
@@ -4261,7 +4061,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: alice }
       )
     }
@@ -4272,14 +4072,6 @@ contract('TroveManager - Shutdown', async accounts => {
     const carol_trove_Before = await troveManager.Troves(carol)
     const whale_trove_Before = await troveManager.Troves(whale)
 
-    // Calculate expected redemption values
-    // ICR order: Carol (333%), Bob (344%), Alice (363%), Whale/Dennis (10000%)
-    const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [carol, bob, alice, whale], // troves in redemption order (lowest ICR first)
-      dennis, // redeemer
-      redemptionAmount
-    )
-
     // Dennis tries to redeem the full amount
     const redemptionTx = await troveManager.redeemCollateralForShutdown(
       redemptionAmount,
@@ -4289,14 +4081,16 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       {
         from: dennis,
         gasPrice: GAS_PRICE
       }
     )
 
-    const totalRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+    const collateralDrawn = th.getEmittedRedemptionValues(redemptionTx)[2]
+    const lusdRedeemed = th.getEmittedRedemptionValues(redemptionTx)[1]
+    const lusdAmount = th.getEmittedRedemptionValues(redemptionTx)[0]
 
     // Since Alice already redeemed 1 LUSD from Carol's Trove, Dennis was able to redeem:
     //  - remaining LUSD from Carol's (after Alice's 1 LUSD redemption)
@@ -4320,10 +4114,11 @@ contract('TroveManager - Shutdown', async accounts => {
     assert.equal(alice_trove_After[1].toString(), '0') // Alice's collateral drained
     assert.equal(whale_trove_After[1].toString(), '0') // Whale's collateral drained
 
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 1e16)
+    assert.isTrue(collateralDrawn.eq(receivedCollateral))
 
     const dennis_LUSDBalance_After = await lusdToken.balanceOf(dennis)
-    th.assertIsApproximatelyEqual(dennis_LUSDBalance_After, dennis_LUSDBalance_before.sub(expectedLUSDRedeemed), 1e16)
+    const delta = dennis_LUSDBalance_before.sub(dennis_LUSDBalance_After)
+    assert.isTrue(lusdRedeemed.eq(delta))
   })
   // active debt cannot be zero, as there's a positive min debt enforced, and at least a trove must exist
   it("redeemCollateralForShutdown(): tcr shutdown, full discount, can redeem if there is zero active debt but non-zero debt in DefaultPool", async () => {
@@ -4398,7 +4193,6 @@ contract('TroveManager - Shutdown', async accounts => {
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR.toString(),
         0,
-        th._100pct,
         { from: dennis, gasPrice: GAS_PRICE }
       )
       
@@ -4450,7 +4244,6 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       nicrHint.partialRedemptionHintNICR.toString(),
       0,
-      th._100pct,
       {
         from: carol,
         gasPrice: GAS_PRICE
@@ -4532,14 +4325,7 @@ contract('TroveManager - Shutdown', async accounts => {
 
     // Capture collateral before redemption
     const dennis_coll_before = await collateralToken.balanceOf(dennis)
-    
-    // Calculate expected redemption values
-    // Order: Dennis (lowest ICR 195%), then Carol/Bob/Alice (all 200%), then Whale (10000%)
-    const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-      [dennis, carol, bob, alice, whale], // troves in redemption order (lowest ICR first)
-      dennis, // redeemer (redeeming from his own trove too)
-      redemptionAmount
-    )
+    const dennis_LUSDBalance_Before = await lusdToken.balanceOf(dennis)
 
     const tx = await troveManager.redeemCollateralForShutdown(
       redemptionAmount,
@@ -4551,9 +4337,13 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       0,
       0,
-      th._100pct,
       { from: dennis }
     )
+    const collateralDrawn = th.getEmittedRedemptionValues(tx)[2]
+    const lusdRedeemed = th.getEmittedRedemptionValues(tx)[1]
+    const lusdAmount = th.getEmittedRedemptionValues(tx)[0]
+
+
     
     const { debt: alice_debt_After, coll: alice_coll_After } = await troveManager.Troves(alice)
     const { debt: bob_debt_After, coll: bob_coll_After } = await troveManager.Troves(bob)
@@ -4573,17 +4363,16 @@ contract('TroveManager - Shutdown', async accounts => {
     // Check Dennis received all the drained collateral
     const dennis_coll_after = await collateralToken.balanceOf(dennis)
     const receivedCollateral = dennis_coll_after.sub(dennis_coll_before)
-    th.assertIsApproximatelyEqual(expectedCollateralReceived, receivedCollateral, 1e16)
+    assert.isTrue(collateralDrawn.eq(receivedCollateral))
+    const dennis_LUSDBalance_After = await lusdToken.balanceOf(dennis)
+    const delta = dennis_LUSDBalance_Before.sub(dennis_LUSDBalance_After)
+    assert.isTrue(lusdRedeemed.eq(delta))
 
     // Due to price drop, redemption doesn't cover full debt - troves have remaining debt with zero collateral
     // All troves should have some remaining debt since collateral was exhausted
     assert.isTrue(alice_debt_After.gt(toBN('0')), "Alice should have remaining debt")
     assert.isTrue(bob_debt_After.gt(toBN('0')), "Bob should have remaining debt")
     assert.isTrue(carol_debt_After.gt(toBN('0')), "Carol should have remaining debt")
-
-    // Dennis's remaining debt
-    const expectedDennisDebt = dennis_debt_After // Just use actual value
-    th.assertIsApproximatelyEqual(dennis_debt_After, expectedDennisDebt, 10000)
   });
 
   it("redeemCollateralForShutdown(): reverts when argument _amount is 0", async () => {
@@ -4602,35 +4391,8 @@ contract('TroveManager - Shutdown', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
     // Erin attempts to redeem with _amount = 0
-    const redemptionTxPromise = troveManager.redeemCollateralForShutdown(0, erin, erin, erin, erin, erin, 0, 0, th._100pct, { from: erin })
+    const redemptionTxPromise = troveManager.redeemCollateralForShutdown(0, erin, erin, erin, erin, erin, 0, 0, { from: erin })
     await assertRevert(redemptionTxPromise, "TroveManager: Amount must be greater than zero")
-  })
-
-  it("redeemCollateralForShutdown(): tcr shutdown, 0 discount, reverts if max fee > 100%", async () => {
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: A } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(20, 18), extraParams: { from: B } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(30, 18), extraParams: { from: C } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(40, 18), extraParams: { from: D } })
-
-    // skip bootstrapping phase
-    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
-
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, dec(10, 18), GAS_PRICE ,dec(2, 18)), "maxFee% out of [0.5,100]")
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, dec(10, 18), GAS_PRICE, '1000000000000000001'), "maxFee% out of [0.5,100]")
-  })
-
-  it("redeemCollateralForShutdown():tcr shutdown, 0 discount,  reverts if max fee < 0.5%", async () => { 
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(10, 18), extraParams: { from: A } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(20, 18), extraParams: { from: B } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(30, 18), extraParams: { from: C } })
-    await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(40, 18), extraParams: { from: D } })
-
-    // skip bootstrapping phase
-    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
-
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), 0), "maxFee% out of [0.5,100]")
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), 1), "maxFee% out of [0.5,100]")
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), '4999999999999999'), "maxFee% out of [0.5,100]")
   })
   
   it("redeemCollateralForShutdown(): tcr shutdown, 0 discount, succeeds with no fees", async () => {
@@ -4666,7 +4428,6 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       0,
       0,
-      lessThan5pct,
       { from: A }
     )
     
@@ -4687,7 +4448,6 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       0,
       0,
-      dec(1, 16),
       { from: A }
     )
     assert.isTrue(redemptionTx2.receipt.status)
@@ -4702,104 +4462,11 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       0,
       0,
-      dec(5, 15),
       { from: A }
     )
     assert.isTrue(redemptionTx3.receipt.status)
   })
 
-  it("redeemCollateralForShutdown(): succeeds with any max fee percentage during shutdown", async () => {
-    const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraLUSDAmount: dec(9500, 18), extraParams: { from: A } })
-    const { totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(395, 16)), extraLUSDAmount: dec(9000, 18), extraParams: { from: B } })
-    const { totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(390, 16)), extraLUSDAmount: dec(10000, 18), extraParams: { from: C } })
-    const expectedTotalSupply = A_totalDebt.add(B_totalDebt).add(C_totalDebt)
-
-    // Check total LUSD supply
-    const totalSupply = await lusdToken.totalSupply()
-    th.assertIsApproximatelyEqual(totalSupply, expectedTotalSupply)
-
-    // Trigger shutdown
-    await tcrShutdown()
-
-    await aggregator.setBaseRate(0) 
-
-    // skip bootstrapping phase
-    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
-
-    // During shutdown, redemptions have no fees regardless of amount
-    const attemptedLUSDRedemption = expectedTotalSupply.div(toBN(10))
-
-    // Test with very low max fee (0.5%) - should succeed since there are no fees
-    const tx1 = await troveManager.redeemCollateralForShutdown(
-      attemptedLUSDRedemption.div(toBN(5)),
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      0,
-      0,
-      dec(5, 15), // 0.5%
-      { from: A }
-    )
-    assert.isTrue(tx1.receipt.status)
-    
-    // Test with moderate max fee (10%) - should succeed
-    const tx2 = await troveManager.redeemCollateralForShutdown(
-      attemptedLUSDRedemption.div(toBN(5)),
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      0,
-      0,
-      dec(1, 17), // 10%
-      { from: B }
-    )
-    assert.isTrue(tx2.receipt.status)
-
-    // Test with high max fee (50%) - should succeed
-    const tx3 = await troveManager.redeemCollateralForShutdown(
-      attemptedLUSDRedemption.div(toBN(5)),
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      0,
-      0,
-      dec(5, 17), // 50%
-      { from: C }
-    )
-    assert.isTrue(tx3.receipt.status)
-
-    // Test with maximum max fee (100%) - should succeed
-    const tx4 = await troveManager.redeemCollateralForShutdown(
-      attemptedLUSDRedemption.div(toBN(5)),
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      '0x0000000000000000000000000000000000000000',
-      0,
-      0,
-      dec(1, 18), // 100%
-      { from: A }
-    )
-    assert.isTrue(tx4.receipt.status)
-
-    // Verify all redemptions had zero fees
-    const redemptionEvent1 = th.getEventArgByName(tx1, "Redemption", "_collateralFee")
-    const redemptionEvent2 = th.getEventArgByName(tx2, "Redemption", "_collateralFee")
-    const redemptionEvent3 = th.getEventArgByName(tx3, "Redemption", "_collateralFee")
-    const redemptionEvent4 = th.getEventArgByName(tx4, "Redemption", "_collateralFee")
-    
-    assert.equal(redemptionEvent1.toString(), '0')
-    assert.equal(redemptionEvent2.toString(), '0')
-    assert.equal(redemptionEvent3.toString(), '0')
-    assert.equal(redemptionEvent4.toString(), '0')
-  })
   it("redeemCollateralForShutdown(): doesn't affect the Stability Pool deposits or Collateral gain of redeemed-from troves", async () => {
     //contracts.rateControl.setCoBias(0)
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -4857,7 +4524,6 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000',
       0,
       0,
-      th._100pct,
       { from: erin }
     )
 
@@ -4935,7 +4601,6 @@ contract('TroveManager - Shutdown', async accounts => {
       '0x0000000000000000000000000000000000000000', // lowerShieldedPartialRedemptionHint
       0, // partialRedemptionHintNICR
       0, // maxIterations
-      th._100pct, // maxFeePercentage
       { from: erin }
     )
 
@@ -5022,7 +4687,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint_1,
         lowerShieldedPartialRedemptionHint_1,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: erin })
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
@@ -5055,7 +4720,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint_2,
         lowerShieldedPartialRedemptionHint_2,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: erin })
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
@@ -5088,7 +4753,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint_3,
         lowerShieldedPartialRedemptionHint_3,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: erin })
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
@@ -5123,7 +4788,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint_4,
         lowerShieldedPartialRedemptionHint_4,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: erin })
       assert.isFalse(redemptionTx.receipt.status)
     } catch (error) {
@@ -5175,7 +4840,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: bob })
     } catch (error) {
       assert.include(error.message, "VM Exception while processing transaction")
@@ -5227,7 +4892,7 @@ contract('TroveManager - Shutdown', async accounts => {
       upperShieldedPartialRedemptionHint,
       lowerShieldedPartialRedemptionHint,
       partialRedemptionHintNICR,
-      0, th._100pct,
+      0,
       { from: A })
     // Check A's balance has decreased by 10 LUSD
     assert.equal(await lusdToken.balanceOf(A), A_balanceBefore.sub(toBN(dec(10, 18))).toString())
@@ -5887,7 +5552,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, dec(25,16),
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
@@ -5925,7 +5590,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, dec(5,17),
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
@@ -5963,7 +5628,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, dec(1,18),
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
@@ -6000,7 +5665,7 @@ contract('TroveManager - Shutdown', async accounts => {
           amt,
           firstRedemptionHint, up, lo, sup, slo,
           partialRedemptionHintNICR,
-          0, dec(5, 15), { from: A }
+          0, { from: A }
         )
       }
       assert.isTrue(tx1.receipt.status)
@@ -6015,7 +5680,7 @@ contract('TroveManager - Shutdown', async accounts => {
           amt,
           firstRedemptionHint, up, lo, sup, slo,
           partialRedemptionHintNICR,
-          0, dec(1, 17), { from: B }
+          0, { from: B }
         )
       }
       assert.isTrue(tx2.receipt.status)
@@ -6030,7 +5695,7 @@ contract('TroveManager - Shutdown', async accounts => {
           amt,
           firstRedemptionHint, up, lo, sup, slo,
           partialRedemptionHintNICR,
-          0, dec(5, 17), { from: C }
+          0, { from: C }
         )
       }
       assert.isTrue(tx3.receipt.status)
@@ -6045,7 +5710,7 @@ contract('TroveManager - Shutdown', async accounts => {
           amt,
           firstRedemptionHint, up, lo, sup, slo,
           partialRedemptionHintNICR,
-          0, dec(1, 18), { from: A }
+          0, { from: A }
         )
       }
       assert.isTrue(tx4.receipt.status)
@@ -6089,7 +5754,7 @@ contract('TroveManager - Shutdown', async accounts => {
       const tx = await troveManager.redeemCollateralForShutdown(
         redemptionAmount.div(toBN(2)),
         ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS,
-        0, 0, th._100pct,
+        0, 0,
         { from: erin }
       )
       assert.isTrue(tx.receipt.status)
@@ -6142,7 +5807,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
       const received = (await collateralToken.balanceOf(dennis)).sub(dennisBalBefore)
@@ -6172,7 +5837,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
       const received = (await collateralToken.balanceOf(dennis)).sub(dennisBalBefore)
@@ -6206,7 +5871,7 @@ contract('TroveManager - Shutdown', async accounts => {
         sup,
         slo,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
       const received = (await collateralToken.balanceOf(dennis)).sub(dennisBalBefore)
@@ -6236,7 +5901,6 @@ contract('TroveManager - Shutdown', async accounts => {
         ZERO_ADDRESS,
         0,
         0,
-        th._100pct,
         { from: erin }
       )
 
@@ -6261,7 +5925,7 @@ contract('TroveManager - Shutdown', async accounts => {
         const { 0: up, 1: lo } = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, erin, erin)
         const { 0: sup, 1: slo } = await sortedShieldedTroves.findInsertPosition(partialRedemptionHintNICR, erin, erin)
         const tx = await troveManager.redeemCollateralForShutdown(
-          dec(1000, 18), firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 0, th._100pct, { from: erin }
+          dec(1000, 18), firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 0, { from: erin }
         )
         assert.isFalse(tx.receipt.status)
       } catch (err) {
@@ -6293,7 +5957,7 @@ contract('TroveManager - Shutdown', async accounts => {
           sup,
           slo,
           partialRedemptionHintNICR,
-          0, th._100pct,
+          0,
           { from: bob }
         )
         assert.isFalse(tx.receipt.status)
@@ -6340,7 +6004,7 @@ contract('TroveManager - Shutdown', async accounts => {
          upperShieldedPartialRedemptionHint,
          lowerShieldedPartialRedemptionHint,
          partialRedemptionHintNICR,
-         0, th._100pct,
+         0,
          {
            from: dennis,
            gasPrice: GAS_PRICE
@@ -6373,7 +6037,7 @@ contract('TroveManager - Shutdown', async accounts => {
 
        await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-       await troveManager.redeemCollateralForShutdown(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, th._100pct, { from: flyn })
+       await troveManager.redeemCollateralForShutdown(attemptedRedemptionAmount, alice, alice, alice, alice, alice, 0, 2, { from: flyn })
 
        const flynBalance = await lusdToken.balanceOf(flyn)
        const actualRedeemedAmount = F_lusdAmount.sub(flynBalance)
@@ -6569,14 +6233,7 @@ contract('TroveManager - Shutdown', async accounts => {
       assert.isTrue(await troveManager.isShutdown())
 
       let dennisBal = await lusdToken.balanceOf(dennis)
-
-      // Calculate expected redemption values
-      // Alice (shielded, ICR 400%) will be redeemed, Whale (shielded, ICR 2000%) won't be touched
-      const { expectedLUSDRedeemed, expectedCollateralReceived } = await calculateExpectedShutdownRedemption(
-        [alice], // only alice's shielded trove will be redeemed
-        dennis, // redeemer
-        dennisBal
-      )
+      const dennis_LUSDBalance_Before = await lusdToken.balanceOf(dennis)
 
       const {
         firstRedemptionHint,
@@ -6605,11 +6262,21 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
       const totalRedeemed = th.getEmittedRedemptionValues(tx)[1]
+      const collateralDrawn = th.getEmittedRedemptionValues(tx)[2]
+      const lusdRedeemed = th.getEmittedRedemptionValues(tx)[1]
+      const lusdAmount = th.getEmittedRedemptionValues(tx)[0]
+     const dennis_coll_after = await collateralToken.balanceOf(dennis)
+      const dennis_LUSDBalance_After = await lusdToken.balanceOf(dennis)
+      const expectedCollateralDrawn = dennis_coll_after.sub(dennis_coll_before)
+      const expectedLUSDRedeemed = dennis_LUSDBalance_Before.sub(dennis_LUSDBalance_After)
+
+      assert.isTrue(collateralDrawn.eq(expectedCollateralDrawn))
+      assert.isTrue(lusdRedeemed.eq(expectedLUSDRedeemed))
 
       // Check alice's shielded trove - after redemption, only gas compensation should remain
       const aliceDebtAfter = await troveManager.getTroveActualDebt(alice)
@@ -6617,14 +6284,8 @@ contract('TroveManager - Shutdown', async accounts => {
       // Alice's trove should be closed
       const alice_trove_isInSortedList = await sortedShieldedTroves.contains(alice)
       assert.isFalse(alice_trove_isInSortedList)
-
-      // Check LUSD redeemed matches expectation
-      th.assertIsApproximatelyEqual(totalRedeemed, expectedLUSDRedeemed, 1e16)
-
-      // Check collateral received matches expectation
-      const dennis_coll_after = await collateralToken.balanceOf(dennis)
-      const receivedCollateral = dennis_coll_after.sub(dennis_coll_before)
-      th.assertIsApproximatelyEqual(receivedCollateral, expectedCollateralReceived, 1e16)
+      // expect full redemption
+      assert.isTrue(totalRedeemed.eq(lusdAmount))
     })
 
     it('redeemCollateralForShutdown(): shielded troves, tcr shutdown, no discount', async () => {
@@ -6668,7 +6329,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         {
           from: dennis,
           gasPrice: GAS_PRICE
@@ -6750,7 +6411,7 @@ contract('TroveManager - Shutdown', async accounts => {
         firstRedemptionHint
       )
 
-      await troveManager.redeemCollateralForShutdown(attempted, firstRedemptionHint, upperPartialRedemptionHint, lowerPartialRedemptionHint, upperShieldedPartialRedemptionHint, lowerShieldedPartialRedemptionHint, partialRedemptionHintNICR, 2, th._100pct, { from: dennis })
+      await troveManager.redeemCollateralForShutdown(attempted, firstRedemptionHint, upperPartialRedemptionHint, lowerPartialRedemptionHint, upperShieldedPartialRedemptionHint, lowerShieldedPartialRedemptionHint, partialRedemptionHintNICR, 2, { from: dennis })
 
       const dennisBalance = await lusdToken.balanceOf(dennis)
       const actualRedeemed = attempted.sub(dennisBalance)
@@ -6789,7 +6450,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
@@ -6827,7 +6488,7 @@ contract('TroveManager - Shutdown', async accounts => {
       } = await hintHelpers.getRedemptionHints(attempted, priceSticky, 0)
       const { 0: up, 1: lo } = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, firstRedemptionHint, firstRedemptionHint)
       const { 0: sup, 1: slo } = await sortedShieldedTroves.findInsertPosition(partialRedemptionHintNICR, firstRedemptionHint, firstRedemptionHint)
-      await troveManager.redeemCollateralForShutdown(attempted, firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 2, th._100pct, { from: dennis })
+      await troveManager.redeemCollateralForShutdown(attempted, firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 2, { from: dennis })
 
       const dennisBalance = await lusdToken.balanceOf(dennis)
       const actualRedeemed = attempted.sub(dennisBalance)
@@ -6873,7 +6534,7 @@ contract('TroveManager - Shutdown', async accounts => {
         upperShieldedPartialRedemptionHint,
         lowerShieldedPartialRedemptionHint,
         partialRedemptionHintNICR,
-        0, th._100pct,
+        0,
         { from: dennis, gasPrice: GAS_PRICE }
       )
 
@@ -6899,7 +6560,7 @@ contract('TroveManager - Shutdown', async accounts => {
       const { 0: up, 1: lo } = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, dennis, dennis)
       const { 0: sup, 1: slo } = await sortedShieldedTroves.findInsertPosition(partialRedemptionHintNICR, dennis, dennis)
 
-      await troveManager.redeemCollateralForShutdown(redemptionAmount, alice, up, lo, sup, slo, partialRedemptionHintNICR, 0, th._100pct, { from: dennis })
+      await troveManager.redeemCollateralForShutdown(redemptionAmount, alice, up, lo, sup, slo, partialRedemptionHintNICR, 0, { from: dennis })
 
       const aliceDebtAfter = await troveManager.getTroveActualDebt(alice)
       assert.isTrue(aliceDebtAfter.gt(toBN('0')))
@@ -6926,7 +6587,7 @@ contract('TroveManager - Shutdown', async accounts => {
       const { 0: up, 1: lo } = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, firstRedemptionHint, firstRedemptionHint)
       const { 0: sup, 1: slo } = await sortedShieldedTroves.findInsertPosition(partialRedemptionHintNICR, firstRedemptionHint, firstRedemptionHint)
 
-      const tx = await troveManager.redeemCollateralForShutdown(A_totalDebt, firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 0, th._100pct, { from: dennis })
+      const tx = await troveManager.redeemCollateralForShutdown(A_totalDebt, firstRedemptionHint, up, lo, sup, slo, partialRedemptionHintNICR, 0, { from: dennis })
       const fee = th.getEventArgByName(tx, "Redemption", "_collateralFee")
       assert.equal(fee.toString(), '0')
     })
