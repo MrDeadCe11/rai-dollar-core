@@ -79,6 +79,8 @@ interface ITroveManager is ILiquityBase {
     function accumulatedRate() external view returns (uint);
     function accumulatedShieldRate() external view returns (uint);
 
+    function dripIsStale() external view returns (bool);
+
     function getTroveOwnersCount() external view returns (uint);
 
     function getShieldedTroveOwnersCount() external view returns (uint);
@@ -125,6 +127,8 @@ interface ITroveManager is ILiquityBase {
     function getEntireSystemDebt() external view returns (uint);
 
     function drip() external;
+
+    function aggDrip(uint256 _interestRate) external;
 
     function closeTrove(address _borrower) external;
 

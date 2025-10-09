@@ -203,6 +203,58 @@ contract Relayer is Ownable, CheckContract {
         return rate;
     }
 
+    function getParUpdateReward() public view returns (uint256) {
+        uint256 _parTwapLength = 24 hours;
+        uint256 _t1 = 2 hours;
+        uint256 _t2 = _t1 * 2; // 4 hours
+        uint256 _t3 = (_parTwapLength * 2) / 5; // 40% of par TWAP length (9.6 hours)
+        uint _maxReward = 20e18;
+
+        uint256 _now = block.timestamp;
+        uint256 _dt = _now - lastParUpdateTime;
+
+        if (_dt <= _t2) { // No subsidy
+            return 0;
+        } else if (_dt >= _t3) { // Max subsidy
+            return _maxReward;
+        } else {
+            return (_maxReward * (_dt - _t2)) / (_t3 - _t2); // Linear subsidy: ramp from 0 at t2 to m at t3
+        }
+    }
+
+    function getRateUpdateReward() public view returns (uint256) {
+        uint256 _rateTwapLength = 12 hours;
+        uint256 _t1 = 30 minutes;
+        uint256 _t2 = _t1 * 2; // 1 hours
+        uint256 _t3 = (_rateTwapLength * 2) / 5; // 40% of rate TWAP length (4.6 hours)
+        uint256 _maxReward = 20e18;
+
+        uint256 _now = block.timestamp;
+        uint256 _dt = _now - lastRateUpdateTime;
+
+        if (_dt <= _t2) { // No subsidy
+            return 0;
+        } else if (_dt >= _t3) { // Max subsidy
+            return _maxReward;
+        } else {
+            return (_maxReward * (_dt - _t2)) / (_t3 - _t2); // Linear subsidy: ramp from 0 at t2 to m at t3
+        }
+    }
+
+    function shouldUpdateRateAndPar() external view returns (bool, bool, uint256) {
+        bool shouldUpdateRate = rateIsStale();
+        bool shouldUpdatePar = parIsStale();
+        uint256 updateReward = 0;
+        if (shouldUpdateRate && shouldUpdatePar) {
+            updateReward = getRateUpdateReward() + getParUpdateReward();
+        } else if (shouldUpdateRate) {
+            updateReward = getRateUpdateReward();
+        } else if (shouldUpdatePar) {
+            updateReward = getParUpdateReward();
+        }
+        return (shouldUpdateRate, shouldUpdatePar, updateReward);
+    }
+     
     function updateRateAndPar() external returns (uint256, uint256) {
         uint256 marketPrice = marketOracle.price();
         return (_updateRate(marketPrice),  _updatePar(marketPrice));

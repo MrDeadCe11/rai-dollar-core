@@ -24,6 +24,8 @@ interface IRelayer {
 
     function nextRateAndPar() external view returns (uint256, uint256);
 
+    function shouldUpdateRateAndPar() external view returns (bool, bool, uint256);
+
     function updateRateAndPar() external returns (uint256, uint256);
     function updatePar() external returns (uint256);
     function updateRate() external returns (uint256);

@@ -25,7 +25,8 @@ interface IAggregator is ILiquityBase {
 
     function setAddresses(
         address _troveManagerAddress,
-        address _lusdTokenAddress
+        address _lusdTokenAddress,
+        address _relayerAddress
     ) external;
 
     function baseRate() external view returns (uint);
@@ -35,6 +36,11 @@ interface IAggregator is ILiquityBase {
     //function setBaseRate(uint rate) external returns (uint);
 
     function lusdToken() external view returns (ILUSDToken);
+
+    function drip() external;
+
+    function getOracleDripReward() external view returns (uint256);
+    function shouldOracleDrip() external returns (bool, uint256);
 
     function updateBaseRateFromRedemption(uint, uint) external returns (uint);
 

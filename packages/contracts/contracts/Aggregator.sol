@@ -23,12 +23,21 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
 
     //address public troveManagerAddress;
     ITroveManager public troveManager;
-
+    
     ILUSDToken public override lusdToken;
 
     // --- Data structures ---
 
     uint constant public SECONDS_IN_ONE_MINUTE = 60;
+
+
+
+    uint32 constant public ORACLE_DRIP_INTERVAL = 60;
+
+    uint256 constant public DRIP_INTERVAL = 1 hours;
+    uint256 constant public DRIP_INTERVAL_2 = DRIP_INTERVAL * 2;
+    uint256 constant public DRIP_INTERVAL_3 = DRIP_INTERVAL * 12;
+
     /*
      * Half-life of 12h. 12h = 720 min
      * (1/2) = d^720 => d = (1/2)^(1/720)
@@ -47,6 +56,9 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     // The timestamp of the latest fee operation (redemption only)
     uint public override lastFeeOperationTime;
 
+    // The timestamp of the latest oracle drip
+    uint32 public lastOracleDripTime;
+
     // per troveManager rate multiplier
     mapping (address => uint256) public rateMultiplier;
     // per troveManager minimum red fees
@@ -59,12 +71,14 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     // --- Events ---
     event BaseRateUpdated(uint _baseRate);
     event LastFeeOpTimeUpdated(uint _lastFeeOpTime);
+    event AggregatorDrip(uint256 _timestamp);
 
     // --- Dependency setter ---
 
     function setAddresses(
         address _troveManagerAddress,
-        address _lusdTokenAddress
+        address _lusdTokenAddress,
+        address _relayerAddress
     )
         external
         override
@@ -72,10 +86,12 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
     {
         checkContract(_troveManagerAddress);
         checkContract(_lusdTokenAddress);
+        checkContract(_relayerAddress);
 
         //troveManagerAddress = _troveManagerAddress;
         troveManager = ITroveManager(_troveManagerAddress);
         lusdToken = ILUSDToken(_lusdTokenAddress);
+        relayer = IRelayer(_relayerAddress);
 
         troveManagers[0] = address(troveManager);
 
@@ -83,6 +99,55 @@ contract Aggregator is LiquityBase, Ownable, CheckContract, IAggregator {
         emit LUSDTokenAddressChanged(_lusdTokenAddress);
 
         _renounceOwnership();
+    }
+
+    // --- TroveManager Drip functions ---
+
+    function getOracleDripReward() public view override returns (uint256) {
+        uint256 _t1 = 1 hours;
+        uint256 _t2 = _t1 * 2;
+        uint256 _t3 = 12 hours;
+        uint256 _maxReward = 20e18;
+
+        uint256 _now = block.timestamp;
+        uint256 _dt = _now - lastOracleDripTime;
+
+        if (_dt <= _t2) { // No subsidy
+            return 0;
+        } else if (_dt >= _t3) { // Max subsidy
+            return _maxReward;
+        } else {
+            return (_maxReward * (_dt - _t2)) / (_t3 - _t2); // Linear subsidy: ramp from 0 at t2 to m at t3
+        }
+    }
+
+    function shouldOracleDrip() external view override returns (bool, uint256) {
+        uint32 _now = uint32(block.timestamp);
+        if (_now - lastOracleDripTime < DRIP_INTERVAL)  {
+            return (false, 0);
+        }
+       return (true, getOracleDripReward());
+    }
+
+    function drip() external override {
+        // update lastOracleDripTime when finishing implementation here
+        // uint256 _interestRate = relayer.getRate();
+        // for (uint256 _i = 0; _i < troveManagers.length; _i++) {
+        //     address _troveManager = troveManagers[_i];
+        //     if (_troveManager == address(0)) continue;
+
+        //     bool _dripIsStale;
+        //     try ITroveManager(_troveManager).dripIsStale() returns (bool _isStale) {
+        //         _dripIsStale = _isStale;
+        //     } catch {
+        //         continue; // swallow FailedInnerCall on non-conforming targets
+        //     }
+
+        //     if (_dripIsStale) {
+        //         ITroveManager(_troveManager).aggDrip(_interestRate);
+        //     }
+        // }
+        // emit AggregatorDrip(block.timestamp);
     }
 
     // --- Redemption fee functions ---

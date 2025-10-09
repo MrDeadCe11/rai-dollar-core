@@ -9,18 +9,8 @@ contract RDOracleTestHelper is RDOracle {
         address _rdToken,
         uint32 _quotePeriodFast,
         uint32 _quotePeriodSlow,
-        address[] memory _stablecoins,
-        uint32 _minObservationDelta
-    )
-        RDOracle(
-            _vault,
-            _rdToken,
-            _quotePeriodFast,
-            _quotePeriodSlow,
-            _stablecoins,
-            _minObservationDelta
-        )
-    {}
+        address[] memory _stablecoins
+    ) RDOracle(_vault, _rdToken, _quotePeriodFast, _quotePeriodSlow, _stablecoins) {}
 
     function testCalculateMedian(uint256[] memory _arr) external pure returns (uint256) {
         return _calculateMedian(_arr);
