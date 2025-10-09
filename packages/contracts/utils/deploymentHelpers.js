@@ -549,6 +549,7 @@ class DeploymentHelper {
     await contracts.aggregator.setAddresses(
       contracts.troveManager.address,
       contracts.lusdToken.address,
+      contracts.relayer.address
     )
 
     // set contracts in GlobalFeeRouter

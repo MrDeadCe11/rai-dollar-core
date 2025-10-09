@@ -827,7 +827,7 @@ function redeemCollateralForShutdown(
     function closeTroveLiquidation(address _borrower) external override {
         // _requireCallerIsLiquidations();
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();    
-        require(msg.sender == address(contractsCache.liquidations), "TM: Caller is not Liq");
+        require(msg.sender == address(contractsCache.liquidations), "TM:not Liq");
         _closeTrove(contractsCache, _borrower, Status.closedByLiquidation);
     }
 
@@ -1149,7 +1149,7 @@ function redeemCollateralForShutdown(
     function _requireCallerIsBorrowerOperationsOrRewards() internal view {
         ITroveManagerStorage.ContractsStorage memory contractsCache = getContractsStorage();
         require(msg.sender == contractsCache.borrowerOperationsAddress || msg.sender == address(contractsCache.rewards),
-        "TroveManager:not BO or rewards");
+        "TM:not BO/rewards");
     }
 
     /** removed to reduce contract size
@@ -1180,12 +1180,12 @@ function redeemCollateralForShutdown(
 
     function _requireAfterBootstrapPeriod() internal view {
         uint systemDeploymentTime = getContractsStorage().lqtyToken.getDeploymentStartTime();
-        require(block.timestamp >= systemDeploymentTime.add(BOOTSTRAP_PERIOD), "TM: Redemptions not allowed during bootstrap");
+        require(block.timestamp >= systemDeploymentTime.add(BOOTSTRAP_PERIOD), "TM:Redemptions not allowed");
     }
 
     function _requireValidMaxFeePercentage(uint _maxFeePercentage) internal pure {
         require(_maxFeePercentage >= REDEMPTION_FEE_FLOOR && _maxFeePercentage <= DECIMAL_PRECISION,
-            "maxFee% out of [0.5,100]");
+            "maxFee% [0.5,100]");
     }
 
     function isShutdown() external view override returns (bool) {
@@ -1237,7 +1237,7 @@ function redeemCollateralForShutdown(
 
     function setTroveStake(address _borrower, uint _num) external override {
         // _requireCallerIsRewards();
-        require(msg.sender == address(getContractsStorage().rewards), "TM: Caller not Rewards");
+        require(msg.sender == address(getContractsStorage().rewards), "TM:not Rewards");
         getTroveStorage().Troves[_borrower].stake = _num;
     }
 

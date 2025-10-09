@@ -36,7 +36,7 @@ interface IAggregator is ILiquityBase {
     function aggDrip(uint256 _interestRate) external;
     function dripIsStale() external view returns (bool);
     function getOracleDripReward() external view returns (uint256);
-    function shouldOracleDrip() external returns (bool, uint256);
+    function shouldOracleDrip() external view returns (bool, uint256);
 
     //function setBaseRate(uint rate) external returns (uint);
 
